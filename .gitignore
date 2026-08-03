@@ -1,0 +1,48 @@
+﻿# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Visual Studio Code local settings
+.vscode/
+*.code-workspace
+
+# Environment and secret files
+.env
+.env.*
+!.env.example
+
+# Python virtual environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python build outputs
+build/
+dist/
+*.egg-info/
+
+# Node.js dependencies and build outputs
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+*.log
+logs/
+
+# Test and report outputs
+coverage/
+test-results/
+
+# Docker local override files
+docker-compose.override.yml
+
+# Temporary files
+tmp/
+temp/
