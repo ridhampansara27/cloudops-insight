@@ -8,6 +8,12 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { PlaceholderPage } from "@/pages/placeholder-page";
 
+// Import the resource inventory screen.
+import { ResourceExplorerPage } from "@/pages/resource-explorer-page";
+
+// Import the resource detail screen.
+import { ResourceDetailPage } from "@/pages/resource-detail-page";
+
 // Export the complete frontend route configuration.
 export const appRouter = createBrowserRouter([
   {
@@ -31,13 +37,18 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display the full cloud resource inventory.
         path: "/cloud/resources",
-        element: (
-          <PlaceholderPage
-            description="Explore discovered AWS resources, ownership, health and cost."
-            title="Resource Explorer"
-          />
-        ),
+
+        // Render the Resource Explorer.
+        element: <ResourceExplorerPage />,
+      },
+      {
+        // Match one specific resource identifier.
+        path: "/cloud/resources/:resourceId",
+
+        // Display the requested resource details.
+        element: <ResourceDetailPage />,
       },
       {
         path: "/cloud/tags",
