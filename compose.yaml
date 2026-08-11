@@ -1,0 +1,113 @@
+# Define the local CloudOps Insight infrastructure services.
+services:
+
+  # Run PostgreSQL for persistent application data.
+  postgres:
+
+    # Use a lightweight PostgreSQL container image.
+    image: postgres:17-alpine
+
+    # Give the container a predictable development name.
+    container_name: cloudops-postgres
+
+    # Restart PostgreSQL unless intentionally stopped.
+    restart: unless-stopped
+
+    # Configure the initial local-development database.
+    environment:
+
+      # Create the CloudOps database.
+      POSTGRES_DB: cloudops
+
+      # Create the local application database user.
+      POSTGRES_USER: cloudops
+
+      # Configure a development-only password.
+      POSTGRES_PASSWORD: cloudops_local_password
+
+    # Expose PostgreSQL to the host-running FastAPI process.
+    ports:
+
+      # Map local PostgreSQL port 5432 to the container.
+      - "5432:5432"
+
+    # Persist database data across container restarts.
+    volumes:
+
+      # Store PostgreSQL data in a managed Docker volume.
+      - postgres_data:/var/lib/postgresql/data
+
+    # Verify PostgreSQL is ready to accept connections.
+    healthcheck:
+
+      # Ask PostgreSQL whether the CloudOps database is ready.
+      test:
+        - CMD-SHELL
+        - pg_isready -U cloudops -d cloudops
+
+      # Run the readiness check every five seconds.
+      interval: 5s
+
+      # Fail an individual check after five seconds.
+      timeout: 5s
+
+      # Allow ten failures before marking the container unhealthy.
+      retries: 10
+
+  # Run Redis for caching and background-job infrastructure.
+  redis:
+
+    # Use a lightweight Redis container image.
+    image: redis:7-alpine
+
+    # Give Redis a predictable local-development name.
+    container_name: cloudops-redis
+
+    # Restart Redis unless intentionally stopped.
+    restart: unless-stopped
+
+    # Enable Redis append-only persistence for local development.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+
+    # Expose Redis to the host-running backend.
+    ports:
+
+      # Map Redis' standard port.
+      - "6379:6379"
+
+    # Persist local Redis state.
+    volumes:
+
+      # Store Redis data in a Docker-managed volume.
+      - redis_data:/data
+
+    # Verify Redis responds to commands.
+    healthcheck:
+
+      # Send Redis' lightweight PING command.
+      test:
+        - CMD
+        - redis-cli
+        - ping
+
+      # Run the check every five seconds.
+      interval: 5s
+
+      # Fail an individual check after three seconds.
+      timeout: 3s
+
+      # Allow ten unsuccessful checks.
+      retries: 10
+
+
+# Define persistent Docker volumes.
+volumes:
+
+  # Persist PostgreSQL database files.
+  postgres_data:
+
+  # Persist Redis data files.
+  redis_data:
