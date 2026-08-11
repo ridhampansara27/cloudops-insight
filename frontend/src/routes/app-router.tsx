@@ -8,6 +8,32 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { PlaceholderPage } from "@/pages/placeholder-page";
 
+// Import the resource inventory screen.
+import { ResourceExplorerPage } from "@/pages/resource-explorer-page";
+
+// Import the resource detail screen.
+import { ResourceDetailPage } from "@/pages/resource-detail-page";
+
+// Import the complete FinOps overview.
+import { CostOverviewPage } from "@/pages/cost-overview-page";
+
+// Import the interactive resource-level Cost Explorer.
+import { CostExplorerPage } from "@/pages/cost-explorer-page";
+
+// Import the FinOps budget-management screen.
+import { BudgetsPage } from "@/pages/budgets-page";
+
+// Import incident management.
+import { IncidentsPage } from "@/pages/incidents-page";
+
+// Import FinOps optimization recommendations.
+import { RecommendationsPage } from "@/pages/recommendations-page";
+
+// Import the global missing-route page.
+import { NotFoundPage } from "@/pages/not-found-page";
+
+
+
 // Export the complete frontend route configuration.
 export const appRouter = createBrowserRouter([
   {
@@ -31,13 +57,18 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display the full cloud resource inventory.
         path: "/cloud/resources",
-        element: (
-          <PlaceholderPage
-            description="Explore discovered AWS resources, ownership, health and cost."
-            title="Resource Explorer"
-          />
-        ),
+
+        // Render the Resource Explorer.
+        element: <ResourceExplorerPage />,
+      },
+      {
+        // Match one specific resource identifier.
+        path: "/cloud/resources/:resourceId",
+
+        // Display the requested resource details.
+        element: <ResourceDetailPage />,
       },
       {
         path: "/cloud/tags",
@@ -58,13 +89,11 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display incident-management workflows.
         path: "/monitoring/incidents",
-        element: (
-          <PlaceholderPage
-            description="Track, acknowledge, investigate and resolve infrastructure incidents."
-            title="Incidents"
-          />
-        ),
+
+        // Render the incident screen.
+        element: <IncidentsPage />,
       },
       {
         path: "/monitoring/alerts",
@@ -76,40 +105,33 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display the complete FinOps overview.
         path: "/costs",
-        element: (
-          <PlaceholderPage
-            description="Review overall AWS cost, trends, forecast and allocation."
-            title="Cost Overview"
-          />
-        ),
+
+        // Render cost, budget, forecast, and anomaly information.
+        element: <CostOverviewPage />,
       },
       {
+        // Display interactive resource-level cost analysis.
         path: "/costs/explorer",
-        element: (
-          <PlaceholderPage
-            description="Analyze cost by account, service, region, resource and tag."
-            title="Cost Explorer"
-          />
-        ),
+
+        // Render the Cost Explorer page.
+        element: <CostExplorerPage />,
+
       },
       {
+        // Display cloud budget management.
         path: "/costs/budgets",
-        element: (
-          <PlaceholderPage
-            description="Create budgets and track actual and forecasted spending."
-            title="Budgets"
-          />
-        ),
+
+        // Render the complete budget page.
+        element: <BudgetsPage />,
       },
       {
+        // Display FinOps recommendations.
         path: "/costs/recommendations",
-        element: (
-          <PlaceholderPage
-            description="Review cost-saving opportunities and utilization evidence."
-            title="Recommendations"
-          />
-        ),
+
+        // Render the optimization page.
+        element: <RecommendationsPage />,
       },
       {
         path: "/settings",
@@ -119,6 +141,13 @@ export const appRouter = createBrowserRouter([
             title="Settings"
           />
         ),
+      },
+      {
+        // Match any application URL not handled above.
+        path: "*",
+
+        // Display the friendly 404 screen.
+        element: <NotFoundPage />,
       },
     ],
   },
