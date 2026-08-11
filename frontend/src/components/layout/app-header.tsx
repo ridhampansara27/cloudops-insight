@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
+// Import mobile navigation.
+import { MobileNavigation } from "@/components/layout/mobile-navigation";
+
 // Import the theme control.
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
@@ -15,6 +18,8 @@ export function AppHeader() {
   // Render the top navigation bar.
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center border-b bg-background/90 px-4 backdrop-blur-md sm:px-6">
+      <MobileNavigation />
+
       <div className="flex flex-1 items-center gap-4">
         <div className="relative hidden w-full max-w-md md:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

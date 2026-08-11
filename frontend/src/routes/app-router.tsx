@@ -20,6 +20,20 @@ import { CostOverviewPage } from "@/pages/cost-overview-page";
 // Import the interactive resource-level Cost Explorer.
 import { CostExplorerPage } from "@/pages/cost-explorer-page";
 
+// Import the FinOps budget-management screen.
+import { BudgetsPage } from "@/pages/budgets-page";
+
+// Import incident management.
+import { IncidentsPage } from "@/pages/incidents-page";
+
+// Import FinOps optimization recommendations.
+import { RecommendationsPage } from "@/pages/recommendations-page";
+
+// Import the global missing-route page.
+import { NotFoundPage } from "@/pages/not-found-page";
+
+
+
 // Export the complete frontend route configuration.
 export const appRouter = createBrowserRouter([
   {
@@ -75,13 +89,11 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display incident-management workflows.
         path: "/monitoring/incidents",
-        element: (
-          <PlaceholderPage
-            description="Track, acknowledge, investigate and resolve infrastructure incidents."
-            title="Incidents"
-          />
-        ),
+
+        // Render the incident screen.
+        element: <IncidentsPage />,
       },
       {
         path: "/monitoring/alerts",
@@ -108,22 +120,18 @@ export const appRouter = createBrowserRouter([
 
       },
       {
+        // Display cloud budget management.
         path: "/costs/budgets",
-        element: (
-          <PlaceholderPage
-            description="Create budgets and track actual and forecasted spending."
-            title="Budgets"
-          />
-        ),
+
+        // Render the complete budget page.
+        element: <BudgetsPage />,
       },
       {
+        // Display FinOps recommendations.
         path: "/costs/recommendations",
-        element: (
-          <PlaceholderPage
-            description="Review cost-saving opportunities and utilization evidence."
-            title="Recommendations"
-          />
-        ),
+
+        // Render the optimization page.
+        element: <RecommendationsPage />,
       },
       {
         path: "/settings",
@@ -133,6 +141,13 @@ export const appRouter = createBrowserRouter([
             title="Settings"
           />
         ),
+      },
+      {
+        // Match any application URL not handled above.
+        path: "*",
+
+        // Display the friendly 404 screen.
+        element: <NotFoundPage />,
       },
     ],
   },
