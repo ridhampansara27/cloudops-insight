@@ -14,6 +14,12 @@ import { ResourceExplorerPage } from "@/pages/resource-explorer-page";
 // Import the resource detail screen.
 import { ResourceDetailPage } from "@/pages/resource-detail-page";
 
+// Import the complete FinOps overview.
+import { CostOverviewPage } from "@/pages/cost-overview-page";
+
+// Import the interactive resource-level Cost Explorer.
+import { CostExplorerPage } from "@/pages/cost-explorer-page";
+
 // Export the complete frontend route configuration.
 export const appRouter = createBrowserRouter([
   {
@@ -87,22 +93,19 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display the complete FinOps overview.
         path: "/costs",
-        element: (
-          <PlaceholderPage
-            description="Review overall AWS cost, trends, forecast and allocation."
-            title="Cost Overview"
-          />
-        ),
+
+        // Render cost, budget, forecast, and anomaly information.
+        element: <CostOverviewPage />,
       },
       {
+        // Display interactive resource-level cost analysis.
         path: "/costs/explorer",
-        element: (
-          <PlaceholderPage
-            description="Analyze cost by account, service, region, resource and tag."
-            title="Cost Explorer"
-          />
-        ),
+
+        // Render the Cost Explorer page.
+        element: <CostExplorerPage />,
+
       },
       {
         path: "/costs/budgets",
