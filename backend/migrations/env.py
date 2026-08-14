@@ -16,6 +16,9 @@ from alembic import context
 # Import application settings.
 from app.core.config import settings
 
+# Import every application model so its table is registered in Base.metadata.
+import app.models  # noqa: F401
+
 # Import the application's shared SQLAlchemy metadata.
 from app.db.base import Base
 
