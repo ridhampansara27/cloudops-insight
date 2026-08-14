@@ -1,30 +1,71 @@
-// Import TanStack Query's central cache client.
-import { QueryClient } from "@tanstack/react-query";
+// Import TanStack Query's shared cache client.
+import {
+  QueryClient,
+} from "@tanstack/react-query";
 
-// Create one query client for the complete application.
-export const queryClient = new QueryClient({
-  // Configure default behavior for all data-fetching queries.
-  defaultOptions: {
-    queries: {
-      // Consider fetched data fresh for thirty seconds.
-      staleTime: 30_000,
+// Import typed API errors.
+import {
+  ApiError,
+} from "@/lib/api-error";
 
-      // Remove unused cached data after five minutes.
-      gcTime: 5 * 60_000,
 
-      // Retry failed network queries twice.
-      retry: 2,
+// Determine whether a failed query should retry.
+function shouldRetryQuery(
+  // Receive current failure count.
+  failureCount: number,
 
-      // Avoid unnecessary refetching whenever the browser regains focus.
-      refetchOnWindowFocus: false,
+  // Receive the thrown request error.
+  error: unknown,
+): boolean {
+  // Never retry normal client/authentication failures.
+  if (
+    error instanceof
+      ApiError &&
+    error.status >= 400 &&
+    error.status < 500
+  ) {
+    // Stop retrying invalid requests.
+    return false;
+  }
 
-      // Refetch when connectivity returns.
-      refetchOnReconnect: true,
+  // Allow at most two attempts for network/server failures.
+  return failureCount < 2;
+}
+
+
+// Create one query client for CloudOps Insight.
+export const queryClient =
+  new QueryClient({
+    // Configure global query behavior.
+    defaultOptions: {
+      // Configure read operations.
+      queries: {
+        // Consider successful data fresh for thirty seconds.
+        staleTime:
+          30_000,
+
+        // Keep inactive cache records for five minutes.
+        gcTime:
+          5 * 60_000,
+
+        // Retry only appropriate failures.
+        retry:
+          shouldRetryQuery,
+
+        // Avoid automatic refetch whenever the browser receives focus.
+        refetchOnWindowFocus:
+          false,
+
+        // Refresh data after connectivity returns.
+        refetchOnReconnect:
+          true,
+      },
+
+      // Configure write operations.
+      mutations: {
+        // Never automatically repeat side-effecting mutations.
+        retry:
+          0,
+      },
     },
-
-    mutations: {
-      // Retry a failed mutation once.
-      retry: 1,
-    },
-  },
-});
+  });

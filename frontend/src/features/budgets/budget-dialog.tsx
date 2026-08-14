@@ -20,11 +20,32 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 
-// Import budget types.
-import type {
-  Budget,
-  BudgetScopeType,
-} from "@/types/budget";
+// Import the API budget representation.
+import type { BudgetApiResponse } from "@/types/api";
+
+// Import the normalized frontend budget-scope type.
+import type { BudgetScopeType } from "@/types/budget";
+
+// Define the normalized form values returned by this dialog.
+export interface BudgetFormValues {
+  // Store the visible budget name.
+  name: string;
+
+  // Store the selected budget scope type.
+  scopeType: BudgetScopeType;
+
+  // Store the selected budget scope value.
+  scopeValue: string;
+
+  // Store the monthly spending limit.
+  monthlyLimit: number;
+
+  // Store the warning percentage.
+  warningThreshold: number;
+
+  // Store the critical percentage.
+  criticalThreshold: number;
+}
 
 // Define the properties required by the dialog.
 interface BudgetDialogProps {
@@ -34,11 +55,17 @@ interface BudgetDialogProps {
   // Allow the parent to open or close the dialog.
   onOpenChange: (open: boolean) => void;
 
-  // Supply an existing budget when editing.
-  budget?: Budget | null;
+  // Supply an API budget when editing.
+  budget?: BudgetApiResponse | null;
 
-  // Send the completed budget back to the page.
-  onSave: (budget: Budget) => void;
+  // Send normalized form values back to the parent.
+  // The parent performs the actual backend API request.
+  onSave: (
+    values: BudgetFormValues,
+  ) => Promise<void>;
+
+  // Tell the dialog when a save request is running.
+  isSaving?: boolean;
 }
 
 // Export the reusable create/edit budget dialog.
@@ -47,13 +74,19 @@ export function BudgetDialog({
   onOpenChange,
   budget,
   onSave,
+  isSaving = false,
 }: BudgetDialogProps) {
   // Handle form submission.
-  function handleSubmit(
+  async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
     // Prevent the browser from reloading the page.
     event.preventDefault();
+
+    // Prevent duplicate submissions while the request is running.
+    if (isSaving) {
+      return;
+    }
 
     // Read all submitted form fields.
     const formData = new FormData(
@@ -65,14 +98,25 @@ export function BudgetDialog({
       formData.get("name") ?? "",
     ).trim();
 
-    // Read the selected scope type.
-    const scopeType = String(
-      formData.get("scopeType") ?? "account",
+    /*
+     * Scope fields are disabled while editing.
+     * Disabled HTML fields are not included in FormData,
+     * so preserve the existing API values in edit mode.
+     */
+    const scopeType = (
+      budget?.scope_type ??
+      String(
+        formData.get("scopeType") ??
+          "account",
+      )
     ) as BudgetScopeType;
 
-    // Read and normalize the scope value.
-    const scopeValue = String(
-      formData.get("scopeValue") ?? "",
+    // Preserve the existing scope value while editing.
+    const scopeValue = (
+      budget?.scope_value ??
+      String(
+        formData.get("scopeValue") ?? "",
+      )
     ).trim();
 
     // Convert the monthly limit to a number.
@@ -130,48 +174,35 @@ export function BudgetDialog({
       return;
     }
 
-    // Build the new or updated budget.
-    const nextBudget: Budget = {
-      // Preserve the existing identifier while editing.
-      id:
-        budget?.id ??
-        crypto.randomUUID(),
-
-      // Store the normalized budget name.
+    // Build normalized values for the API integration layer.
+    const values: BudgetFormValues = {
+      // Store the normalized name.
       name,
 
-      // Store the selected budget dimension.
+      // Store the selected or existing scope type.
       scopeType,
 
-      // Store the normalized scope value.
+      // Store the selected or existing scope value.
       scopeValue,
 
-      // Store the monthly spending limit.
+      // Store the numeric monthly limit.
       monthlyLimit,
 
-      // Preserve observed spending while editing.
-      currentSpend:
-        budget?.currentSpend ?? 0,
-
-      // Preserve forecast data while editing.
-      forecastSpend:
-        budget?.forecastSpend ?? 0,
-
-      // Store the configured warning threshold.
+      // Store the warning threshold.
       warningThreshold,
 
-      // Store the configured critical threshold.
+      // Store the critical threshold.
       criticalThreshold,
-
-      // Preserve existing status while editing.
-      status:
-        budget?.status ?? "healthy",
     };
 
-    // Return the completed budget to the parent page.
-    onSave(nextBudget);
+    /*
+     * Wait for the parent API operation to succeed.
+     * If onSave rejects, execution stops here and the
+     * dialog remains open.
+     */
+    await onSave(values);
 
-    // Close the dialog after saving.
+    // Close only after the backend request succeeds.
     onOpenChange(false);
   }
 
@@ -197,7 +228,7 @@ export function BudgetDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* 
+        {/*
           Using a key forces the form to start with fresh default values
           when switching between create and edit modes.
         */}
@@ -222,7 +253,7 @@ export function BudgetDialog({
                 // Define the input identifier.
                 id="budget-name"
 
-                // Populate existing data while editing.
+                // Populate existing API data while editing.
                 defaultValue={
                   budget?.name ?? ""
                 }
@@ -232,6 +263,9 @@ export function BudgetDialog({
 
                 // Prevent empty submissions.
                 required
+
+                // Prevent changes while saving.
+                disabled={isSaving}
               />
             </div>
 
@@ -251,10 +285,19 @@ export function BudgetDialog({
                 // Define the control identifier.
                 id="budget-scope-type"
 
-                // Populate the existing scope when editing.
+                // Populate the API scope when editing.
                 defaultValue={
-                  budget?.scopeType ??
+                  budget?.scope_type ??
                   "account"
+                }
+
+                /*
+                 * Scope cannot be changed after creation.
+                 * Also prevent interaction while saving.
+                 */
+                disabled={
+                  Boolean(budget) ||
+                  isSaving
                 }
               >
                 <NativeSelectOption value="account">
@@ -291,9 +334,9 @@ export function BudgetDialog({
                 // Define the input identifier.
                 id="budget-scope"
 
-                // Populate existing scope data while editing.
+                // Populate existing API scope data while editing.
                 defaultValue={
-                  budget?.scopeValue ?? ""
+                  budget?.scope_value ?? ""
                 }
 
                 // Display an example value.
@@ -301,6 +344,15 @@ export function BudgetDialog({
 
                 // Prevent empty submissions.
                 required
+
+                /*
+                 * Scope cannot be changed after creation.
+                 * Also prevent interaction while saving.
+                 */
+                disabled={
+                  Boolean(budget) ||
+                  isSaving
+                }
               />
             </div>
 
@@ -331,14 +383,17 @@ export function BudgetDialog({
                   // Allow monetary decimal values.
                   step="0.01"
 
-                  // Populate the current budget limit.
+                  // Populate the backend API monthly limit.
                   defaultValue={
-                    budget?.monthlyLimit ??
+                    budget?.monthly_limit ??
                     100
                   }
 
                   // Require a value.
                   required
+
+                  // Prevent changes while saving.
+                  disabled={isSaving}
                 />
               </div>
 
@@ -367,14 +422,17 @@ export function BudgetDialog({
                   // Keep percentages reasonable.
                   max="100"
 
-                  // Populate the current warning threshold.
+                  // Populate the backend warning threshold.
                   defaultValue={
-                    budget?.warningThreshold ??
+                    budget?.warning_threshold ??
                     80
                   }
 
                   // Require a value.
                   required
+
+                  // Prevent changes while saving.
+                  disabled={isSaving}
                 />
               </div>
 
@@ -400,14 +458,17 @@ export function BudgetDialog({
                   // Prevent invalid negative values.
                   min="1"
 
-                  // Populate the current critical threshold.
+                  // Populate the backend critical threshold.
                   defaultValue={
-                    budget?.criticalThreshold ??
+                    budget?.critical_threshold ??
                     100
                   }
 
                   // Require a value.
                   required
+
+                  // Prevent changes while saving.
+                  disabled={isSaving}
                 />
               </div>
             </div>
@@ -426,6 +487,9 @@ export function BudgetDialog({
               onClick={() =>
                 onOpenChange(false)
               }
+
+              // Prevent closing from this button while saving.
+              disabled={isSaving}
             >
               Cancel
             </Button>
@@ -433,10 +497,15 @@ export function BudgetDialog({
             <Button
               // Submit the form.
               type="submit"
+
+              // Prevent duplicate API requests.
+              disabled={isSaving}
             >
-              {budget
-                ? "Save changes"
-                : "Create budget"}
+              {isSaving
+                ? "Saving..."
+                : budget
+                  ? "Save changes"
+                  : "Create budget"}
             </Button>
           </DialogFooter>
         </form>

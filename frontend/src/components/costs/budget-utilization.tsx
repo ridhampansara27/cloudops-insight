@@ -1,13 +1,14 @@
-// Import the budget icon.
+// Import budget icon.
 import {
-  CircleAlert,
   WalletCards,
 } from "lucide-react";
 
-// Import the reusable progress component.
-import { Progress } from "@/components/ui/progress";
+// Import progress bar.
+import {
+  Progress,
+} from "@/components/ui/progress";
 
-// Import reusable card components.
+// Import card components.
 import {
   Card,
   CardContent,
@@ -16,50 +17,104 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import the overall cost summary.
-import { costSummary } from "@/mocks/costs";
+// Import currency formatter.
+import {
+  formatCurrency,
+} from "@/lib/formatters";
 
-// Format one monetary value as euros.
-function formatCurrency(value: number): string {
-  // Create a localized currency formatter.
-  return new Intl.NumberFormat("de-DE", {
-    // Use currency formatting.
-    style: "currency",
 
-    // Display euros.
-    currency: "EUR",
-  }).format(value);
+// Define budget-utilization properties.
+interface BudgetUtilizationProps {
+  // Supply current month spending.
+  currentSpend: number;
+
+  // Supply account budget when configured.
+  monthlyBudget:
+    | number
+    | null;
+
+  // Supply calculated run-rate forecast.
+  forecast:
+    | number
+    | null;
+
+  // Supply billing currency.
+  currency: string;
 }
 
-// Export the monthly budget status card.
-export function BudgetUtilization() {
-  // Calculate how much of the monthly budget has already been consumed.
-  const actualUtilization =
-    (costSummary.monthToDateCost /
-      costSummary.monthlyBudget) *
+
+// Export real budget-utilization card.
+export function BudgetUtilization({
+  // Receive current spending.
+  currentSpend,
+
+  // Receive budget.
+  monthlyBudget,
+
+  // Receive forecast.
+  forecast,
+
+  // Receive currency.
+  currency,
+}: BudgetUtilizationProps) {
+  // Handle missing budget configuration.
+  if (
+    monthlyBudget ===
+      null ||
+    monthlyBudget <= 0
+  ) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Monthly budget
+          </CardTitle>
+
+          <CardDescription>
+            No active account-level budget has been configured.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Create an account budget from the Budgets page to track
+            utilization here.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Calculate current budget utilization.
+  const utilization =
+    (
+      currentSpend /
+      monthlyBudget
+    ) *
     100;
 
-  // Calculate projected month-end budget utilization.
+  // Calculate forecast utilization when available.
   const forecastUtilization =
-    (costSummary.forecastCost /
-      costSummary.monthlyBudget) *
-    100;
+    forecast === null
+      ? null
+      : (
+          forecast /
+          monthlyBudget
+        ) *
+        100;
 
-  // Determine whether the forecast is likely to exceed the budget.
-  const forecastExceeded =
-    forecastUtilization > 100;
-
-  // Render the budget card.
+  // Render budget status.
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardTitle>Monthly budget</CardTitle>
+            <CardTitle>
+              Monthly budget
+            </CardTitle>
 
             <CardDescription className="mt-1">
-              Actual spending and month-end forecast against the configured
-              budget.
+              Real month-to-date cost against the configured account budget.
             </CardDescription>
           </div>
 
@@ -67,57 +122,63 @@ export function BudgetUtilization() {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-5">
         <div>
           <div className="mb-2 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Current spend
-              </p>
-
-              <p className="text-2xl font-semibold">
-                {formatCurrency(costSummary.monthToDateCost)}
-              </p>
-            </div>
+            <p className="text-2xl font-semibold">
+              {formatCurrency(
+                currentSpend,
+                currency,
+              )}
+            </p>
 
             <p className="text-sm text-muted-foreground">
-              of {formatCurrency(costSummary.monthlyBudget)}
+              of{" "}
+              {formatCurrency(
+                monthlyBudget,
+                currency,
+              )}
             </p>
           </div>
 
           <Progress
-            // Keep the displayed progress between zero and one hundred.
-            value={Math.min(actualUtilization, 100)}
+            value={Math.min(
+              utilization,
+              100,
+            )}
           />
 
           <p className="mt-2 text-xs text-muted-foreground">
-            {actualUtilization.toFixed(1)}% of the monthly budget used
+            {
+              utilization.toFixed(
+                1,
+              )
+            }
+            % consumed
           </p>
         </div>
 
-        <div className="rounded-lg border bg-muted/20 p-4">
-          <div className="flex items-start gap-3">
-            <CircleAlert
-              className={
-                forecastExceeded
-                  ? "mt-0.5 size-4 text-rose-500"
-                  : "mt-0.5 size-4 text-amber-500"
-              }
-            />
+        {forecast !==
+          null && (
+          <div className="rounded-lg border bg-muted/20 p-4">
+            <p className="text-sm font-medium">
+              Run-rate estimate:{" "}
+              {formatCurrency(
+                forecast,
+                currency,
+              )}
+            </p>
 
-            <div>
-              <p className="text-sm font-medium">
-                Forecast: {formatCurrency(costSummary.forecastCost)}
-              </p>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Projected utilization is{" "}
-                {forecastUtilization.toFixed(1)}% of the configured monthly
-                budget.
-              </p>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Approximately{" "}
+              {forecastUtilization?.toFixed(
+                1,
+              )}
+              % of the configured budget based on available daily
+              records.
+            </p>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

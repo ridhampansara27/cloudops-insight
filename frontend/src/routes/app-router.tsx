@@ -1,54 +1,81 @@
 // Import React Router's browser-router creator.
 import { createBrowserRouter } from "react-router-dom";
 
-// Import the application layout.
+// Import the main authenticated application layout.
 import { AppLayout } from "@/components/layout/app-layout";
 
-// Import implemented pages.
+// Import the authentication route guard.
+import { ProtectedRoute } from "@/features/auth/protected-route";
+
+// Import the public login page.
+import { LoginPage } from "@/pages/login-page";
+
+// Import the main dashboard page.
 import { DashboardPage } from "@/pages/dashboard-page";
+
+// Import the reusable placeholder page.
 import { PlaceholderPage } from "@/pages/placeholder-page";
 
-// Import the resource inventory screen.
+// Import the cloud resource inventory page.
 import { ResourceExplorerPage } from "@/pages/resource-explorer-page";
 
-// Import the resource detail screen.
+// Import the individual cloud resource detail page.
 import { ResourceDetailPage } from "@/pages/resource-detail-page";
 
-// Import the complete FinOps overview.
+// Import the complete FinOps overview page.
 import { CostOverviewPage } from "@/pages/cost-overview-page";
 
-// Import the interactive resource-level Cost Explorer.
+// Import the interactive resource-level Cost Explorer page.
 import { CostExplorerPage } from "@/pages/cost-explorer-page";
 
-// Import the FinOps budget-management screen.
+// Import the FinOps budget-management page.
 import { BudgetsPage } from "@/pages/budgets-page";
 
-// Import incident management.
+// Import the incident-management page.
 import { IncidentsPage } from "@/pages/incidents-page";
 
-// Import FinOps optimization recommendations.
+// Import the FinOps optimization recommendations page.
 import { RecommendationsPage } from "@/pages/recommendations-page";
 
 // Import the global missing-route page.
 import { NotFoundPage } from "@/pages/not-found-page";
 
-
-
 // Export the complete frontend route configuration.
 export const appRouter = createBrowserRouter([
   {
-    // Apply the dashboard layout to all main application pages.
-    element: <AppLayout />,
+    // Define the public login route.
+    // This route stays outside ProtectedRoute so unauthenticated users can access it.
+    path: "/login",
 
-    // Define all nested application routes.
+    // Render the login screen.
+    element: <LoginPage />,
+  },
+  {
+    // Define the root of the authenticated application.
+    path: "/",
+
+    // Protect the complete application layout.
+    // Unauthenticated users will be handled by ProtectedRoute.
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
+
+    // Define all routes that require authentication.
     children: [
       {
         // Render the overview dashboard at the root route.
         path: "/",
+
+        // Display the dashboard page.
         element: <DashboardPage />,
       },
       {
+        // Display the cloud-account management route.
         path: "/cloud/accounts",
+
+        // Use a placeholder until the complete cloud-account feature is implemented.
         element: (
           <PlaceholderPage
             description="Connect and validate AWS accounts using secure read-only access."
@@ -64,14 +91,17 @@ export const appRouter = createBrowserRouter([
         element: <ResourceExplorerPage />,
       },
       {
-        // Match one specific resource identifier.
+        // Match one specific cloud-resource identifier.
         path: "/cloud/resources/:resourceId",
 
         // Display the requested resource details.
         element: <ResourceDetailPage />,
       },
       {
+        // Display the cloud tagging and ownership route.
         path: "/cloud/tags",
+
+        // Use a placeholder until tag-management functionality is implemented.
         element: (
           <PlaceholderPage
             description="Review resource tags, environments, owners and cost allocation."
@@ -80,7 +110,10 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
+        // Display infrastructure health monitoring.
         path: "/monitoring/health",
+
+        // Use a placeholder until the health-monitoring feature is implemented.
         element: (
           <PlaceholderPage
             description="Monitor resource health, service status and operational signals."
@@ -92,11 +125,14 @@ export const appRouter = createBrowserRouter([
         // Display incident-management workflows.
         path: "/monitoring/incidents",
 
-        // Render the incident screen.
+        // Render the incident-management screen.
         element: <IncidentsPage />,
       },
       {
+        // Display monitoring alerts.
         path: "/monitoring/alerts",
+
+        // Use a placeholder until alert-management functionality is implemented.
         element: (
           <PlaceholderPage
             description="Configure thresholds and review triggered monitoring alerts."
@@ -117,7 +153,6 @@ export const appRouter = createBrowserRouter([
 
         // Render the Cost Explorer page.
         element: <CostExplorerPage />,
-
       },
       {
         // Display cloud budget management.
@@ -127,14 +162,17 @@ export const appRouter = createBrowserRouter([
         element: <BudgetsPage />,
       },
       {
-        // Display FinOps recommendations.
+        // Display FinOps optimization recommendations.
         path: "/costs/recommendations",
 
-        // Render the optimization page.
+        // Render the optimization recommendations page.
         element: <RecommendationsPage />,
       },
       {
+        // Display application settings.
         path: "/settings",
+
+        // Use a placeholder until the settings feature is implemented.
         element: (
           <PlaceholderPage
             description="Manage application, synchronization and user preferences."
@@ -143,7 +181,7 @@ export const appRouter = createBrowserRouter([
         ),
       },
       {
-        // Match any application URL not handled above.
+        // Match every authenticated application URL not handled above.
         path: "*",
 
         // Display the friendly 404 screen.

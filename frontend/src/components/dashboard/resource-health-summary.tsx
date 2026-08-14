@@ -1,4 +1,4 @@
-// Import the dashboard card components.
+// Import reusable card components.
 import {
   Card,
   CardContent,
@@ -7,54 +7,86 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import the resource dataset.
-import { mockResources } from "@/mocks/resources";
 
-// Export the resource-health summary component.
-export function ResourceHealthSummary() {
-  // Count healthy resources.
-  const healthy = mockResources.filter(
-    (resource) => resource.health === "healthy",
-  ).length;
+// Define resource-health component properties.
+interface ResourceHealthSummaryProps {
+  // Store total discovered resources.
+  total: number;
 
-  // Count warning resources.
-  const warning = mockResources.filter(
-    (resource) => resource.health === "warning",
-  ).length;
+  // Store healthy resources.
+  healthy: number;
 
-  // Count critical resources.
-  const critical = mockResources.filter(
-    (resource) => resource.health === "critical",
-  ).length;
+  // Store warning resources.
+  warning: number;
 
-  // Count unknown resources.
-  const unknown = mockResources.filter(
-    (resource) => resource.health === "unknown",
-  ).length;
+  // Store critical resources.
+  critical: number;
+}
 
-  // Calculate the total number of resources.
-  const total = mockResources.length;
 
-  // Define each health category and visual style.
+// Export the real resource-health summary.
+export function ResourceHealthSummary({
+  // Receive total resources.
+  total,
+
+  // Receive healthy resources.
+  healthy,
+
+  // Receive warning resources.
+  warning,
+
+  // Receive critical resources.
+  critical,
+}: ResourceHealthSummaryProps) {
+  // Calculate resources that do not yet have a recognized health state.
+  const unknown = Math.max(
+    total -
+      healthy -
+      warning -
+      critical,
+    0,
+  );
+
+  // Define every health category.
   const healthItems = [
     {
+      // Display healthy resources.
       label: "Healthy",
+
+      // Store healthy count.
       value: healthy,
+
+      // Use green for healthy infrastructure.
       colorClass: "bg-emerald-500",
     },
     {
+      // Display warning resources.
       label: "Warning",
+
+      // Store warning count.
       value: warning,
+
+      // Use amber for warnings.
       colorClass: "bg-amber-500",
     },
     {
+      // Display critical resources.
       label: "Critical",
+
+      // Store critical count.
       value: critical,
+
+      // Use red for critical infrastructure.
       colorClass: "bg-rose-500",
     },
     {
+      // Display unknown health.
       label: "Unknown",
+
+      // Store unknown count.
       value: unknown,
+
+      // Use neutral styling.
       colorClass: "bg-slate-400",
     },
   ];
@@ -63,7 +95,9 @@ export function ResourceHealthSummary() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Resource health</CardTitle>
+        <CardTitle>
+          Resource health
+        </CardTitle>
 
         <CardDescription>
           Operational health across discovered AWS resources.
@@ -72,47 +106,59 @@ export function ResourceHealthSummary() {
 
       <CardContent className="space-y-5">
         <div className="flex h-3 overflow-hidden rounded-full bg-muted">
-          {healthItems.map((item) => {
-            // Convert resource count into a percentage width.
-            const width =
-              total === 0
-                ? 0
-                : (item.value / total) * 100;
+          {healthItems.map(
+            (item) => {
+              // Calculate this status' percentage of the inventory.
+              const width =
+                total === 0
+                  ? 0
+                  : (
+                      item.value /
+                      total
+                    ) *
+                    100;
 
-            // Render one section of the health distribution bar.
-            return (
-              <div
-                className={item.colorClass}
-                key={item.label}
-                style={{
-                  width: `${width}%`,
-                }}
-              />
-            );
-          })}
+              // Render one health section.
+              return (
+                <div
+                  key={
+                    item.label
+                  }
+                  className={
+                    item.colorClass
+                  }
+                  style={{
+                    width: `${width}%`,
+                  }}
+                />
+              );
+            },
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          {healthItems.map((item) => (
-            <div
-              className="flex items-center justify-between rounded-lg border p-3"
-              key={item.label}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`size-2.5 rounded-full ${item.colorClass}`}
-                />
+          {healthItems.map(
+            (item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`size-2.5 rounded-full ${item.colorClass}`}
+                  />
 
-                <span className="text-sm text-muted-foreground">
-                  {item.label}
+                  <span className="text-sm text-muted-foreground">
+                    {item.label}
+                  </span>
+                </div>
+
+                <span className="text-sm font-semibold">
+                  {item.value}
                 </span>
               </div>
-
-              <span className="text-sm font-semibold">
-                {item.value}
-              </span>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </CardContent>
     </Card>

@@ -1,4 +1,4 @@
-// Import the dashboard card components.
+// Import reusable card components.
 import {
   Card,
   CardContent,
@@ -7,76 +7,128 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import mock service-cost data.
-import { serviceCosts } from "@/mocks/costs";
+// Import shared monetary formatting.
+import {
+  formatCurrency,
+} from "@/lib/formatters";
 
-// Format a monetary value as euro currency.
-function formatCurrency(value: number): string {
-  // Use German locale formatting.
-  return new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: "EUR",
-  }).format(value);
+// Import the real API response type.
+import type {
+  ServiceCostApiResponse,
+} from "@/types/api";
+
+
+// Define component properties.
+interface CostByServiceProps {
+  // Supply aggregated service costs from FastAPI.
+  services: ServiceCostApiResponse[];
+
+  // Supply total month-to-date spending.
+  total: number;
+
+  // Supply the backend billing currency.
+  currency: string;
 }
 
-// Export the cost-by-service component.
-export function CostByService() {
+
+// Export the API-driven service-cost component.
+export function CostByService({
+  // Receive service costs.
+  services,
+
+  // Receive total spending.
+  total,
+
+  // Receive billing currency.
+  currency,
+}: CostByServiceProps) {
   // Render service cost distribution.
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Cost by service</CardTitle>
+        <CardTitle>
+          Cost by service
+        </CardTitle>
 
         <CardDescription>
-          Month-to-date AWS spending grouped by service.
+          Month-to-date cloud spending grouped by service.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {serviceCosts.map((service) => (
-          <div
-            className="space-y-2"
-            key={service.service}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {service.service}
-                </p>
+        {services.length === 0 ? (
+          <div className="py-10 text-center">
+            <p className="font-medium">
+              No cost data available
+            </p>
 
-                <p className="text-xs text-muted-foreground">
-                  {service.percentage.toFixed(1)}% of spend
-                </p>
-              </div>
-
-              <div className="text-right">
-                <p className="text-sm font-semibold">
-                  {formatCurrency(service.cost)}
-                </p>
-
-                <p
-                  className={
-                    service.changePercentage > 0
-                      ? "text-xs text-amber-600 dark:text-amber-400"
-                      : "text-xs text-emerald-600 dark:text-emerald-400"
-                  }
-                >
-                  {service.changePercentage > 0 ? "+" : ""}
-                  {service.changePercentage.toFixed(1)}%
-                </p>
-              </div>
-            </div>
-
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{
-                  width: `${service.percentage}%`,
-                }}
-              />
-            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Billing records will appear after cost synchronization.
+            </p>
           </div>
-        ))}
+        ) : (
+          services.map(
+            (service) => {
+              // Calculate this service's share of overall spending.
+              const percentage =
+                total <= 0
+                  ? 0
+                  : (
+                      service.amount /
+                      total
+                    ) *
+                    100;
+
+              // Render one service.
+              return (
+                <div
+                  key={
+                    service.service
+                  }
+                  className="space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {
+                          service.service
+                        }
+                      </p>
+
+                      <p className="text-xs text-muted-foreground">
+                        {
+                          percentage.toFixed(
+                            1,
+                          )
+                        }
+                        % of spend
+                      </p>
+                    </div>
+
+                    <p className="text-sm font-semibold">
+                      {formatCurrency(
+                        service.amount,
+                        currency,
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{
+                        width: `${Math.min(
+                          percentage,
+                          100,
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            },
+          )
+        )}
       </CardContent>
     </Card>
   );

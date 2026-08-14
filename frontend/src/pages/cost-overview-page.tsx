@@ -1,21 +1,35 @@
-// Import FinOps KPI icons.
+// Import FinOps icons.
 import {
   CircleDollarSign,
+  Database,
   Lightbulb,
   TrendingUp,
   WalletCards,
 } from "lucide-react";
 
-// Import FinOps dashboard components.
-import { BudgetUtilization } from "@/components/costs/budget-utilization";
-import { CostAnomalies } from "@/components/costs/cost-anomalies";
-import { CostTrendChart } from "@/components/costs/cost-trend-chart";
-import { EnvironmentCosts } from "@/components/costs/environment-costs";
+// Import cost components.
+import {
+  BudgetUtilization,
+} from "@/components/costs/budget-utilization";
 
-// Reuse the service-cost component already used by the main dashboard.
-import { CostByService } from "@/components/dashboard/cost-by-service";
+import {
+  CostTrendChart,
+} from "@/components/costs/cost-trend-chart";
 
-// Import reusable card components.
+import {
+  CostByService,
+} from "@/components/dashboard/cost-by-service";
+
+// Import reusable API states.
+import {
+  PageErrorState,
+} from "@/components/shared/page-error-state";
+
+import {
+  PageLoadingState,
+} from "@/components/shared/page-loading-state";
+
+// Import cards.
 import {
   Card,
   CardContent,
@@ -23,24 +37,161 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import the overall mock cost summary.
-import { costSummary } from "@/mocks/costs";
+// Import real hooks.
+import {
+  useBudgets,
+} from "@/features/budgets/api/budgets-api";
 
-// Format euro values consistently.
-function formatCurrency(value: number): string {
-  // Create the localized currency formatter.
-  return new Intl.NumberFormat("de-DE", {
-    // Format as currency.
-    style: "currency",
+import {
+  useCostSummary,
+} from "@/features/costs/api/costs-api";
 
-    // Use euros.
-    currency: "EUR",
-  }).format(value);
-}
+import {
+  useRecommendations,
+} from "@/features/recommendations/api/recommendations-api";
 
-// Export the complete Cost Overview page.
+// Import formatting helpers.
+import {
+  formatCurrency,
+  toNumber,
+} from "@/lib/formatters";
+
+
+// Export real Cost Overview page.
 export function CostOverviewPage() {
-  // Render the FinOps overview.
+  // Load real costs.
+  const costQuery =
+    useCostSummary();
+
+  // Load configured budgets.
+  const budgetsQuery =
+    useBudgets();
+
+  // Load optimization recommendations.
+  const recommendationsQuery =
+    useRecommendations();
+
+  // Handle loading.
+  if (
+    costQuery.isPending ||
+    budgetsQuery.isPending ||
+    recommendationsQuery.isPending
+  ) {
+    return (
+      <PageLoadingState />
+    );
+  }
+
+  // Handle backend failures.
+  if (
+    costQuery.isError ||
+    budgetsQuery.isError ||
+    recommendationsQuery.isError
+  ) {
+    return (
+      <PageErrorState
+        title="Unable to load FinOps data"
+        description="Cost, budget or recommendation data could not be retrieved."
+        onRetry={() => {
+          // Retry costs.
+          void costQuery.refetch();
+
+          // Retry budgets.
+          void budgetsQuery.refetch();
+
+          // Retry recommendations.
+          void recommendationsQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  // Store cost response.
+  const costs =
+    costQuery.data;
+
+  // Find the first active account-level budget.
+  const accountBudget =
+    budgetsQuery.data.find(
+      (budget) =>
+        budget.is_active &&
+        budget.scope_type ===
+          "account",
+    );
+
+  // Normalize budget amount.
+  const monthlyBudget =
+    accountBudget
+      ? toNumber(
+          accountBudget.monthly_limit,
+        )
+      : null;
+
+  // Calculate total savings from open recommendations.
+  const potentialSavings =
+    recommendationsQuery.data
+      .filter(
+        (
+          recommendation,
+        ) =>
+          recommendation.status ===
+          "open",
+      )
+      .reduce(
+        (
+          total,
+          recommendation,
+        ) =>
+          total +
+          toNumber(
+            recommendation
+              .estimated_monthly_savings,
+          ),
+        0,
+      );
+
+  // Determine number of days represented by the API response.
+  const observedDays =
+    costs.daily.length;
+
+  // Calculate average observed daily spend.
+  const averageDailyCost =
+    observedDays === 0
+      ? 0
+      : costs.month_to_date /
+        observedDays;
+
+  // Determine number of days in the current month.
+  const now =
+    new Date();
+
+  // Calculate current month's final day.
+  const daysInMonth =
+    new Date(
+      now.getFullYear(),
+      now.getMonth() +
+        1,
+      0,
+    ).getDate();
+
+  // Create a clearly labeled simple run-rate estimate.
+  const forecast =
+    observedDays === 0
+      ? null
+      : averageDailyCost *
+        daysInMonth;
+
+  // Find the most recent billing date.
+  const latestBillingDate =
+    costs.daily.length >
+    0
+      ? costs.daily[
+          costs.daily
+            .length - 1
+        ].date
+      : null;
+
+  // Render FinOps page.
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -54,20 +205,18 @@ export function CostOverviewPage() {
           </h1>
 
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Track AWS spending, understand cost drivers, compare periods,
-            monitor budgets, and identify optimization opportunities.
+            Cost information now comes from the FastAPI and PostgreSQL
+            backend.
           </p>
         </div>
 
         <div className="rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
-          Billing data updated{" "}
-          {new Date(
-            costSummary.lastUpdatedAt,
-          ).toLocaleString("de-DE")}
+          {latestBillingDate
+            ? `Latest billing record: ${latestBillingDate}`
+            : "No billing records available"}
         </div>
       </div>
 
-      {/* Display the four primary FinOps KPIs. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -80,12 +229,10 @@ export function CostOverviewPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {formatCurrency(costSummary.monthToDateCost)}
-            </p>
-
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              +{costSummary.costChangePercentage.toFixed(1)}% vs. previous
-              period
+              {formatCurrency(
+                costs.month_to_date,
+                costs.currency,
+              )}
             </p>
           </CardContent>
         </Card>
@@ -93,7 +240,7 @@ export function CostOverviewPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Month-end forecast
+              Run-rate estimate
             </CardTitle>
 
             <TrendingUp className="size-4 text-primary" />
@@ -101,11 +248,17 @@ export function CostOverviewPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {formatCurrency(costSummary.forecastCost)}
+              {forecast ===
+              null
+                ? "N/A"
+                : formatCurrency(
+                    forecast,
+                    costs.currency,
+                  )}
             </p>
 
             <p className="mt-2 text-xs text-muted-foreground">
-              Estimated final monthly spend
+              Derived from available daily records
             </p>
           </CardContent>
         </Card>
@@ -113,7 +266,7 @@ export function CostOverviewPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Monthly budget
+              Account budget
             </CardTitle>
 
             <WalletCards className="size-4 text-primary" />
@@ -121,16 +274,13 @@ export function CostOverviewPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {formatCurrency(costSummary.monthlyBudget)}
-            </p>
-
-            <p className="mt-2 text-xs text-muted-foreground">
-              {(
-                (costSummary.monthToDateCost /
-                  costSummary.monthlyBudget) *
-                100
-              ).toFixed(1)}
-              % consumed
+              {monthlyBudget ===
+              null
+                ? "Not configured"
+                : formatCurrency(
+                    monthlyBudget,
+                    costs.currency,
+                  )}
             </p>
           </CardContent>
         </Card>
@@ -146,32 +296,91 @@ export function CostOverviewPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {formatCurrency(costSummary.potentialSavings)}
-            </p>
-
-            <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
-              Identified optimization opportunity
+              {formatCurrency(
+                potentialSavings,
+                costs.currency,
+              )}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Display the primary billing trend chart. */}
-      <CostTrendChart />
+      <CostTrendChart
+        points={
+          costs.daily
+        }
+        currency={
+          costs.currency
+        }
+      />
 
-      {/* Compare service and environment allocation. */}
       <div className="grid gap-6 xl:grid-cols-2">
-        <CostByService />
+        <CostByService
+          services={
+            costs.by_service
+          }
+          total={
+            costs.month_to_date
+          }
+          currency={
+            costs.currency
+          }
+        />
 
-        <EnvironmentCosts />
+        <BudgetUtilization
+          currentSpend={
+            costs.month_to_date
+          }
+          monthlyBudget={
+            monthlyBudget
+          }
+          forecast={
+            forecast
+          }
+          currency={
+            costs.currency
+          }
+        />
       </div>
 
-      {/* Display budget health and current cost anomalies. */}
-      <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-        <BudgetUtilization />
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Billing data coverage
+          </CardTitle>
+        </CardHeader>
 
-        <CostAnomalies />
-      </div>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border p-4">
+            <Database className="size-5 text-primary" />
+
+            <p className="mt-3 text-2xl font-semibold">
+              {
+                costs.daily.length
+              }
+            </p>
+
+            <p className="text-sm text-muted-foreground">
+              Daily billing records
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-4">
+            <CircleDollarSign className="size-5 text-primary" />
+
+            <p className="mt-3 text-2xl font-semibold">
+              {
+                costs.by_service
+                  .length
+              }
+            </p>
+
+            <p className="text-sm text-muted-foreground">
+              Cost service categories
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </section>
   );
 }
