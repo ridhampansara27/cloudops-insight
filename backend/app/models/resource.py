@@ -5,11 +5,15 @@ from typing import Any
 from uuid import UUID
 
 # Import SQLAlchemy database constructs.
+# Import Boolean for active/inactive resource lifecycle state.
+# Import SQL TRUE for the database-level default.
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     String,
     UniqueConstraint,
+    true,
 )
 
 # Import PostgreSQL JSON storage.
@@ -187,6 +191,30 @@ class CloudResource(
         # Store timezone-aware values.
         DateTime(timezone=True),
         # Permit never-synchronized records.
+        nullable=True,
+    )
+
+    # Store whether the resource was present during the latest successful discovery.
+    is_active: Mapped[bool] = mapped_column(
+        # Store a PostgreSQL boolean.
+        Boolean,
+        # Every resource must have a lifecycle state.
+        nullable=False,
+        # New SQLAlchemy objects start active.
+        default=True,
+        # Existing/new database records also default to active.
+        server_default=true(),
+        # Index this field because normal inventory queries filter on it.
+        index=True,
+    )
+
+    # Store when CloudOps first observed that the resource had disappeared.
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        # Store a timezone-aware timestamp.
+        DateTime(
+            timezone=True,
+        ),
+        # Active resources do not have a deletion timestamp.
         nullable=True,
     )
 

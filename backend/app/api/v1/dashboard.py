@@ -13,6 +13,11 @@ from app.api.dependencies import (
     DatabaseSession,
 )
 
+# Import cloud-account model.
+from app.models.cloud_account import (
+    CloudAccount,
+)
+
 # Import ORM models.
 from app.models.cost import CostRecord
 from app.models.incident import Incident
@@ -50,44 +55,64 @@ async def get_dashboard_summary(
         day=1,
     )
 
-    # Count all resources.
+    # Count all currently active resources.
     total_resources = await session.scalar(
         select(
             func.count(
                 CloudResource.id,
             ),
+        ).where(
+            # Ignore resources that disappeared from AWS.
+            CloudResource.is_active.is_(
+                True,
+            ),
         ),
     )
 
-    # Count healthy resources.
+    # Count currently active healthy resources.
     healthy_resources = await session.scalar(
         select(
             func.count(
                 CloudResource.id,
             ),
         ).where(
+            # Ignore resources that disappeared from AWS.
+            CloudResource.is_active.is_(
+                True,
+            ),
+            # Count only healthy resources.
             CloudResource.health_state == "healthy",
         ),
     )
 
-    # Count warning resources.
+    # Count currently active warning resources.
     warning_resources = await session.scalar(
         select(
             func.count(
                 CloudResource.id,
             ),
         ).where(
+            # Ignore resources that disappeared from AWS.
+            CloudResource.is_active.is_(
+                True,
+            ),
+            # Count only warning resources.
             CloudResource.health_state == "warning",
         ),
     )
 
-    # Count critical resources.
+    # Count currently active critical resources.
     critical_resources = await session.scalar(
         select(
             func.count(
                 CloudResource.id,
             ),
         ).where(
+            # Ignore resources that disappeared from AWS.
+            CloudResource.is_active.is_(
+                True,
+            ),
+            # Count only critical resources.
             CloudResource.health_state == "critical",
         ),
     )
@@ -131,6 +156,15 @@ async def get_dashboard_summary(
         ),
     )
 
+    # Determine the most recent successful resource sync.
+    last_resource_sync_at = await session.scalar(
+        select(
+            func.max(
+                CloudAccount.last_synced_at,
+            ),
+        ),
+    )
+
     # Return the aggregated dashboard data.
     return DashboardSummary(
         total_resources=int(
@@ -155,4 +189,6 @@ async def get_dashboard_summary(
             potential_savings or 0,
         ),
         currency="USD",
+        # Return the latest AWS inventory synchronization timestamp.
+        last_resource_sync_at=(last_resource_sync_at),
     )

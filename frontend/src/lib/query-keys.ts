@@ -6,6 +6,15 @@ export const queryKeys = {
     "current-user",
   ] as const,
 
+
+  // Store cloud-account queries.
+  cloudAccounts: {
+    // Store the complete cloud-account list.
+    all: [
+      "cloud-accounts",
+    ] as const,
+  },
+
   // Store dashboard cache keys.
   dashboard: {
     // Store dashboard summary.

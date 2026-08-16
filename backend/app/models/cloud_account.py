@@ -116,3 +116,57 @@ class CloudAccount(
         # Require ownership information.
         nullable=False,
     )
+
+    # Store when AWS credentials were most recently validated.
+    last_validated_at: Mapped[datetime | None] = mapped_column(
+        # Store timezone-aware timestamps.
+        DateTime(
+            timezone=True,
+        ),
+        # Allow accounts that have never been validated.
+        nullable=True,
+    )
+
+    # Store the latest safe validation failure message.
+    last_validation_error: Mapped[str | None] = mapped_column(
+        # Keep validation messages reasonably bounded.
+        String(
+            1024,
+        ),
+        # Successful connections do not require an error.
+        nullable=True,
+    )
+
+    # Store background synchronization lifecycle state.
+    sync_status: Mapped[str] = mapped_column(
+        # Keep workflow states compact.
+        String(
+            32,
+        ),
+        # Require a status.
+        nullable=False,
+        # New accounts have not started synchronization.
+        default="idle",
+        # Existing database records also receive idle.
+        server_default="idle",
+    )
+
+    # Store when the latest synchronization attempt started.
+    sync_started_at: Mapped[datetime | None] = mapped_column(
+        # Store timezone-aware timestamps.
+        DateTime(
+            timezone=True,
+        ),
+        # Accounts may never have synchronized.
+        nullable=True,
+    )
+
+    # Store the latest safe synchronization failure.
+    last_sync_error: Mapped[str | None] = mapped_column(
+        # Bound provider error size.
+        String(
+            1024,
+        ),
+        # Successful accounts have no error.
+        nullable=True,
+    )

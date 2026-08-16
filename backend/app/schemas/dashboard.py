@@ -1,4 +1,7 @@
 # Import Pydantic's schema base.
+# Import datetime typing.
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -27,3 +30,6 @@ class DashboardSummary(BaseModel):
 
     # Return cost currency.
     currency: str
+
+    # Return the latest completed resource synchronization.
+    last_resource_sync_at: datetime | None

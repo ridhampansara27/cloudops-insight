@@ -1,5 +1,13 @@
 # Import UUID typing.
+# Import UTC-aware timestamps.
+from datetime import (
+    UTC,
+    datetime,
+)
 from uuid import UUID
+
+# Import AnyIO thread execution for blocking Boto3 operations.
+from anyio import to_thread
 
 # Import FastAPI routing and HTTP error helpers.
 from fastapi import APIRouter, HTTPException, status
@@ -10,16 +18,45 @@ from app.api.dependencies import (
     DatabaseSession,
 )
 
+# Import the SQLAlchemy CloudAccount model so this route can load an account directly by ID.
+from app.models.cloud_account import CloudAccount
+
+# Import AWS validation service.
+from app.providers.aws.connection import (
+    AwsConnectionError,
+    AwsConnectionService,
+)
+
+# Import normalized AWS account configuration.
+from app.providers.aws.types import (
+    AwsAccountConfig,
+)
+
 # Import the repository.
 from app.repositories.cloud_account_repository import (
     CloudAccountRepository,
 )
 
 # Import API schemas.
+# Import validation response schema.
 from app.schemas.cloud_account import (
     CloudAccountCreate,
     CloudAccountRead,
     CloudAccountUpdate,
+    CloudAccountValidationResponse,
+)
+
+# Import synchronization response schema.
+# Import queued synchronization schemas.
+from app.schemas.resource_sync import (
+    ResourceSyncQueuedResponse,
+    ResourceSyncStatusResponse,
+)
+
+# Import resource synchronization service.
+# Import Celery AWS synchronization task.
+from app.tasks.aws_sync import (
+    sync_aws_account_task,
 )
 
 # Create the cloud-account router.
@@ -96,6 +133,45 @@ async def get_cloud_account(
     )
 
 
+# Return current resource-synchronization state.
+@router.get(
+    "/{account_id}/sync-status",
+    response_model=ResourceSyncStatusResponse,
+)
+async def get_cloud_account_sync_status(
+    # Receive cloud-account UUID.
+    account_id: UUID,
+    # Require authentication.
+    current_user: CurrentUser,
+    # Receive database session.
+    session: DatabaseSession,
+) -> ResourceSyncStatusResponse:
+    # Require authentication.
+    del current_user
+
+    # Retrieve account.
+    account = await session.get(
+        CloudAccount,
+        account_id,
+    )
+
+    # Reject unknown accounts.
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cloud account not found.",
+        )
+
+    # Return persisted synchronization status.
+    return ResourceSyncStatusResponse(
+        account_id=account.id,
+        sync_status=(account.sync_status),
+        sync_started_at=(account.sync_started_at),
+        last_synced_at=(account.last_synced_at),
+        last_sync_error=(account.last_sync_error),
+    )
+
+
 # Register a new cloud account.
 @router.post(
     "",
@@ -144,6 +220,203 @@ async def create_cloud_account(
     # Return the created account.
     return CloudAccountRead.model_validate(
         account,
+    )
+
+
+# Validate access to one configured AWS account.
+@router.post(
+    "/{account_id}/validate",
+    response_model=CloudAccountValidationResponse,
+)
+async def validate_cloud_account(
+    # Read the CloudOps account UUID.
+    account_id: UUID,
+    # Require an authenticated application user.
+    current_user: CurrentUser,
+    # Receive the asynchronous database session.
+    session: DatabaseSession,
+) -> CloudAccountValidationResponse:
+    # Require authentication even though role authorization comes later.
+    del current_user
+
+    # Create the database repository.
+    repository = CloudAccountRepository(
+        session,
+    )
+
+    # Retrieve account configuration.
+    account = await repository.get_by_id(
+        account_id,
+    )
+
+    # Reject unknown CloudOps records.
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cloud account not found.",
+        )
+
+    # Create a thread-safe immutable AWS configuration snapshot.
+    aws_account = AwsAccountConfig(
+        # Store expected AWS account ID.
+        account_id=account.external_account_id,
+        # Store optional AssumeRole ARN.
+        role_arn=account.role_arn,
+        # Store optional ExternalId.
+        external_id=account.external_id,
+        # Copy discovery regions.
+        enabled_regions=tuple(
+            account.enabled_regions,
+        ),
+    )
+
+    # Create AWS validation service.
+    connection_service = AwsConnectionService()
+
+    try:
+        # Run blocking Boto3 network operations outside the async event loop.
+        identity = await to_thread.run_sync(
+            connection_service.validate_account,
+            aws_account,
+        )
+
+    except AwsConnectionError as error:
+        # Record the validation attempt time.
+        account.last_validated_at = datetime.now(
+            UTC,
+        )
+
+        # Mark the account as unhealthy.
+        account.status = "error"
+
+        # Store only the safe application error message.
+        account.last_validation_error = str(
+            error,
+        )
+
+        # Persist account state.
+        await session.commit()
+
+        # Return a useful API validation failure.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(
+                error,
+            ),
+        ) from error
+
+    # Record successful validation.
+    account.last_validated_at = datetime.now(
+        UTC,
+    )
+
+    # Mark AWS connectivity successful.
+    account.status = "connected"
+
+    # Clear any historical validation error.
+    account.last_validation_error = None
+
+    # Persist connection status.
+    await session.commit()
+
+    # Return verified AWS identity.
+    return CloudAccountValidationResponse(
+        # Confirm successful connection.
+        connected=True,
+        # Return verified account ID.
+        account_id=identity.account_id,
+        # Return verified caller ARN.
+        caller_arn=identity.arn,
+        # Explain the result.
+        message="AWS account connection validated successfully.",
+    )
+
+
+# Queue AWS inventory synchronization.
+@router.post(
+    "/{account_id}/sync",
+    response_model=ResourceSyncQueuedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def sync_cloud_account(
+    # Receive CloudOps cloud-account UUID.
+    account_id: UUID,
+    # Require authentication.
+    current_user: CurrentUser,
+    # Receive database session.
+    session: DatabaseSession,
+) -> ResourceSyncQueuedResponse:
+    # Require authentication.
+    del current_user
+
+    # Retrieve account.
+    account = await session.get(
+        CloudAccount,
+        account_id,
+    )
+
+    # Reject unknown accounts.
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cloud account not found.",
+        )
+
+    # Require verified AWS connection.
+    if account.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Validate the AWS account before synchronization.",
+        )
+
+    # Prevent obvious duplicate synchronization requests.
+    if account.sync_status in {
+        "queued",
+        "running",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS synchronization is already in progress.",
+        )
+
+    # Mark account queued before sending the Celery task.
+    account.sync_status = "queued"
+
+    # Clear previous queue errors.
+    account.last_sync_error = None
+
+    # Persist queue state.
+    await session.commit()
+
+    try:
+        # Publish the synchronization task to Redis.
+        task = sync_aws_account_task.delay(
+            str(
+                account_id,
+            ),
+        )
+
+    except Exception as error:
+        # Mark queue submission failure.
+        account.sync_status = "failed"
+
+        # Store a safe queue error.
+        account.last_sync_error = "Unable to queue resource synchronization."
+
+        # Persist failure.
+        await session.commit()
+
+        # Report service unavailability.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Background synchronization service is unavailable.",
+        ) from error
+
+    # Return queued task information.
+    return ResourceSyncQueuedResponse(
+        account_id=account_id,
+        task_id=task.id,
+        status="queued",
     )
 
 

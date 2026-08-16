@@ -214,7 +214,14 @@ export function DashboardPage() {
         <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
           <span className="size-2 rounded-full bg-emerald-500" />
 
-          API connected
+          <span>
+            Last AWS sync{" "}
+            {formatTimestamp(
+              summary.last_resource_sync_at,
+            )}
+          </span>
+
+      
         </div>
       </div>
 

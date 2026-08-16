@@ -40,6 +40,17 @@ import { RecommendationsPage } from "@/pages/recommendations-page";
 // Import the global missing-route page.
 import { NotFoundPage } from "@/pages/not-found-page";
 
+// Import AWS account-management page.
+import {
+  CloudAccountsPage,
+} from "@/pages/cloud-accounts-page";
+
+
+
+
+
+
+
 // Export the complete frontend route configuration.
 export const appRouter = createBrowserRouter([
   {
@@ -71,17 +82,13 @@ export const appRouter = createBrowserRouter([
         // Display the dashboard page.
         element: <DashboardPage />,
       },
+      
       {
-        // Display the cloud-account management route.
+        // Expose connected-cloud account management.
         path: "/cloud/accounts",
 
-        // Use a placeholder until the complete cloud-account feature is implemented.
-        element: (
-          <PlaceholderPage
-            description="Connect and validate AWS accounts using secure read-only access."
-            title="Cloud Accounts"
-          />
-        ),
+        // Render AWS account management.
+        element: <CloudAccountsPage />,
       },
       {
         // Display the full cloud resource inventory.

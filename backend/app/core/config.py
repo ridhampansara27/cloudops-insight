@@ -1,6 +1,9 @@
 # Import a cache decorator so settings are constructed only once.
 from functools import lru_cache
 
+# Import Pydantic's field-validation helper.
+from pydantic import field_validator
+
 # Import the Pydantic settings base class and configuration helper.
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -64,6 +67,24 @@ class Settings(BaseSettings):
     # Define the development administrator password.
     seed_admin_password: str = ""
 
+    # Define the AWS region used for STS and default AWS clients.
+    aws_default_region: str = "eu-central-1"
+
+    # Define an optional local AWS profile.
+    aws_profile_name: str | None = None
+
+    # Define the STS AssumeRole session name.
+    aws_role_session_name: str = "cloudops-insight"
+
+    # Define the lifetime of temporary assumed-role credentials.
+    aws_role_duration_seconds: int = 3600
+
+    # Define Celery's Redis message broker.
+    celery_broker_url: str = "redis://localhost:6379/1"
+
+    # Define Celery's task-result backend.
+    celery_result_backend: str = "redis://localhost:6379/2"
+
     # Convert comma-separated CORS origins into a Python list.
     @property
     def cors_origin_list(self) -> list[str]:
@@ -72,6 +93,24 @@ class Settings(BaseSettings):
 
         # Remove whitespace and empty values.
         return [origin.strip() for origin in origins if origin.strip()]
+
+    # Normalize an empty AWS profile value into None.
+    @field_validator(
+        "aws_profile_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_aws_profile(
+        cls,
+        value: object,
+    ) -> object:
+        # Convert an empty environment-variable string into None.
+        if value == "":
+            # Allow Boto3 to use its normal credential-provider chain.
+            return None
+
+        # Preserve any explicitly configured profile name.
+        return value
 
 
 # Cache settings so the application uses one shared instance.

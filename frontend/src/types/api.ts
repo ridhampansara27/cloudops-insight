@@ -1,4 +1,86 @@
 // ------------------------------
+// Cloud Accounts
+// ------------------------------
+
+// Define one registered cloud account.
+export interface CloudAccountApiResponse {
+  // Store CloudOps UUID.
+  id: string;
+
+  // Store provider.
+  provider: string;
+
+  // Store visible account name.
+  name: string;
+
+  // Store provider-native AWS account ID.
+  external_account_id: string;
+
+  // Store AssumeRole ARN when configured.
+  role_arn:
+    | string
+    | null;
+
+  // Store enabled discovery regions.
+  enabled_regions: string[];
+
+  // Store AWS connection validation state.
+  status: string;
+
+  // Store latest successful inventory sync.
+  last_synced_at:
+    | string
+    | null;
+
+  // Store latest validation attempt.
+  last_validated_at:
+    | string
+    | null;
+
+  // Store safe validation error.
+  last_validation_error:
+    | string
+    | null;
+
+  // Store background synchronization state.
+  sync_status: string;
+
+  // Store latest synchronization start time.
+  sync_started_at:
+    | string
+    | null;
+
+  // Store safe synchronization error.
+  last_sync_error:
+    | string
+    | null;
+
+  // Store creation timestamp.
+  created_at: string;
+
+  // Store modification timestamp.
+  updated_at: string;
+}
+
+
+// Define queued synchronization response.
+export interface CloudAccountSyncQueuedResponse {
+  // Store account UUID.
+  account_id: string;
+
+  // Store Celery task identifier.
+  task_id: string;
+
+  // Store queue status.
+  status: string;
+}
+
+
+
+
+
+
+// ------------------------------
 // Dashboard
 // ------------------------------
 
@@ -33,6 +115,11 @@ export interface DashboardSummaryResponse {
 
   // Return billing currency.
   currency: string;
+
+  // Return the latest completed AWS inventory synchronization.
+  last_resource_sync_at:
+    | string
+    | null;
 }
 
 

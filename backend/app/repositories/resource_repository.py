@@ -36,7 +36,12 @@ class ResourceRepository:
         int,
     ]:
         # Start with the resource table.
-        filters = []
+        # Always show only resources present in the latest successful discovery.
+        filters = [
+            CloudResource.is_active.is_(
+                True,
+            ),
+        ]
 
         # Apply free-text resource search.
         if search:
@@ -139,8 +144,22 @@ class ResourceRepository:
         self,
         resource_id: UUID,
     ) -> CloudResource | None:
-        # Use SQLAlchemy primary-key lookup.
-        return await self.session.get(
+        # Build an active-resource detail query.
+        statement = select(
             CloudResource,
-            resource_id,
+        ).where(
+            # Match requested UUID.
+            CloudResource.id == resource_id,
+            # Hide historical resources from normal inventory.
+            CloudResource.is_active.is_(
+                True,
+            ),
         )
+
+        # Execute the query.
+        result = await self.session.execute(
+            statement,
+        )
+
+        # Return the active resource when it exists.
+        return result.scalar_one_or_none()

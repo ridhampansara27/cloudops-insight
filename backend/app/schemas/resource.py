@@ -62,6 +62,12 @@ class ResourceRead(BaseModel):
     # Return the latest synchronization timestamp.
     last_synced_at: datetime | None
 
+    # Return whether the resource exists in current provider inventory.
+    is_active: bool
+
+    # Return when CloudOps observed the resource disappear.
+    deleted_at: datetime | None
+
 
 # Define one paginated resource response.
 class ResourceListResponse(BaseModel):

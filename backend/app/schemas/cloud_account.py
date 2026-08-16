@@ -111,3 +111,35 @@ class CloudAccountRead(BaseModel):
 
     # Return last modification time.
     updated_at: datetime
+
+    # Return the most recent successful or failed validation time.
+    last_validated_at: datetime | None
+
+    # Return the latest safe validation failure when one exists.
+    last_validation_error: str | None
+
+    # Return synchronization workflow state.
+    sync_status: str
+
+    # Return latest synchronization start time.
+    sync_started_at: datetime | None
+
+    # Return latest safe synchronization failure.
+    last_sync_error: str | None
+
+
+# Describe a successful AWS connection validation.
+class CloudAccountValidationResponse(
+    BaseModel,
+):
+    # Confirm provider connectivity.
+    connected: bool
+
+    # Return the verified AWS account ID.
+    account_id: str
+
+    # Return the ARN representing the verified caller.
+    caller_arn: str
+
+    # Return a user-facing result message.
+    message: str

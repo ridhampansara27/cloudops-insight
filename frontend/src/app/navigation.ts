@@ -56,6 +56,16 @@ export const navigationGroups: NavigationGroup[] = [
         icon: Cloud,
       },
       {
+        // Display cloud connections navigation.
+        label: "AWS Accounts",
+
+        // Navigate to account management.
+        href: "/cloud/accounts",
+
+        // Use cloud icon.
+        icon: Cloud,
+      },
+      {
         label: "Resources",
         href: "/cloud/resources",
         icon: Boxes,
