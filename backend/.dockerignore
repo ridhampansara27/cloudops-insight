@@ -1,0 +1,33 @@
+# Local Python environment.
+.venv/
+
+# Python caches.
+__pycache__/
+*.py[cod]
+
+# Test caches.
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage output.
+.coverage
+htmlcov/
+
+# Local secrets.
+.env
+.env.*
+
+# Keep the safe example configuration.
+!.env.example
+
+# Git metadata.
+.git/
+.gitignore
+
+# IDE data.
+.vscode/
+.idea/
+
+# Test code is not required in the production runtime image.
+tests/

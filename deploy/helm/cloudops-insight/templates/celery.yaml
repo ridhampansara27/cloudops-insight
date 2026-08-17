@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: cloudops-worker
+
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: cloudops-worker
+
+  template:
+    metadata:
+      labels:
+        app: cloudops-worker
+
+    spec:
+      containers:
+        - name: worker
+
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+
+          command:
+            - celery
+            - -A
+            - app.tasks.celery_app:celery_app
+            - worker
+            - --loglevel=INFO
+            - --concurrency=1
+
+          envFrom:
+            - configMapRef:
+                name: cloudops-config
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: DATABASE_URL
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: JWT_SECRET
+
+          resources:
+{{ toYaml .Values.worker.resources | indent 12 }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: cloudops-beat
+
+spec:
+  # Run exactly one Beat scheduler.
+  #
+  # Multiple Celery Beat instances could schedule duplicate periodic tasks.
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: cloudops-beat
+
+  template:
+    metadata:
+      labels:
+        app: cloudops-beat
+
+    spec:
+      containers:
+        - name: beat
+
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+
+          command:
+            - celery
+            - -A
+            - app.tasks.celery_app:celery_app
+            - beat
+            - --loglevel=INFO
+
+          envFrom:
+            - configMapRef:
+                name: cloudops-config
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: DATABASE_URL
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: JWT_SECRET
+
+          resources:
+{{ toYaml .Values.beat.resources | indent 12 }}

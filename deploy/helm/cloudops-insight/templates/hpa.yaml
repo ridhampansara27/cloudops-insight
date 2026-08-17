@@ -1,0 +1,33 @@
+{{- if .Values.autoscaling.enabled }}
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+
+metadata:
+  name: cloudops-backend
+
+spec:
+  # Scale the FastAPI Deployment.
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cloudops-backend
+
+  # Never scale below the normal HA baseline.
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+
+  # Protect the local cluster from excessive scaling.
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+
+  metrics:
+    - type: Resource
+
+      resource:
+        name: cpu
+
+        target:
+          type: Utilization
+
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+
+{{- end }}

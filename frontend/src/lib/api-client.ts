@@ -9,17 +9,21 @@ import {
   useAuthStore,
 } from "@/stores/auth-store";
 
-// Read the FastAPI base URL from Vite configuration.
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL;
-
-// Fail immediately when frontend configuration is incomplete.
-if (!API_BASE_URL) {
-  // Prevent the application from silently sending requests to an invalid URL.
-  throw new Error(
-    "VITE_API_BASE_URL is not configured.",
-  );
-}
+// Read the optional external FastAPI URL.
+//
+// During normal Vite development this is:
+// http://127.0.0.1:8000
+//
+// In Docker/Kubernetes it can be empty,
+// causing the frontend to use the browser's current origin.
+const API_BASE_URL = (
+  import.meta.env
+    .VITE_API_BASE_URL ??
+  ""
+).replace(
+  /\/$/,
+  "",
+);
 
 // Define supported API-request configuration.
 interface ApiRequestOptions

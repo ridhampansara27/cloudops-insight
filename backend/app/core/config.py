@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
 
     # Define the initial development administrator email address.
-    seed_admin_email: str = "admin@cloudops.local"
+    seed_admin_email: str = "admin@example.com"
 
     # Define the initial administrator's display name.
     seed_admin_name: str = "CloudOps Administrator"

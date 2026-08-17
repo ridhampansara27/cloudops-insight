@@ -1,0 +1,33 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+
+metadata:
+  name: cloudops-backend
+
+spec:
+  # Keep at least one FastAPI Pod available during voluntary disruption.
+  minAvailable: 1
+
+  # Allow unhealthy Pods to be evicted during drains.
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+  selector:
+    matchLabels:
+      app: cloudops-backend
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+
+metadata:
+  name: cloudops-frontend
+
+spec:
+  # Keep at least one frontend replica available.
+  minAvailable: 1
+
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+  selector:
+    matchLabels:
+      app: cloudops-frontend

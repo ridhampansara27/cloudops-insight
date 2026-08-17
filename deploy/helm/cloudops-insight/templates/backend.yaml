@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: cloudops-backend
+
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: cloudops-backend
+
+  template:
+    metadata:
+      labels:
+        app: cloudops-backend
+
+    spec:
+      containers:
+        - name: backend
+
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: 8000
+
+          envFrom:
+            - configMapRef:
+                name: cloudops-config
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: DATABASE_URL
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: JWT_SECRET
+
+            - name: SEED_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: SEED_ADMIN_PASSWORD
+
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+
+            periodSeconds: 5
+            failureThreshold: 12
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          resources:
+{{ toYaml .Values.backend.resources | indent 12 }}
+
+---
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: cloudops-backend
+
+spec:
+  selector:
+    app: cloudops-backend
+
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}
+      targetPort: http
+
+  type: ClusterIP
