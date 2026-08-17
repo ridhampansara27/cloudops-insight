@@ -2,7 +2,6 @@
 import {
   ArrowLeft,
   Cloud,
-  Database,
   MapPin,
   Server,
   UserRound,
@@ -13,6 +12,11 @@ import {
   Link,
   useParams,
 } from "react-router-dom";
+
+// Import resource metrics chart.
+import {
+  ResourceMetricsChart,
+} from "@/components/resources/resource-metrics-chart";
 
 // Import resource health badge.
 import {
@@ -45,15 +49,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import resource API query.
+// Import resource API queries.
 import {
   useResource,
+  useResourceMetrics,
 } from "@/features/resources/api/resources-api";
 
 // Import timestamp formatting.
 import {
   formatTimestamp,
 } from "@/lib/formatters";
+
 
 
 // Export resource detail page.
@@ -70,6 +76,13 @@ export function ResourceDetailPage() {
   const resourceQuery =
     useResource(
       resourceId,
+    );
+
+  // Load the most recent twenty-four hours of monitoring data.
+  const metricsQuery =
+    useResourceMetrics(
+      resourceId,
+      24,
     );
 
   // Display loading state.
@@ -391,16 +404,12 @@ export function ResourceDetailPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="flex min-h-60 items-center justify-center rounded-lg border border-dashed bg-muted/20 p-6 text-center">
-            <div>
-              <Database className="mx-auto size-6 text-muted-foreground" />
-
-              <p className="mt-3 text-sm text-muted-foreground">
-                CPU, memory, network and service-specific metrics
-                will appear after CloudWatch integration.
-              </p>
-            </div>
-          </div>
+          <ResourceMetricsChart
+            series={
+              metricsQuery.data ??
+              []
+            }
+          />
         </CardContent>
       </Card>
     </section>

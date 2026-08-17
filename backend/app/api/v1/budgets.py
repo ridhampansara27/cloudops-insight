@@ -27,6 +27,11 @@ from app.schemas.budget import (
     BudgetUpdate,
 )
 
+# Import real budget evaluation.
+from app.services.budget_evaluation_service import (
+    BudgetEvaluationService,
+)
+
 # Create the budget router.
 router = APIRouter()
 
@@ -57,13 +62,40 @@ async def list_budgets(
     # Retrieve ORM objects.
     budgets = result.scalars().all()
 
-    # Serialize the results.
-    return [
-        BudgetRead.model_validate(
+    # Create the budget evaluation service.
+    evaluation_service = BudgetEvaluationService(
+        session,
+    )
+
+    # Store evaluated budget responses.
+    responses: list[BudgetRead] = []
+
+    # Evaluate every configured budget.
+    for budget in budgets:
+        # Calculate real current spend and utilization.
+        evaluation = await evaluation_service.evaluate(
             budget,
         )
-        for budget in budgets
-    ]
+
+        # Serialize persisted budget fields.
+        budget_read = BudgetRead.model_validate(
+            budget,
+        )
+
+        # Add calculated budget evaluation fields.
+        responses.append(
+            budget_read.model_copy(
+                update={
+                    "current_spend": evaluation.current_spend,
+                    "utilization_percentage": (evaluation.utilization_percentage),
+                    "evaluation_status": (evaluation.evaluation_status),
+                    "last_evaluated_at": (evaluation.last_evaluated_at),
+                },
+            ),
+        )
+
+    # Return evaluated budgets.
+    return responses
 
 
 # Create one budget.
@@ -113,9 +145,26 @@ async def create_budget(
         budget,
     )
 
-    # Return the created budget.
-    return BudgetRead.model_validate(
+    # Evaluate the newly created budget.
+    evaluation = await BudgetEvaluationService(
+        session,
+    ).evaluate(
         budget,
+    )
+
+    # Serialize persisted budget fields.
+    budget_read = BudgetRead.model_validate(
+        budget,
+    )
+
+    # Return the budget with calculated evaluation fields.
+    return budget_read.model_copy(
+        update={
+            "current_spend": evaluation.current_spend,
+            "utilization_percentage": (evaluation.utilization_percentage),
+            "evaluation_status": (evaluation.evaluation_status),
+            "last_evaluated_at": (evaluation.last_evaluated_at),
+        },
     )
 
 
@@ -180,9 +229,26 @@ async def update_budget(
         budget,
     )
 
-    # Return updated budget.
-    return BudgetRead.model_validate(
+    # Evaluate the updated budget.
+    evaluation = await BudgetEvaluationService(
+        session,
+    ).evaluate(
         budget,
+    )
+
+    # Serialize persisted budget fields.
+    budget_read = BudgetRead.model_validate(
+        budget,
+    )
+
+    # Return the updated budget with calculated evaluation fields.
+    return budget_read.model_copy(
+        update={
+            "current_spend": evaluation.current_spend,
+            "utilization_percentage": (evaluation.utilization_percentage),
+            "evaluation_status": (evaluation.evaluation_status),
+            "last_evaluated_at": (evaluation.last_evaluated_at),
+        },
     )
 
 

@@ -1,9 +1,10 @@
 # Import Decimal and UUID types.
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 # Import SQLAlchemy constructs.
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
 
 # Import ORM typing.
 from sqlalchemy.orm import Mapped, mapped_column
@@ -98,4 +99,48 @@ class Budget(
         ),
         # Require ownership.
         nullable=False,
+    )
+
+    # Store current evaluated spending.
+    current_spend: Mapped[Decimal] = mapped_column(
+        Numeric(
+            precision=18,
+            scale=6,
+        ),
+        default=Decimal(
+            0,
+        ),
+        server_default="0",
+        nullable=False,
+    )
+
+    # Store percentage of the configured budget consumed.
+    utilization_percentage: Mapped[Decimal] = mapped_column(
+        Numeric(
+            precision=8,
+            scale=2,
+        ),
+        default=Decimal(
+            0,
+        ),
+        server_default="0",
+        nullable=False,
+    )
+
+    # Store evaluation result.
+    evaluation_status: Mapped[str] = mapped_column(
+        String(
+            32,
+        ),
+        default="not_evaluated",
+        server_default="not_evaluated",
+        nullable=False,
+    )
+
+    # Store latest evaluation time.
+    last_evaluated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(
+            timezone=True,
+        ),
+        nullable=True,
     )

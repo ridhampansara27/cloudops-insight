@@ -313,3 +313,41 @@ export interface RecommendationApiResponse {
   status: string;
   created_at: string;
 }
+
+
+
+
+
+// ------------------------------
+// Monitoring
+// ------------------------------
+
+// Define one CloudWatch metric point.
+export interface MetricPointApiResponse {
+  // Store provider timestamp.
+  timestamp: string;
+
+  // Store numeric metric value.
+  value: number;
+}
+
+// Define one complete CloudWatch series.
+export interface MetricSeriesApiResponse {
+  // Store provider namespace.
+  namespace: string;
+
+  // Store metric name.
+  metric_name: string;
+
+  // Store statistic.
+  statistic: string;
+
+  // Store unit.
+  unit:
+    | string
+    | null;
+
+  // Store chronological metric points.
+  points:
+    MetricPointApiResponse[];
+}

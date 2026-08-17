@@ -50,6 +50,18 @@ export const queryKeys = {
         "detail",
         resourceId,
       ] as const,
+     
+    // Create a resource monitoring query key.
+    metrics: (
+      resourceId: string,
+      hours: number,
+    ) =>
+      [
+        "resources",
+        "metrics",
+        resourceId,
+        hours,
+      ] as const,  
   },
 
   // Store cost cache keys.

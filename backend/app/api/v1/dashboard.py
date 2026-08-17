@@ -138,6 +138,8 @@ async def get_dashboard_summary(
                 0,
             ),
         ).where(
+            # Count only AWS service-level aggregate records.
+            CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         ),
     )

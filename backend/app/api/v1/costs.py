@@ -61,6 +61,8 @@ async def get_cost_summary(
                 0,
             ),
         ).where(
+            # Count only AWS service-level aggregate records.
+            CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         ),
     )
@@ -76,6 +78,8 @@ async def get_cost_summary(
             ),
         )
         .where(
+            # Count only AWS service-level aggregate records.
+            CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         )
         .group_by(
@@ -99,6 +103,8 @@ async def get_cost_summary(
             ),
         )
         .where(
+            # Count only AWS service-level aggregate records.
+            CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         )
         .group_by(

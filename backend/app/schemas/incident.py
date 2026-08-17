@@ -40,6 +40,9 @@ class IncidentRead(BaseModel):
     # Return resolution time.
     resolved_at: datetime | None
 
+    # Return whether the incident was manually or automatically created.
+    source: str
+
 
 # Define a workflow status update.
 class IncidentStatusUpdate(BaseModel):

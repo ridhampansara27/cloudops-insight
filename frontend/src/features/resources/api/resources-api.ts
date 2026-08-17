@@ -19,6 +19,16 @@ import type {
   ResourceListResponse,
 } from "@/types/api";
 
+import type {
+  MetricSeriesApiResponse,
+} from "@/types/api";
+
+
+
+
+
+
+
 // Define supported resource filters.
 export interface ResourceFilters {
   // Store one-based page number.
@@ -151,5 +161,52 @@ export function useResource(
     // Avoid invalid requests before a route ID exists.
     enabled:
       resourceId.length > 0,
+  });
+}
+
+
+
+// Request CloudWatch monitoring history for one resource.
+async function getResourceMetrics(
+  resourceId: string,
+  hours: number,
+): Promise<
+  MetricSeriesApiResponse[]
+> {
+  // Request stored PostgreSQL time-series information.
+  return apiRequest<
+    MetricSeriesApiResponse[]
+  >(
+    `/api/v1/resources/${resourceId}/metrics?hours=${hours}`,
+  );
+}
+
+
+// Expose resource monitoring query.
+export function useResourceMetrics(
+  resourceId: string,
+  hours = 24,
+) {
+  // Cache monitoring data independently per resource/time window.
+  return useQuery({
+    queryKey:
+      queryKeys.resources.metrics(
+        resourceId,
+        hours,
+      ),
+
+    queryFn: () =>
+      getResourceMetrics(
+        resourceId,
+        hours,
+      ),
+
+    enabled:
+      resourceId.length >
+      0,
+
+    // Monitoring data can refresh every minute while the page is open.
+    refetchInterval:
+      60_000,
   });
 }

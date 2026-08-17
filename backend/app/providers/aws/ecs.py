@@ -130,18 +130,10 @@ def discover_ecs_resources(
                     ).lower(),
                     # Store useful cluster metadata.
                     metadata={
-                        "running_tasks": cluster.get(
-                            "runningTasksCount",
-                            0,
-                        ),
-                        "pending_tasks": cluster.get(
-                            "pendingTasksCount",
-                            0,
-                        ),
-                        "active_services": cluster.get(
-                            "activeServicesCount",
-                            0,
-                        ),
+                        "cluster_name": cluster_arn.rsplit(
+                            "/",
+                            maxsplit=1,
+                        )[-1],
                     },
                     # Store provider tags.
                     tags=cluster_tags,

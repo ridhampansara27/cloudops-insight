@@ -10,6 +10,9 @@ from app.models.cost import CostRecord
 # Import the incident model.
 from app.models.incident import Incident
 
+# Export the CloudWatch time-series model.
+from app.models.metric import MetricSample
+
 # Import optimization recommendations.
 from app.models.recommendation import Recommendation
 
@@ -26,6 +29,7 @@ __all__ = [
     "CloudResource",
     "CostRecord",
     "Incident",
+    "MetricSample",
     "Recommendation",
     "ResourceTag",
     "User",

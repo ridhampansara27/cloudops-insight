@@ -1,6 +1,11 @@
 # Import Celery.
 from celery import Celery
 
+# Import Celery crontab scheduling.
+from celery.schedules import (
+    crontab,
+)
+
 # Import application configuration.
 from app.core.config import settings
 
@@ -17,6 +22,32 @@ celery_app = Celery(
         "app.tasks.aws_sync",
     ],
 )
+
+# Configure periodic CloudOps jobs.
+celery_app.conf.beat_schedule = {
+    # Refresh AWS resource inventory every hour.
+    "aws-resource-discovery-hourly": {
+        "task": ("cloudops.schedule_all_aws_resource_syncs"),
+        "schedule": crontab(
+            minute=5,
+        ),
+    },
+    # Collect CloudWatch metrics every fifteen minutes.
+    "aws-cloudwatch-metrics": {
+        "task": ("cloudops.schedule_all_aws_metric_syncs"),
+        "schedule": crontab(
+            minute="*/15",
+        ),
+    },
+    # Cost Explorer does not require frequent polling.
+    "aws-cost-explorer-daily": {
+        "task": ("cloudops.schedule_all_aws_cost_syncs"),
+        "schedule": crontab(
+            hour=6,
+            minute=15,
+        ),
+    },
+}
 
 
 # Configure safe interoperable task serialization.

@@ -112,3 +112,15 @@ class BudgetRead(BaseModel):
 
     # Return modification time.
     updated_at: datetime
+
+    # Return real current-month spending.
+    current_spend: Decimal
+
+    # Return percentage of the monthly budget already consumed.
+    utilization_percentage: Decimal
+
+    # Return the calculated budget health state.
+    evaluation_status: str
+
+    # Return when the budget evaluation was performed.
+    last_evaluated_at: datetime | None

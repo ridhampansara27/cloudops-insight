@@ -71,3 +71,14 @@ class ResourceSyncStatusResponse(
 
     # Return safe failure information.
     last_sync_error: str | None
+
+
+# Describe one monitoring synchronization.
+class MonitoringSyncResponse(
+    BaseModel,
+):
+    # Return cloud account UUID.
+    account_id: UUID
+
+    # Return processed metric points.
+    samples_upserted: int

@@ -109,3 +109,17 @@ class Incident(
         # Allow unassigned incidents.
         nullable=True,
     )
+
+    # Store where the incident originated.
+    source: Mapped[str] = mapped_column(
+        # Support monitoring and manual incidents.
+        String(
+            32,
+        ),
+        # Existing incidents are treated as manual/demo records.
+        default="manual",
+        # Existing database rows receive a valid default.
+        server_default="manual",
+        # Require incident provenance.
+        nullable=False,
+    )

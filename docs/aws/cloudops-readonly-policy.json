@@ -18,6 +18,26 @@
         "s3:GetBucketTagging"
       ],
       "Resource": "*"
+    },
+
+    {
+      "Sid": "CloudOpsMonitoringRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricData"
+      ],
+      "Resource": "*"
     }
+
+    {
+      "Sid": "CloudOpsFinOpsRead",
+      "Effect": "Allow",
+      "Action": [
+        "ce:GetCostAndUsage",
+        "ce:GetCostAndUsageWithResources"
+      ],
+      "Resource": "*"
+    }
+    
   ]
 }

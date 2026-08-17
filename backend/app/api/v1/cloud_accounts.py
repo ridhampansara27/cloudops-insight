@@ -12,6 +12,9 @@ from anyio import to_thread
 # Import FastAPI routing and HTTP error helpers.
 from fastapi import APIRouter, HTTPException, status
 
+# Import Pydantic base schema.
+from pydantic import BaseModel
+
 # Import authentication/database dependencies.
 from app.api.dependencies import (
     CurrentUser,
@@ -46,18 +49,39 @@ from app.schemas.cloud_account import (
     CloudAccountValidationResponse,
 )
 
-# Import synchronization response schema.
-# Import queued synchronization schemas.
+# Import synchronization response schemas.
 from app.schemas.resource_sync import (
+    MonitoringSyncResponse,
     ResourceSyncQueuedResponse,
     ResourceSyncStatusResponse,
 )
 
-# Import resource synchronization service.
+# Import Cost Explorer synchronization service.
+from app.services.cost_sync_service import (
+    CostSyncService,
+)
+
+# Import monitoring synchronization service.
+from app.services.monitoring_sync_service import (
+    MonitoringSyncService,
+)
+
 # Import Celery AWS synchronization task.
 from app.tasks.aws_sync import (
     sync_aws_account_task,
 )
+
+
+# Describe a successful Cost Explorer synchronization.
+class CostSyncResponse(
+    BaseModel,
+):
+    # Return the synchronized cloud account UUID.
+    account_id: UUID
+
+    # Return the number of imported cost records.
+    records_imported: int
+
 
 # Create the cloud-account router.
 router = APIRouter()
@@ -417,6 +441,66 @@ async def sync_cloud_account(
         account_id=account_id,
         task_id=task.id,
         status="queued",
+    )
+
+
+# Synchronize real CloudWatch metrics for one AWS account.
+@router.post(
+    "/{account_id}/metrics/sync",
+    response_model=MonitoringSyncResponse,
+)
+async def sync_cloud_account_metrics(
+    # Receive cloud account UUID.
+    account_id: UUID,
+    # Require authenticated application user.
+    current_user: CurrentUser,
+    # Receive asynchronous database session.
+    session: DatabaseSession,
+) -> MonitoringSyncResponse:
+    # Require authentication.
+    del current_user
+
+    # Run CloudWatch synchronization.
+    samples = await MonitoringSyncService(
+        session,
+    ).sync_account(
+        account_id,
+    )
+
+    # Return synchronization result.
+    return MonitoringSyncResponse(
+        account_id=account_id,
+        samples_upserted=(samples),
+    )
+
+
+# Synchronize real Cost Explorer records.
+@router.post(
+    "/{account_id}/costs/sync",
+    response_model=CostSyncResponse,
+)
+async def sync_cloud_account_costs(
+    # Receive cloud account UUID.
+    account_id: UUID,
+    # Require authenticated application user.
+    current_user: CurrentUser,
+    # Receive asynchronous database session.
+    session: DatabaseSession,
+) -> CostSyncResponse:
+    # Require authentication.
+    del current_user
+
+    # Synchronize Cost Explorer.
+    imported = await CostSyncService(
+        session,
+    ).sync_account(
+        account_id,
+    )
+
+    # Return synchronization statistics.
+    return CostSyncResponse(
+        account_id=account_id,
+        records_imported=imported,
     )
 
 
