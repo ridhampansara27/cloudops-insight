@@ -1,0 +1,499 @@
+name: CloudOps CI/CD
+
+# ------------------------------------------------------------
+# Workflow triggers
+# ------------------------------------------------------------
+
+on:
+  # Validate every pull request.
+  pull_request:
+
+  # Deploy only after code reaches main.
+  push:
+    branches:
+      - main
+
+  # Allow manual execution from GitHub.
+  workflow_dispatch:
+
+
+# Restrict the default GITHUB_TOKEN.
+permissions:
+  contents: read
+
+
+# ------------------------------------------------------------
+# Shared image metadata
+# ------------------------------------------------------------
+
+env:
+  REGISTRY: ghcr.io
+
+  BACKEND_IMAGE: >-
+    ghcr.io/${{ github.repository_owner }}/cloudops-insight-backend
+
+  FRONTEND_IMAGE: >-
+    ghcr.io/${{ github.repository_owner }}/cloudops-insight-frontend
+
+  # Immutable application version.
+  IMAGE_TAG: sha-${{ github.sha }}
+
+
+jobs:
+
+  # ==========================================================
+  # Backend quality
+  # ==========================================================
+
+  backend-quality:
+    name: Backend quality
+
+    runs-on: ubuntu-24.04
+
+    services:
+
+      postgres:
+        image: postgres:17-alpine
+
+        env:
+          POSTGRES_DB: cloudops
+          POSTGRES_USER: cloudops
+          POSTGRES_PASSWORD: cloudops_ci_password
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd
+          "pg_isready -U cloudops -d cloudops"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+
+      redis:
+        image: redis:7-alpine
+
+        ports:
+          - 6379:6379
+
+        options: >-
+          --health-cmd
+          "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+
+    env:
+      DATABASE_URL: >-
+        postgresql+asyncpg://cloudops:cloudops_ci_password@127.0.0.1:5432/cloudops
+
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/1
+
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/2
+
+      JWT_SECRET: >-
+        ci-only-jwt-secret-do-not-use-in-production-1234567890
+
+      SEED_ADMIN_EMAIL: admin@example.com
+
+      SEED_ADMIN_NAME: CloudOps CI Administrator
+
+      SEED_ADMIN_PASSWORD: ci-only-password
+
+
+    steps:
+
+      # Checkout application source.
+      - name: Checkout repository
+
+        uses: actions/checkout@v6
+
+
+      # Install the Python version used by CloudOps.
+      - name: Set up Python
+
+        uses: actions/setup-python@v7
+
+        with:
+          python-version: "3.13"
+
+
+      # Install Poetry.
+      - name: Install Poetry
+
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+
+      # Install backend dependencies.
+      - name: Install backend dependencies
+
+        working-directory: backend
+
+        run: |
+          poetry install --no-interaction
+
+
+      # Verify schema migration works from an empty database.
+      - name: Apply database migrations
+
+        working-directory: backend
+
+        run: |
+          poetry run alembic upgrade head
+
+
+      # Check Python lint rules.
+      - name: Ruff check
+
+        working-directory: backend
+
+        run: |
+          poetry run ruff check app tests scripts
+
+
+      # Check source formatting.
+      - name: Ruff format check
+
+        working-directory: backend
+
+        run: |
+          poetry run ruff format --check app tests scripts
+
+
+      # Run backend tests.
+      - name: Run pytest
+
+        working-directory: backend
+
+        run: |
+          poetry run pytest -v
+
+
+      # Ensure SQLAlchemy models do not require another migration.
+      - name: Check Alembic metadata
+
+        working-directory: backend
+
+        run: |
+          poetry run alembic check
+
+
+
+  # ==========================================================
+  # Frontend quality
+  # ==========================================================
+
+  frontend-quality:
+    name: Frontend quality
+
+    runs-on: ubuntu-24.04
+
+
+    steps:
+
+      # Checkout application source.
+      - name: Checkout repository
+
+        uses: actions/checkout@v6
+
+
+      # Install Node.js.
+      - name: Set up Node.js
+
+        uses: actions/setup-node@v7
+
+        with:
+          node-version: "22"
+
+          cache: npm
+
+          cache-dependency-path: frontend/package-lock.json
+
+
+      # Install exactly the locked dependencies.
+      - name: Install frontend dependencies
+
+        working-directory: frontend
+
+        run: |
+          npm ci
+
+
+      # Run lint, TypeScript, and production build validation.
+      - name: Check frontend
+
+        working-directory: frontend
+
+        run: |
+          npm run check
+
+
+
+  # ==========================================================
+  # Docker build, scan and publish
+  # ==========================================================
+
+  publish-images:
+    name: Build, scan and publish images
+
+    # Never publish images from pull-request validation.
+    if: github.event_name != 'pull_request'
+
+    needs:
+      - backend-quality
+      - frontend-quality
+
+    runs-on: ubuntu-24.04
+
+
+    permissions:
+      # Read application source.
+      contents: read
+
+      # Publish containers into GHCR.
+      packages: write
+
+
+    steps:
+
+      # Checkout application repository.
+      - name: Checkout repository
+
+        uses: actions/checkout@v6
+
+
+      # Configure Docker Buildx.
+      - name: Set up Docker Buildx
+
+        uses: docker/setup-buildx-action@v4
+
+
+      # Authenticate to GitHub Container Registry.
+      - name: Log in to GHCR
+
+        uses: docker/login-action@v4
+
+        with:
+          registry: ${{ env.REGISTRY }}
+
+          username: ${{ github.actor }}
+
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+      # ------------------------------------------------------
+      # Backend image
+      # ------------------------------------------------------
+
+      - name: Build backend image
+
+        uses: docker/build-push-action@v7
+
+        with:
+          context: ./backend
+
+          load: true
+
+          push: false
+
+          tags: >-
+            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
+
+          cache-from: type=gha,scope=backend
+
+          cache-to: type=gha,mode=max,scope=backend
+
+
+      # Fail the pipeline for HIGH or CRITICAL fixable vulnerabilities.
+      - name: Scan backend image
+
+        uses: aquasecurity/trivy-action@v0.36.0
+
+        with:
+          image-ref: >-
+            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
+
+          format: table
+
+          severity: HIGH,CRITICAL
+
+          exit-code: "1"
+
+          ignore-unfixed: true
+
+          vuln-type: os,library
+
+
+      # ------------------------------------------------------
+      # Frontend image
+      # ------------------------------------------------------
+
+      - name: Build frontend image
+
+        uses: docker/build-push-action@v7
+
+        with:
+          context: ./frontend
+
+          load: true
+
+          push: false
+
+          tags: >-
+            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
+
+          build-args: |
+            VITE_API_BASE_URL=
+
+          cache-from: type=gha,scope=frontend
+
+          cache-to: type=gha,mode=max,scope=frontend
+
+
+      # Scan the NGINX frontend image.
+      - name: Scan frontend image
+
+        uses: aquasecurity/trivy-action@v0.36.0
+
+        with:
+          image-ref: >-
+            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
+
+          format: table
+
+          severity: HIGH,CRITICAL
+
+          exit-code: "1"
+
+          ignore-unfixed: true
+
+          vuln-type: os,library
+
+
+      # Push only after both security scans have succeeded.
+      - name: Push backend image
+
+        run: |
+          docker push "${BACKEND_IMAGE}:${IMAGE_TAG}"
+
+
+      - name: Push frontend image
+
+        run: |
+          docker push "${FRONTEND_IMAGE}:${IMAGE_TAG}"
+
+
+
+  # ==========================================================
+  # Update GitOps desired state
+  # ==========================================================
+
+  update-gitops:
+    name: Update development GitOps image tags
+
+    if: github.event_name != 'pull_request'
+
+    needs:
+      - publish-images
+
+    runs-on: ubuntu-24.04
+
+
+    steps:
+
+      # Checkout the separate GitOps repository.
+      - name: Checkout GitOps repository
+
+        uses: actions/checkout@v6
+
+        with:
+          repository: ridhampansara27/cloudops-gitops
+
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+
+          path: gitops
+
+
+      # Update exact image markers without requiring additional YAML tooling.
+      - name: Update development images
+
+        shell: bash
+
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import os
+
+          path = Path("gitops/environments/dev/values.yaml")
+
+          lines = path.read_text(encoding="utf-8").splitlines()
+
+          output = []
+
+          for line in lines:
+              indentation = line[: len(line) - len(line.lstrip())]
+
+              if "# backend-image-repository" in line:
+                  line = (
+                      f'{indentation}repository: '
+                      f'"{os.environ["BACKEND_IMAGE"]}" '
+                      f'# backend-image-repository'
+                  )
+
+              elif "# backend-image-tag" in line:
+                  line = (
+                      f'{indentation}tag: '
+                      f'"{os.environ["IMAGE_TAG"]}" '
+                      f'# backend-image-tag'
+                  )
+
+              elif "# frontend-image-repository" in line:
+                  line = (
+                      f'{indentation}repository: '
+                      f'"{os.environ["FRONTEND_IMAGE"]}" '
+                      f'# frontend-image-repository'
+                  )
+
+              elif "# frontend-image-tag" in line:
+                  line = (
+                      f'{indentation}tag: '
+                      f'"{os.environ["IMAGE_TAG"]}" '
+                      f'# frontend-image-tag'
+                  )
+
+              output.append(line)
+
+          path.write_text(
+              "\n".join(output) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+
+      # Commit the new immutable deployment version.
+      - name: Commit GitOps update
+
+        working-directory: gitops
+
+        shell: bash
+
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add environments/dev/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "GitOps repository already uses ${IMAGE_TAG}."
+            exit 0
+          fi
+
+          git commit -m "deploy(dev): ${IMAGE_TAG}"
+
+          git push
