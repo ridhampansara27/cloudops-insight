@@ -1,13 +1,10 @@
-// Import React utilities.
+// Import React state and deferred-value support.
 import {
-  // Memoize filtered resource results.
-  useMemo,
-
-  // Store filter state.
+  useDeferredValue,
   useState,
 } from "react";
 
-// Import icons used by the page.
+// Import resource icons.
 import {
   Boxes,
   CircleAlert,
@@ -16,7 +13,16 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-// Import reusable UI components.
+// Import reusable API states.
+import {
+  PageErrorState,
+} from "@/components/shared/page-error-state";
+
+import {
+  PageLoadingState,
+} from "@/components/shared/page-loading-state";
+
+// Import cards and inputs.
 import {
   Card,
   CardContent,
@@ -24,126 +30,157 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import { Input } from "@/components/ui/input";
+import {
+  Input,
+} from "@/components/ui/input";
 
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
 
-// Import the resource table.
-import { ResourceDataTable } from "@/features/resources/resource-data-table";
+// Import resource table.
+import {
+  ResourceDataTable,
+} from "@/features/resources/resource-data-table";
 
-// Import the mock AWS resources.
-import { mockResources } from "@/mocks/resources";
+// Import real API hooks.
+import {
+  useDashboardSummary,
+} from "@/features/dashboard/api/dashboard-api";
 
-// Export the Resource Explorer page.
+import {
+  useResources,
+} from "@/features/resources/api/resources-api";
+
+
+// Export API-driven Resource Explorer.
 export function ResourceExplorerPage() {
-  // Store the free-text search query.
-  const [searchQuery, setSearchQuery] =
+  // Store current server page.
+  const [
+    page,
+    setPage,
+  ] =
+    useState(1);
+
+  // Use ten resources per page.
+  const pageSize = 10;
+
+  // Store user search input.
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] =
     useState("");
 
-  // Store the selected AWS service.
-  const [serviceFilter, setServiceFilter] =
+  // Defer rapid search-input updates.
+  const deferredSearch =
+    useDeferredValue(
+      searchQuery.trim(),
+    );
+
+  // Store service filter.
+  const [
+    serviceFilter,
+    setServiceFilter,
+  ] =
     useState("all");
 
-  // Store the selected environment.
+  // Store environment filter.
   const [
     environmentFilter,
     setEnvironmentFilter,
-  ] = useState("all");
-
-  // Store the selected health state.
-  const [healthFilter, setHealthFilter] =
+  ] =
     useState("all");
 
-  // Calculate the resource inventory after applying all filters.
-  const filteredResources = useMemo(() => {
-    // Normalize the search string for case-insensitive comparison.
-    const normalizedSearch =
-      searchQuery.trim().toLowerCase();
-
-    // Return only resources matching all active filters.
-    return mockResources.filter((resource) => {
-      // Match resource name, identifier, owner, service, or region.
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        resource.name
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        resource.resourceId
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        resource.owner
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        resource.service
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        resource.region
-          .toLowerCase()
-          .includes(normalizedSearch);
-
-      // Match the selected service.
-      const matchesService =
-        serviceFilter === "all" ||
-        resource.service === serviceFilter;
-
-      // Match the selected environment.
-      const matchesEnvironment =
-        environmentFilter === "all" ||
-        resource.environment ===
-          environmentFilter;
-
-      // Match the selected health state.
-      const matchesHealth =
-        healthFilter === "all" ||
-        resource.health === healthFilter;
-
-      // Require every active filter to match.
-      return (
-        matchesSearch &&
-        matchesService &&
-        matchesEnvironment &&
-        matchesHealth
-      );
-    });
-  }, [
-    // Recalculate when search changes.
-    searchQuery,
-
-    // Recalculate when the service filter changes.
-    serviceFilter,
-
-    // Recalculate when the environment filter changes.
-    environmentFilter,
-
-    // Recalculate when the health filter changes.
+  // Store health filter.
+  const [
     healthFilter,
-  ]);
+    setHealthFilter,
+  ] =
+    useState("all");
 
-  // Calculate total resources.
-  const totalResources = mockResources.length;
+  // Load global inventory counts.
+  const summaryQuery =
+    useDashboardSummary();
 
-  // Calculate healthy resources.
-  const healthyResources = mockResources.filter(
-    (resource) => resource.health === "healthy",
-  ).length;
+  // Load the requested backend resource page.
+  const resourcesQuery =
+    useResources({
+      // Send current page.
+      page,
 
-  // Calculate warning resources.
-  const warningResources = mockResources.filter(
-    (resource) => resource.health === "warning",
-  ).length;
+      // Send server page size.
+      pageSize,
 
-  // Calculate critical resources.
-  const criticalResources = mockResources.filter(
-    (resource) => resource.health === "critical",
-  ).length;
+      // Send search text only when non-empty.
+      search:
+        deferredSearch ||
+        undefined,
 
-  // Render the Resource Explorer.
+      // Send service filter only when selected.
+      service:
+        serviceFilter ===
+        "all"
+          ? undefined
+          : serviceFilter,
+
+      // Send environment only when selected.
+      environment:
+        environmentFilter ===
+        "all"
+          ? undefined
+          : environmentFilter,
+
+      // Send health only when selected.
+      healthState:
+        healthFilter ===
+        "all"
+          ? undefined
+          : healthFilter,
+    });
+
+  // Display initial loading state.
+  if (
+    summaryQuery.isPending ||
+    resourcesQuery.isPending
+  ) {
+    return (
+      <PageLoadingState />
+    );
+  }
+
+  // Display backend failure state.
+  if (
+    summaryQuery.isError ||
+    resourcesQuery.isError
+  ) {
+    return (
+      <PageErrorState
+        title="Unable to load resources"
+        description="The resource inventory could not be retrieved from CloudOps Insight."
+        onRetry={() => {
+          // Retry inventory summary.
+          void summaryQuery.refetch();
+
+          // Retry resource page.
+          void resourcesQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  // Store global resource summary.
+  const summary =
+    summaryQuery.data;
+
+  // Store current resource page.
+  const resourcePage =
+    resourcesQuery.data;
+
+  // Render Resource Explorer.
   return (
     <section className="space-y-6">
-      {/* Display the page heading. */}
       <div>
         <p className="text-sm font-medium text-primary">
           Cloud inventory
@@ -154,14 +191,12 @@ export function ResourceExplorerPage() {
         </h1>
 
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Search and analyze discovered AWS infrastructure across
-          services, environments, regions, health states, and cost.
+          Search and analyze resources stored in the CloudOps
+          inventory database.
         </p>
       </div>
 
-      {/* Display inventory summary cards. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Total resources card. */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -173,12 +208,13 @@ export function ResourceExplorerPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {totalResources}
+              {
+                summary.total_resources
+              }
             </p>
           </CardContent>
         </Card>
 
-        {/* Healthy resources card. */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -190,12 +226,13 @@ export function ResourceExplorerPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {healthyResources}
+              {
+                summary.healthy_resources
+              }
             </p>
           </CardContent>
         </Card>
 
-        {/* Warning resources card. */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -207,12 +244,13 @@ export function ResourceExplorerPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {warningResources}
+              {
+                summary.warning_resources
+              }
             </p>
           </CardContent>
         </Card>
 
-        {/* Critical resources card. */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -224,48 +262,61 @@ export function ResourceExplorerPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {criticalResources}
+              {
+                summary.critical_resources
+              }
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Display search and filtering controls. */}
       <Card>
         <CardContent className="pt-6">
           <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_180px_180px_180px]">
-            {/* Search resources. */}
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
               <Input
-                // Store the current search query.
-                value={searchQuery}
-
-                // Update search when the user types.
-                onChange={(event) =>
-                  setSearchQuery(event.target.value)
+                value={
+                  searchQuery
                 }
+                onChange={(
+                  event,
+                ) => {
+                  // Store new search.
+                  setSearchQuery(
+                    event.target
+                      .value,
+                  );
 
-                // Explain searchable fields.
-                placeholder="Search name, ID, owner, service or region..."
-
-                // Leave space for the search icon.
+                  // Return to first server page.
+                  setPage(
+                    1,
+                  );
+                }}
+                placeholder="Search resource name or provider ID..."
                 className="pl-9"
               />
             </div>
 
-            {/* AWS service filter. */}
             <NativeSelect
-              // Store the current service filter.
-              value={serviceFilter}
-
-              // Update the selected service.
-              onChange={(event) =>
-                setServiceFilter(
-                  event.target.value,
-                )
+              value={
+                serviceFilter
               }
+              onChange={(
+                event,
+              ) => {
+                // Store service filter.
+                setServiceFilter(
+                  event.target
+                    .value,
+                );
+
+                // Reset server page.
+                setPage(
+                  1,
+                );
+              }}
             >
               <NativeSelectOption value="all">
                 All services
@@ -283,8 +334,8 @@ export function ResourceExplorerPage() {
                 ECS
               </NativeSelectOption>
 
-              <NativeSelectOption value="ALB">
-                ALB
+              <NativeSelectOption value="ELB">
+                ALB / ELB
               </NativeSelectOption>
 
               <NativeSelectOption value="S3">
@@ -292,14 +343,24 @@ export function ResourceExplorerPage() {
               </NativeSelectOption>
             </NativeSelect>
 
-            {/* Environment filter. */}
             <NativeSelect
-              value={environmentFilter}
-              onChange={(event) =>
-                setEnvironmentFilter(
-                  event.target.value,
-                )
+              value={
+                environmentFilter
               }
+              onChange={(
+                event,
+              ) => {
+                // Store environment.
+                setEnvironmentFilter(
+                  event.target
+                    .value,
+                );
+
+                // Reset server page.
+                setPage(
+                  1,
+                );
+              }}
             >
               <NativeSelectOption value="all">
                 All environments
@@ -318,14 +379,24 @@ export function ResourceExplorerPage() {
               </NativeSelectOption>
             </NativeSelect>
 
-            {/* Health-state filter. */}
             <NativeSelect
-              value={healthFilter}
-              onChange={(event) =>
-                setHealthFilter(
-                  event.target.value,
-                )
+              value={
+                healthFilter
               }
+              onChange={(
+                event,
+              ) => {
+                // Store health filter.
+                setHealthFilter(
+                  event.target
+                    .value,
+                );
+
+                // Reset backend page.
+                setPage(
+                  1,
+                );
+              }}
             >
               <NativeSelectOption value="all">
                 All health states
@@ -349,16 +420,37 @@ export function ResourceExplorerPage() {
             </NativeSelect>
           </div>
 
-          {/* Display active filter result count. */}
           <p className="mt-4 text-xs text-muted-foreground">
-            {filteredResources.length} of{" "}
-            {mockResources.length} resources match the current filters.
+            {
+              resourcePage.total
+            }{" "}
+            resources match the current server-side filters.
+            {resourcesQuery.isFetching &&
+              " Refreshing…"}
           </p>
         </CardContent>
       </Card>
 
-      {/* Display the filtered resource inventory. */}
-      <ResourceDataTable data={filteredResources} />
+      <ResourceDataTable
+        data={
+          resourcePage.items
+        }
+        page={
+          resourcePage.page
+        }
+        pageSize={
+          resourcePage.page_size
+        }
+        total={
+          resourcePage.total
+        }
+        totalPages={
+          resourcePage.total_pages
+        }
+        onPageChange={
+          setPage
+        }
+      />
     </section>
   );
 }

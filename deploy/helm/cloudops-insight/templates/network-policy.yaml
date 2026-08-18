@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: cloudops-backend-ingress
+
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudops-backend
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow frontend NGINX to call FastAPI.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: cloudops-frontend
+
+      ports:
+        - protocol: TCP
+          port: 8000

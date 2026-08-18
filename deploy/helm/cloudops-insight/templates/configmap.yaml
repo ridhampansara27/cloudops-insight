@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: cloudops-config
+
+data:
+  # Configure FastAPI runtime environment.
+  APP_NAME: "CloudOps Insight API"
+
+  APP_ENV: "kubernetes"
+
+  DEBUG: "false"
+
+  API_V1_PREFIX: "/api/v1"
+
+  LOG_LEVEL: "INFO"
+
+  SQL_ECHO: "false"
+
+  # Configure Redis.
+  REDIS_URL: "redis://cloudops-redis:6379/0"
+
+  # Configure Celery.
+  CELERY_BROKER_URL: "redis://cloudops-redis:6379/1"
+
+  CELERY_RESULT_BACKEND: "redis://cloudops-redis:6379/2"
+
+  # Use default AWS region.
+  AWS_DEFAULT_REGION: "eu-central-1"
+
+  # Do not expect a workstation AWS profile inside Kubernetes.
+  AWS_PROFILE_NAME: ""
+
+  # Configure STS role sessions.
+  AWS_ROLE_SESSION_NAME: "cloudops-insight"
+
+  AWS_ROLE_DURATION_SECONDS: "3600"
+
+  # Allow local web development if required.
+  CORS_ORIGINS: "http://localhost:5173,http://localhost:8080,http://cloudops.local"

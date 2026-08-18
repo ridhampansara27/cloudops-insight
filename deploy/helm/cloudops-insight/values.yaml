@@ -1,0 +1,139 @@
+# ------------------------------------------------------------
+# Backend
+# ------------------------------------------------------------
+
+backend:
+  replicaCount: 2
+
+  image:
+    repository: cloudops-backend
+    tag: local
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 8000
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+
+# ------------------------------------------------------------
+# Frontend
+# ------------------------------------------------------------
+
+frontend:
+  replicaCount: 2
+
+  image:
+    repository: cloudops-frontend
+    tag: local
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 8080
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+
+# ------------------------------------------------------------
+# Celery worker
+# ------------------------------------------------------------
+
+worker:
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+
+# ------------------------------------------------------------
+# Celery Beat
+# ------------------------------------------------------------
+
+beat:
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+
+# ------------------------------------------------------------
+# PostgreSQL — local Kind only
+# ------------------------------------------------------------
+
+postgres:
+  image: postgres:17-alpine
+
+  database: cloudops
+
+  username: cloudops
+
+  storage:
+    size: 2Gi
+
+
+# ------------------------------------------------------------
+# Redis — local Kind only
+# ------------------------------------------------------------
+
+redis:
+  image: redis:7-alpine
+
+
+# ------------------------------------------------------------
+# Secret references
+# ------------------------------------------------------------
+
+secrets:
+  existingSecret: cloudops-secrets
+
+
+# ------------------------------------------------------------
+# Ingress
+# ------------------------------------------------------------
+
+ingress:
+  enabled: true
+
+  className: nginx
+
+  host: cloudops.local
+
+
+# ------------------------------------------------------------
+# Autoscaling
+# ------------------------------------------------------------
+
+autoscaling:
+  enabled: true
+
+  minReplicas: 2
+
+  maxReplicas: 5
+
+  targetCPUUtilizationPercentage: 70

@@ -23,3 +23,17 @@ interface ImportMeta {
   // Expose the typed Vite environment object.
   readonly env: ImportMetaEnv;
 }
+
+
+
+// Describe environment variables exposed by Vite.
+interface ImportMetaEnv {
+  // Define the public FastAPI base URL.
+  readonly VITE_API_BASE_URL: string;
+}
+
+// Extend Vite's ImportMeta type.
+interface ImportMeta {
+  // Expose our typed environment configuration.
+  readonly env: ImportMetaEnv;
+}

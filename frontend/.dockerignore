@@ -1,0 +1,20 @@
+# npm dependencies are recreated inside the builder.
+node_modules/
+
+# Existing frontend build.
+dist/
+
+# Machine-specific environment values.
+.env
+.env.local
+.env.*.local
+
+# Git metadata.
+.git/
+
+# IDE state.
+.vscode/
+.idea/
+
+# npm logs.
+npm-debug.log*

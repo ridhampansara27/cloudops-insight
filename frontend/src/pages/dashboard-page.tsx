@@ -1,15 +1,22 @@
-// Import the dashboard KPI component.
-import { MetricCard } from "@/components/dashboard/metric-card";
+// Import the resource-health badge.
+import {
+  ResourceHealthBadge,
+} from "@/components/shared/resource-health-badge";
 
-// Import the service-cost visualization.
-import { CostByService } from "@/components/dashboard/cost-by-service";
+// Import dashboard components.
+import {
+  CostByService,
+} from "@/components/dashboard/cost-by-service";
 
-// Import the resource-health visualization.
-import { ResourceHealthSummary } from "@/components/dashboard/resource-health-summary";
+import {
+  MetricCard,
+} from "@/components/dashboard/metric-card";
 
-// Import badge and card components.
-import { Badge } from "@/components/ui/badge";
+import {
+  ResourceHealthSummary,
+} from "@/components/dashboard/resource-health-summary";
 
+// Import reusable cards.
 import {
   Card,
   CardContent,
@@ -18,241 +25,371 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import mock dashboard data.
+// Import reusable loading/error states.
 import {
-  activeIncidents,
-  dashboardMetrics,
-  highCostResources,
-} from "@/mocks/dashboard";
+  PageErrorState,
+} from "@/components/shared/page-error-state";
 
-// Format a number as a euro currency value.
-function formatCurrency(value: number): string {
-  // Use the German locale because the project is being developed in Germany.
-  return new Intl.NumberFormat("de-DE", {
-    // Format the value as currency.
-    style: "currency",
+import {
+  PageLoadingState,
+} from "@/components/shared/page-loading-state";
 
-    // Display the value in euros.
-    currency: "EUR",
-  }).format(value);
-}
+// Import dashboard metric adapter.
+import {
+  createDashboardMetrics,
+} from "@/features/dashboard/dashboard-adapter";
 
-// Export the main dashboard page.
+// Import real API hooks.
+import {
+  useDashboardSummary,
+} from "@/features/dashboard/api/dashboard-api";
+
+import {
+  useCostSummary,
+} from "@/features/costs/api/costs-api";
+
+import {
+  useIncidents,
+} from "@/features/incidents/api/incidents-api";
+
+import {
+  useResources,
+} from "@/features/resources/api/resources-api";
+
+// Import shared timestamp formatting.
+import {
+  formatTimestamp,
+} from "@/lib/formatters";
+
+
+// Export the real API-driven dashboard.
 export function DashboardPage() {
-  // Render the operational overview.
+  // Load dashboard KPI information.
+  const dashboardQuery =
+    useDashboardSummary();
+
+  // Load real billing information.
+  const costQuery =
+    useCostSummary();
+
+  // Load real incidents.
+  const incidentsQuery =
+    useIncidents();
+
+  // Load enough resources for the dashboard's attention list.
+  const resourcesQuery =
+    useResources({
+      // Load the first page.
+      page: 1,
+
+      // The backend currently allows a maximum of one hundred rows.
+      pageSize: 100,
+    });
+
+  // Display the loading state during the first API load.
+  if (
+    dashboardQuery.isPending ||
+    costQuery.isPending ||
+    incidentsQuery.isPending ||
+    resourcesQuery.isPending
+  ) {
+    // Render the reusable loading skeleton.
+    return (
+      <PageLoadingState />
+    );
+  }
+
+  // Display an API error when any required dashboard query fails.
+  if (
+    dashboardQuery.isError ||
+    costQuery.isError ||
+    incidentsQuery.isError ||
+    resourcesQuery.isError
+  ) {
+    // Render a friendly retry state.
+    return (
+      <PageErrorState
+        title="Unable to load dashboard"
+        description="CloudOps Insight could not retrieve the operational dashboard data."
+        onRetry={() => {
+          // Retry dashboard summary.
+          void dashboardQuery.refetch();
+
+          // Retry cost information.
+          void costQuery.refetch();
+
+          // Retry incidents.
+          void incidentsQuery.refetch();
+
+          // Retry resources.
+          void resourcesQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  // Store the successful dashboard response.
+  const summary =
+    dashboardQuery.data;
+
+  // Store the successful cost response.
+  const costs =
+    costQuery.data;
+
+  // Store real incidents.
+  const incidents =
+    incidentsQuery.data;
+
+  // Store real resource inventory.
+  const resources =
+    resourcesQuery.data.items;
+
+  // Convert backend KPIs into MetricCard models.
+  const metrics =
+    createDashboardMetrics(
+      summary,
+    );
+
+  // Select resources requiring operational attention.
+  const attentionResources =
+    resources
+      .filter(
+        (resource) =>
+          resource.health_state ===
+            "warning" ||
+          resource.health_state ===
+            "critical",
+      )
+      .slice(
+        0,
+        5,
+      );
+
+  // Select unresolved incidents for the dashboard.
+  const activeIncidents =
+    incidents
+      .filter(
+        (incident) =>
+          incident.status !==
+          "resolved",
+      )
+      .slice(
+        0,
+        4,
+      );
+
+  // Create a lookup from resource UUID to resource name.
+  const resourceNames =
+    new Map(
+      resources.map(
+        (resource) => [
+          // Store resource UUID.
+          resource.id,
+
+          // Store display name.
+          resource.name,
+        ],
+      ),
+    );
+
+  // Render the dashboard.
   return (
     <section className="space-y-6">
-      {/* Display the dashboard heading and synchronization status. */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        {/* Display the dashboard title and description. */}
         <div>
-          {/* Display the dashboard section label. */}
           <p className="text-sm font-medium text-primary">
             Cloud operations overview
           </p>
 
-          {/* Display the main dashboard heading. */}
           <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
             Infrastructure health and cost
           </h1>
 
-          {/* Explain the purpose of the dashboard. */}
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Monitor AWS resource health, active incidents, cloud spending and
-            optimization opportunities.
+            Monitor cloud resource health, incidents, spending and
+            optimization opportunities using the real CloudOps API.
           </p>
         </div>
 
-        {/* Display the latest resource synchronization information. */}
         <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
-          {/* Display a green status indicator. */}
           <span className="size-2 rounded-full bg-emerald-500" />
 
-          {/* Display the synchronization status text. */}
-          Resource data updated 2 minutes ago
+          <span>
+            Last AWS sync{" "}
+            {formatTimestamp(
+              summary.last_resource_sync_at,
+            )}
+          </span>
+
+      
         </div>
       </div>
 
-      {/* Display the six main dashboard KPI cards. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {/* Render one KPI card for each dashboard metric. */}
-        {dashboardMetrics.map((metric) => (
-          <MetricCard
-            key={metric.id}
-            metric={metric}
-          />
-        ))}
+        {metrics.map(
+          (metric) => (
+            <MetricCard
+              key={metric.id}
+              metric={metric}
+            />
+          ),
+        )}
       </div>
 
-      {/* Display infrastructure health and cloud-cost distribution. */}
       <div className="grid gap-6 xl:grid-cols-2">
-        {/* Show the distribution of healthy, warning, critical, and unknown resources. */}
-        <ResourceHealthSummary />
+        <ResourceHealthSummary
+          total={
+            summary.total_resources
+          }
+          healthy={
+            summary.healthy_resources
+          }
+          warning={
+            summary.warning_resources
+          }
+          critical={
+            summary.critical_resources
+          }
+        />
 
-        {/* Show month-to-date AWS spending grouped by service. */}
-        <CostByService />
+        <CostByService
+          services={
+            costs.by_service
+          }
+          total={
+            costs.month_to_date
+          }
+          currency={
+            costs.currency
+          }
+        />
       </div>
 
-      {/* Display expensive resources and active infrastructure incidents. */}
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        {/* Display the highest-cost AWS resources. */}
         <Card>
-          {/* Display the card heading. */}
           <CardHeader>
-            {/* Display the card title. */}
-            <CardTitle>Highest-cost resources</CardTitle>
+            <CardTitle>
+              Resources requiring attention
+            </CardTitle>
 
-            {/* Explain the resource-cost information. */}
             <CardDescription>
-              Month-to-date cloud cost and forecast by resource.
+              Warning and critical resources from the live inventory.
             </CardDescription>
           </CardHeader>
 
-          {/* Display the high-cost resource list. */}
           <CardContent className="space-y-4">
-            {/* Render every high-cost resource. */}
-            {highCostResources.map((resource) => (
-              <div
-                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
-                key={resource.id}
-              >
-                {/* Display resource identity and health. */}
-                <div className="min-w-0">
-                  {/* Display resource name and health badge. */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Display the resource name. */}
-                    <p className="truncate font-medium">
-                      {resource.name}
-                    </p>
+            {attentionResources.length ===
+            0 ? (
+              <div className="py-8 text-center">
+                <p className="font-medium">
+                  No unhealthy resources
+                </p>
 
-                    {/* Display the resource health state. */}
-                    <Badge
-                      variant={
-                        resource.health === "healthy"
-                          ? "secondary"
-                          : "destructive"
-                      }
-                    >
-                      {resource.health}
-                    </Badge>
-                  </div>
-
-                  {/* Display service and environment information. */}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {resource.service} · {resource.environment}
-                  </p>
-                </div>
-
-                {/* Display resource cost information. */}
-                <div className="grid shrink-0 grid-cols-3 gap-5 text-right text-sm">
-                  {/* Display month-to-date cost. */}
-                  <div>
-                    {/* Display the cost label. */}
-                    <p className="text-xs text-muted-foreground">
-                      MTD
-                    </p>
-
-                    {/* Display the formatted month-to-date cost. */}
-                    <p className="font-medium">
-                      {formatCurrency(resource.monthToDateCost)}
-                    </p>
-                  </div>
-
-                  {/* Display forecasted month-end cost. */}
-                  <div>
-                    {/* Display the forecast label. */}
-                    <p className="text-xs text-muted-foreground">
-                      Forecast
-                    </p>
-
-                    {/* Display the formatted forecast cost. */}
-                    <p className="font-medium">
-                      {formatCurrency(resource.forecastCost)}
-                    </p>
-                  </div>
-
-                  {/* Display cost-change information. */}
-                  <div>
-                    {/* Display the cost-change label. */}
-                    <p className="text-xs text-muted-foreground">
-                      Change
-                    </p>
-
-                    {/* Display the cost-change percentage. */}
-                    <p className="font-medium text-amber-600 dark:text-amber-400">
-                      +{resource.changePercentage}%
-                    </p>
-                  </div>
-                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  All discovered resources are currently healthy.
+                </p>
               </div>
-            ))}
+            ) : (
+              attentionResources.map(
+                (resource) => (
+                  <div
+                    key={
+                      resource.id
+                    }
+                    className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {
+                          resource.name
+                        }
+                      </p>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {
+                          resource.service
+                        }{" "}
+                        ·{" "}
+                        {
+                          resource.region
+                        }
+                      </p>
+                    </div>
+
+                    <ResourceHealthBadge
+                      health={
+                        resource.health_state
+                      }
+                    />
+                  </div>
+                ),
+              )
+            )}
           </CardContent>
         </Card>
 
-        {/* Display currently active incidents. */}
         <Card>
-          {/* Display the incident card heading. */}
           <CardHeader>
-            {/* Display the incident section title. */}
-            <CardTitle>Active incidents</CardTitle>
+            <CardTitle>
+              Active incidents
+            </CardTitle>
 
-            {/* Explain what is displayed in the incident list. */}
             <CardDescription>
               Current infrastructure issues requiring attention.
             </CardDescription>
           </CardHeader>
 
-          {/* Display active incidents. */}
           <CardContent className="space-y-4">
-            {/* Render each active incident. */}
-            {activeIncidents.map((incident) => (
-              <div
-                className="rounded-lg border p-4"
-                key={incident.id}
-              >
-                {/* Display incident severity and identifier. */}
-                <div className="flex items-start justify-between gap-3">
-                  {/* Display the incident severity. */}
-                  <Badge
-                    variant={
-                      incident.severity === "critical"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {incident.severity}
-                  </Badge>
-
-                  {/* Display the incident identifier. */}
-                  <span className="text-xs text-muted-foreground">
-                    {incident.id}
-                  </span>
-                </div>
-
-                {/* Display the incident title. */}
-                <p className="mt-3 text-sm font-medium">
-                  {incident.title}
+            {activeIncidents.length ===
+            0 ? (
+              <div className="py-8 text-center">
+                <p className="font-medium">
+                  No active incidents
                 </p>
 
-                {/* Display the affected resource name. */}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {incident.resourceName}
+                <p className="mt-1 text-sm text-muted-foreground">
+                  There are currently no unresolved operational incidents.
                 </p>
-
-                {/* Display current incident status and timing information. */}
-                <div className="mt-3 flex items-center justify-between text-xs">
-                  {/* Display the current workflow status. */}
-                  <span className="capitalize text-muted-foreground">
-                    {incident.status}
-                  </span>
-
-                  {/* Display temporary timing information. */}
-                  <span className="text-muted-foreground">
-                    Opened recently
-                  </span>
-                </div>
               </div>
-            ))}
+            ) : (
+              activeIncidents.map(
+                (incident) => (
+                  <div
+                    key={
+                      incident.id
+                    }
+                    className="rounded-lg border p-4"
+                  >
+                    <p className="text-sm font-medium">
+                      {
+                        incident.title
+                      }
+                    </p>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {resourceNames.get(
+                        incident.resource_id,
+                      ) ??
+                        incident.resource_id}
+                    </p>
+
+                    <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span className="capitalize">
+                        {
+                          incident.status
+                        }
+                      </span>
+
+                      <span>
+                        {formatTimestamp(
+                          incident.started_at,
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                ),
+              )
+            )}
           </CardContent>
         </Card>
       </div>

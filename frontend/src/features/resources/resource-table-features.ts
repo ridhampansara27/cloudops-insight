@@ -1,15 +1,9 @@
-// Import the optional TanStack Table features required by the resource table.
+// Import only sorting-related TanStack Table features.
 import {
-  // Create the paginated row model.
-  createPaginatedRowModel,
-
   // Create the sorted row model.
   createSortedRowModel,
 
-  // Enable client-side pagination.
-  rowPaginationFeature,
-
-  // Enable client-side sorting.
+  // Enable sorting APIs.
   rowSortingFeature,
 
   // Provide alphanumeric sorting.
@@ -21,37 +15,38 @@ import {
   // Provide normal text sorting.
   sortFn_text,
 
-  // Combine the required features into one table definition.
+  // Combine the selected table features.
   tableFeatures,
 } from "@tanstack/react-table";
 
-// Define exactly which optional features this table uses.
-export const resourceTableFeatures = tableFeatures({
-  // Enable pagination APIs.
-  rowPaginationFeature,
 
-  // Enable sorting APIs.
-  rowSortingFeature,
+// Define exactly which features this server-paginated table uses.
+export const resourceTableFeatures =
+  tableFeatures({
+    // Enable client-side sorting for the currently loaded backend page.
+    rowSortingFeature,
 
-  // Create the pagination row model.
-  paginatedRowModel: createPaginatedRowModel(),
+    // Create the sorted row model.
+    sortedRowModel:
+      createSortedRowModel(),
 
-  // Create the sorting row model.
-  sortedRowModel: createSortedRowModel(),
+    // Register sorting functions.
+    sortFns: {
+      // Support alphanumeric values.
+      alphanumeric:
+        sortFn_alphanumeric,
 
-  // Register the sorting functions used by our columns.
-  sortFns: {
-    // Use alphanumeric sorting for mixed string identifiers.
-    alphanumeric: sortFn_alphanumeric,
+      // Support numeric values.
+      basic:
+        sortFn_basic,
 
-    // Use basic comparison for numeric values.
-    basic: sortFn_basic,
+      // Support text values.
+      text:
+        sortFn_text,
+    },
+  });
 
-    // Use text sorting for resource names and strings.
-    text: sortFn_text,
-  },
-});
 
-// Export the feature type so column definitions remain fully typed.
+// Export the feature type used by the column helper.
 export type ResourceTableFeatures =
   typeof resourceTableFeatures;

@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: "{{ .Release.Name }}-migration"
+
+  annotations:
+    # Execute before every install or upgrade.
+    helm.sh/hook: post-install,pre-upgrade
+
+    # Run after the namespace Secret already exists.
+    helm.sh/hook-weight: "0"
+
+    # Remove completed previous hook jobs.
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+
+spec:
+  backoffLimit: 3
+
+  template:
+    metadata:
+      labels:
+        app: cloudops-migration
+
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: migration
+
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+
+          command:
+            - alembic
+            - upgrade
+            - head
+
+          envFrom:
+            - configMapRef:
+                name: cloudops-config
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: DATABASE_URL
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: JWT_SECRET

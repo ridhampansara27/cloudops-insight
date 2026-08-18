@@ -1,0 +1,215 @@
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL
+  # ----------------------------------------------------------
+
+  postgres:
+    # Use the local PostgreSQL version already used by the project.
+    image: postgres:17-alpine
+
+    # Keep the familiar local container name.
+    container_name: cloudops-postgres
+
+    # Configure local development database.
+    environment:
+      POSTGRES_DB: cloudops
+      POSTGRES_USER: cloudops
+      POSTGRES_PASSWORD: cloudops_local_password
+
+    # Expose PostgreSQL for local development tools.
+    ports:
+      - "5432:5432"
+
+    # Persist local database data.
+    volumes:
+      - cloudops-postgres-data:/var/lib/postgresql/data
+
+    # Verify database availability.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U cloudops -d cloudops"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  # ----------------------------------------------------------
+  # Redis
+  # ----------------------------------------------------------
+
+  redis:
+    # Use the Redis version already used by CloudOps.
+    image: redis:7-alpine
+
+    # Give Redis a predictable name.
+    container_name: cloudops-redis
+
+    # Expose local Redis.
+    ports:
+      - "6379:6379"
+
+    # Persist Redis state used during development.
+    volumes:
+      - cloudops-redis-data:/data
+
+    # Verify Redis is responsive.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  # ----------------------------------------------------------
+  # FastAPI
+  # ----------------------------------------------------------
+
+  cloudops-backend:
+    # Build from the production Dockerfile.
+    build:
+      context: ./backend
+
+    # Give the locally built image a reusable name.
+    image: cloudops-backend:local
+
+    # Load your uncommitted local configuration.
+    env_file:
+      - ./backend/.env
+
+    # Override infrastructure URLs because localhost
+    # inside a container means the container itself.
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cloudops:cloudops_local_password@postgres:5432/cloudops
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+
+    # Wait until infrastructure is ready.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    # Keep direct API access available during development.
+    ports:
+      - "8000:8000"
+
+
+  # ----------------------------------------------------------
+  # Celery worker
+  # ----------------------------------------------------------
+
+  cloudops-worker:
+    # Reuse exactly the same backend image.
+    image: cloudops-backend:local
+
+    # Load application configuration.
+    env_file:
+      - ./backend/.env
+
+    # Override internal dependency hostnames.
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cloudops:cloudops_local_password@postgres:5432/cloudops
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+
+    # Start a Celery worker instead of Uvicorn.
+    command:
+      [
+        "celery",
+        "-A",
+        "app.tasks.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--concurrency=1"
+      ]
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+
+  # ----------------------------------------------------------
+  # Celery Beat
+  # ----------------------------------------------------------
+
+  cloudops-beat:
+    # Reuse backend application image.
+    image: cloudops-backend:local
+
+    # Load application configuration.
+    env_file:
+      - ./backend/.env
+
+    # Override Docker dependency hostnames.
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cloudops:cloudops_local_password@postgres:5432/cloudops
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+
+    # Start the periodic task scheduler.
+    command:
+      [
+        "celery",
+        "-A",
+        "app.tasks.celery_app:celery_app",
+        "beat",
+        "--loglevel=INFO"
+      ]
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+
+  # ----------------------------------------------------------
+  # React + NGINX
+  # ----------------------------------------------------------
+
+  cloudops-frontend:
+    # Build production React application.
+    build:
+      context: ./frontend
+
+      # Use same-origin API requests.
+      args:
+        VITE_API_BASE_URL: ""
+
+    # Name the image.
+    image: cloudops-frontend:local
+
+    # Publish the non-root NGINX port.
+    ports:
+      - "8080:8080"
+
+    # Start frontend after backend service exists.
+    depends_on:
+      - cloudops-backend
+
+
+# ------------------------------------------------------------
+# Persistent local Docker data
+# ------------------------------------------------------------
+
+volumes:
+  cloudops-postgres-data:
+  cloudops-redis-data:

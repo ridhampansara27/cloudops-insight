@@ -45,9 +45,15 @@ export function MetricCard({ metric }: MetricCardProps) {
   // Select the icon that belongs to the metric category.
   const Icon = metricIcons[metric.category];
 
-  // Select the appropriate trend icon.
+  // Select the icon matching the metric movement.
   const TrendIcon =
-    metric.trend === "down" ? ArrowDownRight : ArrowUpRight;
+    metric.trend === "down"
+      ? ArrowDownRight
+      : ArrowUpRight;
+
+  // Determine whether this metric currently has comparison data.
+  const hasComparison =
+    metric.trend !== "neutral";
 
   // Determine whether the trend is operationally positive.
   const isPositive =
@@ -74,21 +80,33 @@ export function MetricCard({ metric }: MetricCardProps) {
         </p>
 
         <div className="mt-2 flex flex-wrap items-center gap-1 text-xs">
-          <span
-            className={cn(
-              "inline-flex items-center font-medium",
-              isPositive
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-rose-600 dark:text-rose-400",
-            )}
-          >
-            <TrendIcon className="mr-1 size-3.5" />
-            {metric.change}%
-          </span>
+          {hasComparison ? (
+            <>
+              <span
+                className={cn(
+                  // Display the comparison value.
+                  "inline-flex items-center font-medium",
 
-          <span className="text-muted-foreground">
-            {metric.comparisonLabel}
-          </span>
+                  // Display positive trends in green.
+                  isPositive
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-rose-600 dark:text-rose-400",
+                )}
+              >
+                <TrendIcon className="mr-1 size-3.5" />
+
+                {metric.change}%
+              </span>
+
+              <span className="text-muted-foreground">
+                {metric.comparisonLabel}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">
+              {metric.comparisonLabel}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
