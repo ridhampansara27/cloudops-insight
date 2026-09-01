@@ -243,7 +243,12 @@ jobs:
     name: Build, scan and publish images
 
     # Never publish images from pull-request validation.
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main'
+      )
 
     needs:
       - backend-quality
@@ -391,38 +396,49 @@ jobs:
 
 
   # ==========================================================
-  # Update GitOps desired state
+  # Propose GitOps deployment
   # ==========================================================
 
   update-gitops:
-    name: Update development GitOps image tags
+    name: Propose development GitOps deployment
 
-    if: github.event_name != 'pull_request'
+    # Only publish deployment state after code from main has
+    # successfully produced and scanned immutable container images.
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main'
+      )
 
     needs:
       - publish-images
 
     runs-on: ubuntu-24.04
 
-
     steps:
 
-      # Checkout the separate GitOps repository.
+      # Checkout the separate repository containing the desired
+      # Kubernetes deployment state.
       - name: Checkout GitOps repository
-
         uses: actions/checkout@v6
 
         with:
           repository: ridhampansara27/cloudops-gitops
-
           token: ${{ secrets.GITOPS_REPO_TOKEN }}
-
           path: gitops
 
 
-      # Update exact image markers without requiring additional YAML tooling.
-      - name: Update development images
-
+      # Update both development environments to the exact immutable
+      # application images created by this workflow.
+      #
+      # We intentionally update:
+      #   - environments/dev       -> local/Kind development
+      #   - environments/aws-dev   -> AWS EKS development
+      #
+      # The parser follows the backend/frontend YAML sections rather
+      # than relying on comments being present in the values files.
+      - name: Update development image versions
         shell: bash
 
         run: |
@@ -430,70 +446,196 @@ jobs:
           from pathlib import Path
           import os
 
-          path = Path("gitops/environments/dev/values.yaml")
 
-          lines = path.read_text(encoding="utf-8").splitlines()
+          BACKEND_IMAGE = os.environ["BACKEND_IMAGE"]
+          FRONTEND_IMAGE = os.environ["FRONTEND_IMAGE"]
+          IMAGE_TAG = os.environ["IMAGE_TAG"]
 
-          output = []
 
-          for line in lines:
-              indentation = line[: len(line) - len(line.lstrip())]
+          FILES = [
+              Path("gitops/environments/dev/values.yaml"),
+              Path("gitops/environments/aws-dev/values.yaml"),
+          ]
 
-              if "# backend-image-repository" in line:
-                  line = (
-                      f'{indentation}repository: '
-                      f'"{os.environ["BACKEND_IMAGE"]}" '
-                      f'# backend-image-repository'
-                  )
 
-              elif "# backend-image-tag" in line:
-                  line = (
-                      f'{indentation}tag: '
-                      f'"{os.environ["IMAGE_TAG"]}" '
-                      f'# backend-image-tag'
-                  )
+          def update_values_file(path: Path) -> None:
+              """Update backend/frontend image repository and tag values."""
 
-              elif "# frontend-image-repository" in line:
-                  line = (
-                      f'{indentation}repository: '
-                      f'"{os.environ["FRONTEND_IMAGE"]}" '
-                      f'# frontend-image-repository'
-                  )
+              lines = path.read_text(encoding="utf-8").splitlines()
 
-              elif "# frontend-image-tag" in line:
-                  line = (
-                      f'{indentation}tag: '
-                      f'"{os.environ["IMAGE_TAG"]}" '
-                      f'# frontend-image-tag'
-                  )
+              output = []
 
-              output.append(line)
+              component = None
+              inside_image = False
 
-          path.write_text(
-              "\n".join(output) + "\n",
-              encoding="utf-8",
-          )
+              for line in lines:
+                  stripped = line.strip()
+                  indentation = len(line) - len(line.lstrip())
+
+
+                  # Top-level backend/frontend sections.
+                  if indentation == 0 and stripped == "backend:":
+                      component = "backend"
+                      inside_image = False
+
+                  elif indentation == 0 and stripped == "frontend:":
+                      component = "frontend"
+                      inside_image = False
+
+                  elif indentation == 0 and stripped.endswith(":"):
+                      component = None
+                      inside_image = False
+
+
+                  # image: is nested inside backend or frontend.
+                  if (
+                      component in {"backend", "frontend"}
+                      and indentation == 2
+                      and stripped == "image:"
+                  ):
+                      inside_image = True
+
+                      output.append(line)
+                      continue
+
+
+                  # Leaving the image mapping.
+                  if (
+                      inside_image
+                      and stripped
+                      and indentation <= 2
+                  ):
+                      inside_image = False
+
+
+                  if inside_image and stripped.startswith("repository:"):
+                      image = (
+                          BACKEND_IMAGE
+                          if component == "backend"
+                          else FRONTEND_IMAGE
+                      )
+
+                      line = (
+                          f'{line[:indentation]}repository: '
+                          f'"{image}"'
+                      )
+
+
+                  elif inside_image and stripped.startswith("tag:"):
+                      line = (
+                          f'{line[:indentation]}tag: '
+                          f'"{IMAGE_TAG}"'
+                      )
+
+
+                  output.append(line)
+
+
+              path.write_text(
+                  "\n".join(output) + "\n",
+                  encoding="utf-8",
+              )
+
+
+          for values_file in FILES:
+              update_values_file(values_file)
+
+              print(
+                  f"Updated {values_file} "
+                  f"to application version {IMAGE_TAG}"
+              )
           PY
 
 
-      # Commit the new immutable deployment version.
-      - name: Commit GitOps update
-
+      # Never push deployment changes directly into GitOps main.
+      # Create an immutable deployment proposal branch instead.
+      - name: Create GitOps deployment branch
         working-directory: gitops
-
         shell: bash
 
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        env:
+          GH_TOKEN: ${{ secrets.GITOPS_REPO_TOKEN }}
 
-          git add environments/dev/values.yaml
+        run: |
+          set -euo pipefail
+
+          DEPLOY_BRANCH="deploy/${IMAGE_TAG}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Make workflow retries idempotent.
+          if git ls-remote \
+            --exit-code \
+            --heads \
+            origin \
+            "${DEPLOY_BRANCH}" >/dev/null 2>&1; then
+
+            echo "Deployment branch ${DEPLOY_BRANCH} already exists."
+
+            EXISTING_PR="$(
+              gh pr list \
+                --repo ridhampansara27/cloudops-gitops \
+                --head "${DEPLOY_BRANCH}" \
+                --state all \
+                --json url \
+                --jq '.[0].url // empty'
+            )"
+
+            if [ -n "${EXISTING_PR}" ]; then
+              echo "Deployment PR already exists: ${EXISTING_PR}"
+              exit 0
+            fi
+
+            echo "Deployment branch exists but has no PR."
+            echo "Creating the missing GitOps pull request."
+
+            gh pr create \
+              --repo ridhampansara27/cloudops-gitops \
+              --base main \
+              --head "${DEPLOY_BRANCH}" \
+              --title "deploy(dev): ${IMAGE_TAG}" \
+              --body "Promote CloudOps application version \`${IMAGE_TAG}\` to the development environments."
+
+            exit 0
+          fi
+
+          git checkout -b "${DEPLOY_BRANCH}"
+
+          git add \
+            environments/dev/values.yaml \
+            environments/aws-dev/values.yaml
 
           if git diff --cached --quiet; then
-            echo "GitOps repository already uses ${IMAGE_TAG}."
+            echo "GitOps already uses ${IMAGE_TAG}."
             exit 0
           fi
 
           git commit -m "deploy(dev): ${IMAGE_TAG}"
 
-          git push
+          git push \
+            --set-upstream \
+            origin \
+            "${DEPLOY_BRANCH}"
+
+          gh pr create \
+            --repo ridhampansara27/cloudops-gitops \
+            --base main \
+            --head "${DEPLOY_BRANCH}" \
+            --title "deploy(dev): ${IMAGE_TAG}" \
+            --body "## Deployment
+
+          Promote CloudOps application version \`${IMAGE_TAG}\` to the development environments.
+
+          ## Environments
+
+          - local/Kind development
+          - AWS EKS development
+
+          ## Images
+
+          - backend: \`${BACKEND_IMAGE}:${IMAGE_TAG}\`
+          - frontend: \`${FRONTEND_IMAGE}:${IMAGE_TAG}\`
+
+          This PR was generated automatically after application CI, image build, and Trivy security scanning succeeded."
