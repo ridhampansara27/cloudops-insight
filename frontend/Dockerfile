@@ -38,9 +38,15 @@ RUN npm run build
 # Use a small NGINX runtime.
 FROM nginx:alpine AS runtime
 
-# Remove the default NGINX website configuration.
-RUN rm \
-    /etc/nginx/conf.d/default.conf
+# Install all currently available Alpine security updates.
+#
+# The base NGINX image can temporarily contain vulnerable OS packages
+# even when patched packages are already available in Alpine's
+# repositories. Upgrade them during the image build so the final
+# runtime image passes the container security gate.
+RUN apk upgrade --no-cache \
+    && rm \
+        /etc/nginx/conf.d/default.conf
 
 # Copy our global NGINX configuration.
 COPY nginx/nginx.conf \
