@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 # Import UUID parsing.
 from uuid import UUID
 
+from sqlalchemy import select
+
 # Import SQLAlchemy async-engine utilities.
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
@@ -19,6 +21,16 @@ from app.core.config import settings
 # Import CloudAccount ORM model.
 from app.models.cloud_account import (
     CloudAccount,
+)
+
+# Import Cost Explorer synchronization.
+from app.services.cost_sync_service import (
+    CostSyncService,
+)
+
+# Import CloudWatch monitoring synchronization.
+from app.services.monitoring_sync_service import (
+    MonitoringSyncService,
 )
 
 # Import resource synchronization service.
@@ -173,3 +185,243 @@ def sync_aws_account_task(
             account_id,
         ),
     )
+
+
+# Retrieve AWS accounts eligible for automatic synchronization.
+async def _get_connected_aws_account_ids(
+    *,
+    skip_busy_resource_syncs: bool = False,
+) -> list[str]:
+    # Create an engine scoped to this Celery execution.
+    engine = create_async_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+    )
+
+    # Create an asynchronous session factory.
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+    )
+
+    try:
+        # Open a database session.
+        async with session_factory() as session:
+            # Select connected AWS accounts only.
+            statement = select(
+                CloudAccount.id,
+            ).where(
+                CloudAccount.provider == "aws",
+                CloudAccount.status == "connected",
+            )
+
+            # Resource discovery should not overlap an existing resource sync.
+            if skip_busy_resource_syncs:
+                statement = statement.where(
+                    CloudAccount.sync_status.notin_(
+                        [
+                            "queued",
+                            "running",
+                        ],
+                    ),
+                )
+
+            # Execute account query.
+            result = await session.execute(
+                statement,
+            )
+
+            # Convert UUIDs to JSON-safe strings for Celery.
+            return [str(account_id) for account_id in result.scalars().all()]
+
+    finally:
+        # Release worker-specific database connections.
+        await engine.dispose()
+
+
+# Run CloudWatch synchronization for one AWS account.
+async def _run_metric_sync(
+    account_id_text: str,
+) -> dict[str, int | str]:
+    # Convert Celery argument back into UUID.
+    account_id = UUID(
+        account_id_text,
+    )
+
+    # Create isolated asynchronous engine.
+    engine = create_async_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+    )
+
+    # Create worker-local database sessions.
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+    )
+
+    try:
+        # Open database session.
+        async with session_factory() as session:
+            # Execute existing CloudWatch synchronization service.
+            samples = await MonitoringSyncService(
+                session,
+            ).sync_account(
+                account_id,
+            )
+
+            # Return JSON-safe Celery result.
+            return {
+                "account_id": account_id_text,
+                "samples_upserted": samples,
+            }
+
+    finally:
+        # Release worker database connections.
+        await engine.dispose()
+
+
+# Run Cost Explorer synchronization for one AWS account.
+async def _run_cost_sync(
+    account_id_text: str,
+) -> dict[str, int | str]:
+    # Convert Celery argument back into UUID.
+    account_id = UUID(
+        account_id_text,
+    )
+
+    # Create isolated asynchronous engine.
+    engine = create_async_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+    )
+
+    # Create worker-local database sessions.
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+    )
+
+    try:
+        # Open database session.
+        async with session_factory() as session:
+            # Execute existing Cost Explorer synchronization.
+            records = await CostSyncService(
+                session,
+            ).sync_account(
+                account_id,
+            )
+
+            # Return JSON-safe Celery result.
+            return {
+                "account_id": account_id_text,
+                "records_imported": records,
+            }
+
+    finally:
+        # Release worker database connections.
+        await engine.dispose()
+
+
+# Register one-account CloudWatch synchronization task.
+@celery_app.task(
+    name="cloudops.sync_aws_metrics",
+)
+def sync_aws_metrics_task(
+    account_id: str,
+) -> dict[str, int | str]:
+    # Execute asynchronous monitoring code from Celery.
+    return asyncio.run(
+        _run_metric_sync(
+            account_id,
+        ),
+    )
+
+
+# Register one-account Cost Explorer synchronization task.
+@celery_app.task(
+    name="cloudops.sync_aws_costs",
+)
+def sync_aws_costs_task(
+    account_id: str,
+) -> dict[str, int | str]:
+    # Execute asynchronous cost synchronization from Celery.
+    return asyncio.run(
+        _run_cost_sync(
+            account_id,
+        ),
+    )
+
+
+# Register periodic resource discovery scheduler.
+@celery_app.task(
+    name="cloudops.schedule_all_aws_resource_syncs",
+)
+def schedule_all_aws_resource_syncs_task() -> dict[str, int]:
+    # Retrieve connected AWS accounts that are not already synchronizing.
+    account_ids = asyncio.run(
+        _get_connected_aws_account_ids(
+            skip_busy_resource_syncs=True,
+        ),
+    )
+
+    # Queue one resource synchronization per account.
+    for account_id in account_ids:
+        sync_aws_account_task.delay(
+            account_id,
+        )
+
+    # Report number of queued accounts.
+    return {
+        "scheduled": len(
+            account_ids,
+        ),
+    }
+
+
+# Register periodic CloudWatch scheduler.
+@celery_app.task(
+    name="cloudops.schedule_all_aws_metric_syncs",
+)
+def schedule_all_aws_metric_syncs_task() -> dict[str, int]:
+    # Retrieve all connected AWS accounts.
+    account_ids = asyncio.run(
+        _get_connected_aws_account_ids(),
+    )
+
+    # Queue one monitoring synchronization per account.
+    for account_id in account_ids:
+        sync_aws_metrics_task.delay(
+            account_id,
+        )
+
+    # Report number of queued accounts.
+    return {
+        "scheduled": len(
+            account_ids,
+        ),
+    }
+
+
+# Register periodic Cost Explorer scheduler.
+@celery_app.task(
+    name="cloudops.schedule_all_aws_cost_syncs",
+)
+def schedule_all_aws_cost_syncs_task() -> dict[str, int]:
+    # Retrieve all connected AWS accounts.
+    account_ids = asyncio.run(
+        _get_connected_aws_account_ids(),
+    )
+
+    # Queue one cost synchronization per account.
+    for account_id in account_ids:
+        sync_aws_costs_task.delay(
+            account_id,
+        )
+
+    # Report number of queued accounts.
+    return {
+        "scheduled": len(
+            account_ids,
+        ),
+    }
