@@ -187,8 +187,6 @@ def sync_aws_account_task(
     )
 
 
-
-
 # Retrieve AWS accounts eligible for automatic synchronization.
 async def _get_connected_aws_account_ids(
     *,
@@ -234,10 +232,7 @@ async def _get_connected_aws_account_ids(
             )
 
             # Convert UUIDs to JSON-safe strings for Celery.
-            return [
-                str(account_id)
-                for account_id in result.scalars().all()
-            ]
+            return [str(account_id) for account_id in result.scalars().all()]
 
     finally:
         # Release worker-specific database connections.
