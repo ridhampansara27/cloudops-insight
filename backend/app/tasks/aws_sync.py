@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 # Import UUID parsing.
 from uuid import UUID
 
+from sqlalchemy import select
+
 # Import SQLAlchemy async-engine utilities.
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
@@ -21,6 +23,16 @@ from app.models.cloud_account import (
     CloudAccount,
 )
 
+# Import Cost Explorer synchronization.
+from app.services.cost_sync_service import (
+    CostSyncService,
+)
+
+# Import CloudWatch monitoring synchronization.
+from app.services.monitoring_sync_service import (
+    MonitoringSyncService,
+)
+
 # Import resource synchronization service.
 from app.services.resource_sync_service import (
     ResourceSyncError,
@@ -30,18 +42,6 @@ from app.services.resource_sync_service import (
 # Import Celery application.
 from app.tasks.celery_app import (
     celery_app,
-)
-
-from sqlalchemy import select
-
-# Import CloudWatch monitoring synchronization.
-from app.services.monitoring_sync_service import (
-    MonitoringSyncService,
-)
-
-# Import Cost Explorer synchronization.
-from app.services.cost_sync_service import (
-    CostSyncService,
 )
 
 
