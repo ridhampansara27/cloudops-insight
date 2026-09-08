@@ -150,7 +150,7 @@ export function createDashboardMetrics(
       id: "potential-savings",
 
       // Display the metric label.
-      label: "Potential savings",
+      label: "Quantified savings",
 
       // Format the backend saving opportunity.
       value: formatCurrency(
@@ -166,7 +166,7 @@ export function createDashboardMetrics(
 
       // Explain where the saving opportunity comes from.
       comparisonLabel:
-        "Open recommendations",
+        "Available estimates",
 
       // Use savings visual treatment.
       category: "savings",

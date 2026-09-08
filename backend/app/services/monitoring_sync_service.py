@@ -64,6 +64,11 @@ from app.services.monitoring_query_factory import (
     build_metric_queries,
 )
 
+# Import FinOps recommendation evaluation.
+from app.services.recommendation_engine import (
+    RecommendationEngine,
+)
+
 
 # Coordinate CloudWatch metric synchronization.
 class MonitoringSyncService:
@@ -206,6 +211,11 @@ class MonitoringSyncService:
             self.session,
         )
 
+        # Create the FinOps recommendation evaluator.
+        recommendation_engine = RecommendationEngine(
+            self.session,
+        )
+
         # Evaluate every active resource.
         for resource in resources:
             # Evaluate real monitoring state.
@@ -220,6 +230,12 @@ class MonitoringSyncService:
             await incident_service.reconcile(
                 resource=resource,
                 evaluation=evaluation,
+            )
+
+            # Refresh optimization recommendations using the
+            # latest real CloudWatch observations.
+            await recommendation_engine.evaluate_resource(
+                resource,
             )
 
         # Commit all metric updates.

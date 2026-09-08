@@ -171,15 +171,35 @@ class RecommendationEngine:
         # 5. Apply the CloudOps < 10% CPU rule.
         # -----------------------------------------------------
 
-        # Step 353 requires the average CPU to be strictly
-        # below ten percent.
-        #
-        # Therefore:
-        #
-        # 9.9%  -> candidate
-        # 10.0% -> not a candidate
-        # 20.0% -> not a candidate
+        # Reuse a previous rightsizing recommendation for this
+        # resource instead of creating duplicates every time
+        # monitoring synchronization runs.
+        existing_result = await self.session.execute(
+            select(
+                Recommendation,
+            )
+            .where(
+                Recommendation.resource_id == resource.id,
+                Recommendation.recommendation_type == "rightsizing",
+            )
+            .order_by(
+                Recommendation.created_at.desc(),
+            ),
+        )
+
+        existing_recommendation = existing_result.scalars().first()
+
+        # Resolve a currently open recommendation when the
+        # resource is no longer below the CPU threshold.
         if average_cpu >= CPU_THRESHOLD_PERCENT:
+            if (
+                existing_recommendation is not None
+                and existing_recommendation.status == "open"
+            ):
+                existing_recommendation.status = "resolved"
+
+                await self.session.commit()
+
             return None
 
         # -----------------------------------------------------
@@ -230,166 +250,152 @@ class RecommendationEngine:
         cost_rows = cost_result.all()
 
         # -----------------------------------------------------
-        # 8. Require real resource-level cost.
+        # 8. Calculate savings only when real resource-level
+        #    AWS billing data is available.
         # -----------------------------------------------------
 
-        # Step 353 explicitly forbids inventing a monetary
-        # recommendation when resource-level cost is unavailable.
-        if not cost_rows:
-            return None
+        # Start without a monetary estimate. This is intentional:
+        # CloudOps must never invent a financial saving when AWS
+        # has not supplied resource-level billing data.
+        monthly_run_rate: Decimal | None = None
+        potential_savings: Decimal | None = None
 
-        # Sum the real observed AWS cost for this EC2 instance.
-        observed_cost = sum(
-            (
+        # Calculate a monetary estimate only when Cost Explorer
+        # returned resource-level rows.
+        if cost_rows:
+            observed_cost = sum(
+                (
+                    Decimal(
+                        str(
+                            row.amount,
+                        ),
+                    )
+                    for row in cost_rows
+                ),
                 Decimal(
-                    str(
-                        row.amount,
-                    ),
+                    0,
+                ),
+            )
+
+            # Count distinct billing dates represented by AWS.
+            observed_dates = {row.usage_date for row in cost_rows}
+
+            observed_days = len(
+                observed_dates,
+            )
+
+            # Only quantify savings from positive real spending.
+            if (
+                observed_cost
+                > Decimal(
+                    0,
                 )
-                for row in cost_rows
-            ),
-            Decimal(
-                0,
-            ),
-        )
+                and observed_days > 0
+            ):
+                monthly_run_rate = (
+                    observed_cost
+                    / Decimal(
+                        observed_days,
+                    )
+                    * Decimal(
+                        days_in_month,
+                    )
+                ).quantize(
+                    MONEY_QUANTIZER,
+                )
 
-        # A zero or negative observed cost cannot produce
-        # a meaningful monetary rightsizing recommendation.
-        if observed_cost <= Decimal(
-            0,
-        ):
-            return None
-
-        # -----------------------------------------------------
-        # 9. Determine how many billing days were observed.
-        # -----------------------------------------------------
-
-        # Store unique dates represented by the imported
-        # resource-level Cost Explorer records.
-        observed_dates = {row.usage_date for row in cost_rows}
-
-        # Count distinct observed billing days.
-        observed_days = len(
-            observed_dates,
-        )
-
-        # Protect the run-rate calculation against division
-        # by zero.
-        if observed_days == 0:
-            return None
-
-        # -----------------------------------------------------
-        # 10. Calculate monthly run-rate.
-        # -----------------------------------------------------
-
-        # Step 353 formula:
-        #
-        # monthly run-rate
-        # =
-        # observed resource cost
-        # / observed days
-        # * days in current month
-        monthly_run_rate = (
-            observed_cost
-            / Decimal(
-                observed_days,
-            )
-            * Decimal(
-                days_in_month,
-            )
-        )
-
-        # Round the calculated run-rate to normal
-        # currency precision.
-        monthly_run_rate = monthly_run_rate.quantize(
-            MONEY_QUANTIZER,
-        )
-
-        # -----------------------------------------------------
-        # 11. Calculate potential monthly savings.
-        # -----------------------------------------------------
-
-        # Step 353 formula:
-        #
-        # potential savings
-        # =
-        # monthly run-rate
-        # * 25%
-        potential_savings = monthly_run_rate * RIGHTSIZING_SAVINGS_RATE
-
-        # Store savings using two-decimal currency precision.
-        potential_savings = potential_savings.quantize(
-            MONEY_QUANTIZER,
-        )
+                potential_savings = (
+                    monthly_run_rate * RIGHTSIZING_SAVINGS_RATE
+                ).quantize(
+                    MONEY_QUANTIZER,
+                )
 
         # -----------------------------------------------------
         # 12. Build transparent recommendation evidence.
         # -----------------------------------------------------
 
-        # Explain exactly which CloudOps rule generated
-        # the recommendation.
-        #
-        # Do not describe this as an AWS recommendation.
-        evidence = (
-            "CloudOps rule-based heuristic: "
-            f"24-hour average CPU was "
-            f"{average_cpu:.1f}%. "
-            "Recent resource-level AWS Cost Explorer "
-            "records indicate a monthly run-rate of "
-            f"${monthly_run_rate:.2f}. "
-            "Estimated savings assumes a 25% reduction "
-            "after rightsizing."
-        )
+        if potential_savings is None:
+            description = (
+                "CloudOps detected sustained low CPU utilization "
+                "for this active EC2 instance. A monetary savings "
+                "estimate is unavailable because positive "
+                "resource-level AWS Cost Explorer records are not "
+                "currently available."
+            )
+
+            evidence = (
+                "CloudOps rule-based heuristic: "
+                f"24-hour average CPU was {average_cpu:.1f}%. "
+                "The instance satisfies the CloudOps <10% CPU "
+                "rightsizing signal. Resource-level AWS Cost "
+                "Explorer data is unavailable, so CloudOps does "
+                "not fabricate a savings amount."
+            )
+
+        else:
+            # A calculated saving implies that a monthly run-rate
+            # was successfully derived from real AWS billing data.
+            assert monthly_run_rate is not None
+
+            description = (
+                "CloudOps detected sustained low CPU utilization "
+                "together with real resource-level AWS cost data "
+                "for this active EC2 instance."
+            )
+
+            evidence = (
+                "CloudOps rule-based heuristic: "
+                f"24-hour average CPU was {average_cpu:.1f}%. "
+                "Recent resource-level AWS Cost Explorer records "
+                "indicate a monthly run-rate of "
+                f"${monthly_run_rate:.2f}. "
+                "Estimated savings assumes a 25% reduction "
+                "after rightsizing."
+            )
 
         # -----------------------------------------------------
-        # 13. Create the persisted recommendation.
+        # 13. Create or update the persisted recommendation.
         # -----------------------------------------------------
 
-        # Create an explainable CloudOps-generated
-        # rightsizing recommendation.
-        recommendation = Recommendation(
-            # Link the recommendation to the EC2 resource.
-            resource_id=resource.id,
-            # Use the defined optimization category.
-            recommendation_type="rightsizing",
-            # Provide a human-readable recommendation title.
-            title=(f"Rightsize underutilized EC2 instance {resource.name}"),
-            # Explain why this optimization is being proposed.
-            description=(
-                "CloudOps detected sustained low CPU "
-                "utilization together with real "
-                "resource-level AWS cost data for this "
-                "active EC2 instance."
-            ),
-            # Store the exact rule evidence used.
-            evidence=evidence,
-            # Store the calculated potential monthly saving.
-            estimated_monthly_savings=(potential_savings),
-            # Step 353 requires medium risk.
-            risk="medium",
-            # Step 353 requires medium confidence.
-            confidence="medium",
-            # Newly generated recommendations begin open.
-            status="open",
-        )
+        recommendation_title = f"Rightsize underutilized EC2 instance {resource.name}"
+
+        if existing_recommendation is None:
+            recommendation = Recommendation(
+                resource_id=resource.id,
+                recommendation_type="rightsizing",
+                title=recommendation_title,
+                description=description,
+                evidence=evidence,
+                estimated_monthly_savings=potential_savings,
+                risk="medium",
+                confidence="medium",
+                status="open",
+            )
+
+            self.session.add(
+                recommendation,
+            )
+
+        else:
+            recommendation = existing_recommendation
+
+            # Refresh evidence and monetary estimates without
+            # changing the user's recommendation workflow state.
+            recommendation.title = recommendation_title
+            recommendation.description = description
+            recommendation.evidence = evidence
+            recommendation.estimated_monthly_savings = potential_savings
+            recommendation.risk = "medium"
+            recommendation.confidence = "medium"
 
         # -----------------------------------------------------
         # 14. Persist the recommendation.
         # -----------------------------------------------------
 
-        # Stage the new recommendation in the session.
-        self.session.add(
-            recommendation,
-        )
-
-        # Persist the recommendation to PostgreSQL.
         await self.session.commit()
 
-        # Reload generated database fields such as
-        # UUID and timestamps.
         await self.session.refresh(
             recommendation,
         )
 
-        # Return the persisted recommendation.
         return recommendation

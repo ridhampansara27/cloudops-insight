@@ -307,7 +307,8 @@ export interface RecommendationApiResponse {
   // Support backend decimal serialization safely.
   estimated_monthly_savings:
     | number
-    | string;
+    | string
+    | null;
   risk: string;
   confidence: string;
   status: string;
