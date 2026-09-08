@@ -145,7 +145,7 @@ export function CostOverviewPage() {
           total +
           toNumber(
             recommendation
-              .estimated_monthly_savings,
+              .estimated_monthly_savings ?? 0,
           ),
         0,
       );
@@ -288,7 +288,7 @@ export function CostOverviewPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Potential savings
+              Quantified savings
             </CardTitle>
 
             <Lightbulb className="size-4 text-primary" />

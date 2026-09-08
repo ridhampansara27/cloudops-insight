@@ -33,7 +33,7 @@ class RecommendationRead(BaseModel):
     evidence: str
 
     # Return estimated monthly saving.
-    estimated_monthly_savings: Decimal
+    estimated_monthly_savings: Decimal | None
 
     # Return operational risk.
     risk: str

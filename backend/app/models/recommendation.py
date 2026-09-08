@@ -70,14 +70,14 @@ class Recommendation(
     )
 
     # Store estimated monthly savings.
-    estimated_monthly_savings: Mapped[Decimal] = mapped_column(
+    estimated_monthly_savings: Mapped[Decimal | None] = mapped_column(
         # Store monetary values accurately.
         Numeric(
             precision=18,
             scale=2,
         ),
         # Require an estimated saving.
-        nullable=False,
+        nullable=True,
     )
 
     # Store operational risk.

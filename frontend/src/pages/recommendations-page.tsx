@@ -160,7 +160,7 @@ export function RecommendationsPage() {
           total +
           toNumber(
             recommendation
-              .estimated_monthly_savings,
+              .estimated_monthly_savings ?? 0,
           ),
         0,
       );
@@ -268,7 +268,7 @@ export function RecommendationsPage() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription>
-                    Potential monthly savings
+                    Quantified monthly savings
                   </CardDescription>
                 </CardHeader>
 
@@ -475,20 +475,25 @@ export function RecommendationsPage() {
                           </p>
                         </div>
 
-                        {/* Display estimated monthly saving. */}
+                        {/* Display estimated monthly saving when AWS
+                            resource-level billing data is available. */}
                         <div>
                           <p className="text-xs text-muted-foreground">
                             Estimated monthly saving
                           </p>
 
                           <p className="mt-1 text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(
-                              toNumber(
-                                recommendation
-                                  .estimated_monthly_savings,
-                              ),
-                              "USD",
-                            )}
+                            {recommendation
+                              .estimated_monthly_savings ===
+                            null
+                              ? "Estimate unavailable"
+                              : formatCurrency(
+                                  toNumber(
+                                    recommendation
+                                      .estimated_monthly_savings,
+                                  ),
+                                  "USD",
+                                )}
                           </p>
                         </div>
 
