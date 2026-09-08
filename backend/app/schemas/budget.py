@@ -1,6 +1,7 @@
 # Import datetime, Decimal, and UUID types.
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 # Import Pydantic helpers.
@@ -15,13 +16,15 @@ class BudgetCreate(BaseModel):
         max_length=160,
     )
 
-    # Define account, service, environment, or team.
-    scope_type: str = Field(
-        max_length=32,
-    )
+    # Only expose scopes the current evaluator supports.
+    scope_type: Literal[
+        "account",
+        "service",
+    ]
 
     # Store the selected scope.
     scope_value: str = Field(
+        min_length=1,
         max_length=255,
     )
 
@@ -41,6 +44,7 @@ class BudgetCreate(BaseModel):
     critical_threshold: int = Field(
         default=100,
         ge=1,
+        le=100,
     )
 
 
@@ -70,6 +74,7 @@ class BudgetUpdate(BaseModel):
     critical_threshold: int | None = Field(
         default=None,
         ge=1,
+        le=100,
     )
 
     # Allow disabling the budget.

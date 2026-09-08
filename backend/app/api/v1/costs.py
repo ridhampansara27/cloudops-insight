@@ -51,7 +51,7 @@ async def get_cost_summary(
         day=1,
     )
 
-    # Calculate the current month's total spending.
+    # Calculate the current month's service-level total.
     month_total_result = await session.scalar(
         select(
             func.coalesce(
@@ -61,7 +61,6 @@ async def get_cost_summary(
                 0,
             ),
         ).where(
-            # Count only AWS service-level aggregate records.
             CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         ),
@@ -78,7 +77,6 @@ async def get_cost_summary(
             ),
         )
         .where(
-            # Count only AWS service-level aggregate records.
             CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         )
@@ -103,7 +101,6 @@ async def get_cost_summary(
             ),
         )
         .where(
-            # Count only AWS service-level aggregate records.
             CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         )
@@ -113,6 +110,34 @@ async def get_cost_summary(
         .order_by(
             CostRecord.usage_date.asc(),
         ),
+    )
+
+    # Determine whether mapped resource-level cost records exist.
+    resource_level_count = await session.scalar(
+        select(
+            func.count(
+                CostRecord.id,
+            ),
+        ).where(
+            CostRecord.cost_type == "resource_direct",
+            CostRecord.resource_id.is_not(None),
+            CostRecord.usage_date >= month_start,
+        ),
+    )
+
+    # Read the actual reporting currency from imported records.
+    currency_result = await session.scalar(
+        select(
+            CostRecord.currency,
+        )
+        .where(
+            CostRecord.cost_type == "service_aggregate",
+            CostRecord.usage_date >= month_start,
+        )
+        .order_by(
+            CostRecord.usage_date.desc(),
+        )
+        .limit(1),
     )
 
     # Convert service rows into API models.
@@ -137,12 +162,15 @@ async def get_cost_summary(
         for row in daily_result.all()
     ]
 
-    # Return the summary.
+    # Return only genuine imported AWS billing information.
     return CostSummaryRead(
         month_to_date=float(
             month_total_result or 0,
         ),
         by_service=service_costs,
         daily=daily_costs,
-        currency="USD",
+        currency=(currency_result or "USD"),
+        resource_level_available=bool(
+            resource_level_count,
+        ),
     )

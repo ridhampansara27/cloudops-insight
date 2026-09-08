@@ -21,6 +21,13 @@ export function formatCurrency(
   // Use USD when the backend does not explicitly provide another currency.
   currency = "USD",
 ): string {
+  // Normalize sub-cent values so tiny AWS adjustments never
+  // appear as confusing values such as "-0,00 $".
+  const displayValue =
+    Math.abs(value) < 0.005
+      ? 0
+      : value;
+
   // Create a localized currency representation.
   return new Intl.NumberFormat(
     "de-DE",
@@ -31,7 +38,7 @@ export function formatCurrency(
       // Use the backend-provided billing currency.
       currency,
     },
-  ).format(value);
+  ).format(displayValue);
 }
 
 

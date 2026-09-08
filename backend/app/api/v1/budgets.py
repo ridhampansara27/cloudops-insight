@@ -20,6 +20,9 @@ from app.api.dependencies import (
 # Import Budget ORM model.
 from app.models.budget import Budget
 
+# Import connected cloud accounts for account-scope validation.
+from app.models.cloud_account import CloudAccount
+
 # Import budget schemas.
 from app.schemas.budget import (
     BudgetCreate,
@@ -120,6 +123,30 @@ async def create_budget(
                 "Critical threshold must be greater than or equal to warning threshold."
             ),
         )
+
+    # Validate account-scoped budgets against a genuine
+    # connected CloudOps cloud account.
+    if payload.scope_type == "account":
+        try:
+            cloud_account_id = UUID(
+                payload.scope_value,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Account budget scope must reference a valid cloud account.",
+            ) from error
+
+        cloud_account = await session.get(
+            CloudAccount,
+            cloud_account_id,
+        )
+
+        if cloud_account is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Selected cloud account does not exist.",
+            )
 
     # Build the ORM object.
     budget = Budget(

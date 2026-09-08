@@ -94,6 +94,11 @@ class BudgetEvaluationService:
 
         # Start with current-month cost records.
         conditions = [
+            # Use one authoritative billing representation.
+            #
+            # Resource-level rows may later coexist with service
+            # aggregates, so counting both would double count spend.
+            CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         ]
 
