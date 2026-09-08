@@ -107,8 +107,8 @@ export function MobileNavigation() {
                             }
                             to={item.href}
                             end={
-                              item.href ===
-                              "/"
+                              item.href !==
+                              "/cloud/resources"
                             }
                             onClick={() =>
                               setOpen(false)

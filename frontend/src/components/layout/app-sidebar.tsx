@@ -52,7 +52,7 @@ export function AppSidebar() {
                           "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
                       )
                     }
-                    end={item.href === "/"}
+                    end={item.href !== "/cloud/resources"}
                     key={item.href}
                     to={item.href}
                   >
@@ -66,18 +66,6 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border p-4">
-        <div className="rounded-lg bg-sidebar-accent p-3">
-          <p className="text-xs font-medium">
-            Development environment
-          </p>
-
-          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="size-2 rounded-full bg-emerald-500" />
-            Local services available
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

@@ -43,6 +43,7 @@ import {
 
 // Import monetary formatting.
 import {
+  formatBillingAmount,
   formatCurrency,
 } from "@/lib/formatters";
 
@@ -221,6 +222,7 @@ export function CostExplorerPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
             <Input
+              aria-label="Search AWS billing services"
               value={
                 searchQuery
               }
@@ -282,7 +284,7 @@ export function CostExplorerPage() {
                         </TableCell>
 
                         <TableCell className="text-right font-medium">
-                          {formatCurrency(
+                          {formatBillingAmount(
                             record.amount,
                             costs.currency,
                           )}

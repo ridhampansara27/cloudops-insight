@@ -378,11 +378,21 @@ export function IncidentsPage() {
               <Card>
                 <CardContent className="py-10 text-center">
                   <p className="font-medium">
-                    No incidents found
+                    {
+                      incidents.length ===
+                      0
+                        ? "No active incidents"
+                        : "No incidents match the current filters"
+                    }
                   </p>
 
                   <p className="mt-1 text-sm text-muted-foreground">
-                    No incidents match the current filters.
+                    {
+                      incidents.length ===
+                      0
+                        ? "No synchronized resources currently meet incident-triggering conditions."
+                        : "Adjust the severity or status filters to see other incidents."
+                    }
                   </p>
                 </CardContent>
               </Card>

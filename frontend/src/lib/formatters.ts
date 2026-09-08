@@ -42,6 +42,45 @@ export function formatCurrency(
 }
 
 
+// Format provider billing records while preserving visible
+// evidence of genuine non-zero sub-cent activity.
+export function formatBillingAmount(
+  value: number,
+  currency = "USD",
+): string {
+  // Keep genuine zero as normal currency.
+  if (value === 0) {
+    return formatCurrency(
+      0,
+      currency,
+    );
+  }
+
+  // Express positive/negative sub-cent activity without
+  // pretending it is exactly zero.
+  if (
+    Math.abs(
+      value,
+    ) < 0.01
+  ) {
+    const oneCent =
+      formatCurrency(
+        0.01,
+        currency,
+      );
+
+    return value > 0
+      ? `< ${oneCent}`
+      : `Credit < ${oneCent}`;
+  }
+
+  return formatCurrency(
+    value,
+    currency,
+  );
+}
+
+
 // Format an ISO timestamp for the application UI.
 export function formatTimestamp(
   // Allow nullable API timestamps.
