@@ -1,41 +1,29 @@
-// Import icons used in the application navigation.
+﻿// Import icons used by production-ready navigation entries.
 import {
-  Activity,
-  BellRing,
   Boxes,
   Cloud,
   DollarSign,
   Gauge,
   LayoutDashboard,
   Lightbulb,
-  Settings,
   ShieldAlert,
-  Tags,
   WalletCards,
 } from "lucide-react";
 
-// Define one navigation item.
+// Define one sidebar destination.
 export interface NavigationItem {
-  // Display the item name.
   label: string;
-
-  // Define the item destination.
   href: string;
-
-  // Associate the item with a Lucide icon.
   icon: typeof LayoutDashboard;
 }
 
-// Define one named navigation group.
+// Define one sidebar section.
 export interface NavigationGroup {
-  // Display the group heading.
   label: string;
-
-  // Store all links in the group.
   items: NavigationItem[];
 }
 
-// Export the complete sidebar navigation.
+// Expose only implemented CloudOps v1 functionality.
 export const navigationGroups: NavigationGroup[] = [
   {
     label: "Overview",
@@ -51,18 +39,8 @@ export const navigationGroups: NavigationGroup[] = [
     label: "Cloud",
     items: [
       {
-        label: "Cloud Accounts",
-        href: "/cloud/accounts",
-        icon: Cloud,
-      },
-      {
-        // Display cloud connections navigation.
         label: "AWS Accounts",
-
-        // Navigate to account management.
         href: "/cloud/accounts",
-
-        // Use cloud icon.
         icon: Cloud,
       },
       {
@@ -70,30 +48,15 @@ export const navigationGroups: NavigationGroup[] = [
         href: "/cloud/resources",
         icon: Boxes,
       },
-      {
-        label: "Tags & Ownership",
-        href: "/cloud/tags",
-        icon: Tags,
-      },
     ],
   },
   {
     label: "Monitoring",
     items: [
       {
-        label: "Health",
-        href: "/monitoring/health",
-        icon: Activity,
-      },
-      {
         label: "Incidents",
         href: "/monitoring/incidents",
         icon: ShieldAlert,
-      },
-      {
-        label: "Alerts",
-        href: "/monitoring/alerts",
-        icon: BellRing,
       },
     ],
   },
@@ -119,16 +82,6 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Recommendations",
         href: "/costs/recommendations",
         icon: Lightbulb,
-      },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      {
-        label: "Settings",
-        href: "/settings",
-        icon: Settings,
       },
     ],
   },
