@@ -4,6 +4,11 @@ import {
   useState,
 } from "react";
 
+// Import URL-backed search state.
+import {
+  useSearchParams,
+} from "react-router-dom";
+
 // Import resource icons.
 import {
   Boxes,
@@ -66,12 +71,19 @@ export function ResourceExplorerPage() {
   // Use ten resources per page.
   const pageSize = 10;
 
-  // Store user search input.
+  // Keep resource search in the URL so global search can
+  // deep-link directly into the filtered Resource Explorer.
   const [
-    searchQuery,
-    setSearchQuery,
+    searchParams,
+    setSearchParams,
   ] =
-    useState("");
+    useSearchParams();
+
+  const searchQuery =
+    searchParams.get(
+      "search",
+    ) ??
+    "";
 
   // Defer rapid search-input updates.
   const deferredSearch =
@@ -191,8 +203,8 @@ export function ResourceExplorerPage() {
         </h1>
 
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Search and analyze resources stored in the CloudOps
-          inventory database.
+          Search and analyze synchronized AWS resources across
+          connected cloud accounts.
         </p>
       </div>
 
@@ -283,10 +295,41 @@ export function ResourceExplorerPage() {
                 onChange={(
                   event,
                 ) => {
-                  // Store new search.
-                  setSearchQuery(
+                  // Store search in the URL.
+                  const nextSearch =
                     event.target
-                      .value,
+                      .value;
+
+                  setSearchParams(
+                    (
+                      currentParams,
+                    ) => {
+                      const nextParams =
+                        new URLSearchParams(
+                          currentParams,
+                        );
+
+                      if (
+                        nextSearch.trim()
+                          .length >
+                        0
+                      ) {
+                        nextParams.set(
+                          "search",
+                          nextSearch,
+                        );
+                      } else {
+                        nextParams.delete(
+                          "search",
+                        );
+                      }
+
+                      return nextParams;
+                    },
+                    {
+                      replace:
+                        true,
+                    },
                   );
 
                   // Return to first server page.
@@ -300,6 +343,7 @@ export function ResourceExplorerPage() {
             </div>
 
             <NativeSelect
+              aria-label="Filter resources by service"
               value={
                 serviceFilter
               }
@@ -344,6 +388,7 @@ export function ResourceExplorerPage() {
             </NativeSelect>
 
             <NativeSelect
+              aria-label="Filter resources by environment"
               value={
                 environmentFilter
               }
@@ -380,6 +425,7 @@ export function ResourceExplorerPage() {
             </NativeSelect>
 
             <NativeSelect
+              aria-label="Filter resources by health state"
               value={
                 healthFilter
               }

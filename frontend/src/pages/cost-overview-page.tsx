@@ -205,8 +205,8 @@ export function CostOverviewPage() {
           </h1>
 
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Cost information now comes from the FastAPI and PostgreSQL
-            backend.
+            Track AWS spending, budget limits, cost trends and
+            optimization opportunities.
           </p>
         </div>
 

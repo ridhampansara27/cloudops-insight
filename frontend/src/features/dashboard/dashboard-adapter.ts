@@ -24,7 +24,7 @@ export function createDashboardMetrics(
       id: "total-resources",
 
       // Display the metric label.
-      label: "Resources",
+      label: "Tracked resources",
 
       // Convert the numeric backend value to display text.
       value: String(

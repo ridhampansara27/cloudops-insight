@@ -206,8 +206,8 @@ export function DashboardPage() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Monitor cloud resource health, incidents, spending and
-            optimization opportunities using the real CloudOps API.
+            Monitor synchronized AWS resources, operational health,
+            incidents, spending and optimization opportunities.
           </p>
         </div>
 
@@ -282,11 +282,12 @@ export function DashboardPage() {
             0 ? (
               <div className="py-8 text-center">
                 <p className="font-medium">
-                  No unhealthy resources
+                  No warning or critical resources
                 </p>
 
                 <p className="mt-1 text-sm text-muted-foreground">
-                  All discovered resources are currently healthy.
+                  No synchronized resources currently require attention.
+                  Resources without sufficient metrics may remain Unknown.
                 </p>
               </div>
             ) : (

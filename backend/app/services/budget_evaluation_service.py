@@ -157,6 +157,17 @@ class BudgetEvaluationService:
             )
         )
 
+        # Budget consumption cannot be negative. AWS credits,
+        # refunds, or tiny rounding adjustments may make net
+        # billing records negative, but a budget cannot be
+        # consumed below zero.
+        current_spend = max(
+            current_spend,
+            Decimal(
+                0,
+            ),
+        )
+
         # Normalize configured budget values to Decimal.
         monthly_limit = Decimal(
             budget.monthly_limit,
