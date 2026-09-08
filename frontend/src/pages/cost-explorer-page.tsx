@@ -1,19 +1,27 @@
-// Import React utilities for derived filtering state.
+﻿// Import React utilities for filtering.
+import { useState } from "react";
+
+// Import page icons.
 import {
-  useMemo,
-  useState,
-} from "react";
+  Database,
+  Search,
+} from "lucide-react";
 
-// Import the search icon.
-import { Search } from "lucide-react";
+// Import real cost API.
+import {
+  useCostSummary,
+} from "@/features/costs/api/costs-api";
 
-// Import React Router navigation.
-import { Link } from "react-router-dom";
+// Import reusable API states.
+import {
+  PageErrorState,
+} from "@/components/shared/page-error-state";
+
+import {
+  PageLoadingState,
+} from "@/components/shared/page-loading-state";
 
 // Import reusable UI components.
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-
 import {
   Card,
   CardContent,
@@ -25,11 +33,6 @@ import {
 import { Input } from "@/components/ui/input";
 
 import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-
-import {
   Table,
   TableBody,
   TableCell,
@@ -38,110 +41,86 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Import resource-level mock cost information.
-import { resourceCostRecords } from "@/mocks/costs";
+// Import monetary formatting.
+import {
+  formatCurrency,
+} from "@/lib/formatters";
 
-// Format one amount as euro currency.
-function formatCurrency(value: number): string {
-  // Create a German-localized euro formatter.
-  return new Intl.NumberFormat("de-DE", {
-    // Display monetary formatting.
-    style: "currency",
 
-    // Use euros.
-    currency: "EUR",
-  }).format(value);
-}
-
-// Export the interactive Cost Explorer.
+// Export the production Cost Explorer.
 export function CostExplorerPage() {
-  // Store free-text search.
-  const [searchQuery, setSearchQuery] =
+  // Load genuine AWS Cost Explorer data from FastAPI.
+  const costQuery =
+    useCostSummary();
+
+  // Store service search text.
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] =
     useState("");
 
-  // Store the service filter.
-  const [serviceFilter, setServiceFilter] =
-    useState("all");
+  // Display standard loading state.
+  if (costQuery.isPending) {
+    return (
+      <PageLoadingState />
+    );
+  }
 
-  // Store the environment filter.
-  const [
-    environmentFilter,
-    setEnvironmentFilter,
-  ] = useState("all");
+  // Display standard API error state.
+  if (costQuery.isError) {
+    return (
+      <PageErrorState
+        title="Unable to load Cost Explorer"
+        description="AWS billing records could not be retrieved."
+        onRetry={() => {
+          void costQuery.refetch();
+        }}
+      />
+    );
+  }
 
-  // Calculate the filtered resource-cost dataset.
-  const filteredRecords = useMemo(() => {
-    // Normalize search text.
-    const normalizedSearch =
-      searchQuery.trim().toLowerCase();
+  // Store the genuine backend response.
+  const costs =
+    costQuery.data;
 
-    // Apply every active filter.
-    return resourceCostRecords.filter((record) => {
-      // Match resource name, service, owner, or region.
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        record.resourceName
-          .toLowerCase()
-          .includes(normalizedSearch) ||
+  // Normalize search text.
+  const normalizedSearch =
+    searchQuery
+      .trim()
+      .toLowerCase();
+
+  // Filter genuine service-level records.
+  const visibleServices =
+    costs.by_service.filter(
+      (record) =>
+        normalizedSearch.length ===
+          0 ||
         record.service
           .toLowerCase()
-          .includes(normalizedSearch) ||
-        record.owner
-          .toLowerCase()
-          .includes(normalizedSearch) ||
-        record.region
-          .toLowerCase()
-          .includes(normalizedSearch);
+          .includes(
+            normalizedSearch,
+          ),
+    );
 
-      // Match the service filter.
-      const matchesService =
-        serviceFilter === "all" ||
-        record.service === serviceFilter;
+  // Calculate the total represented by visible services.
+  const visibleCost =
+    visibleServices.reduce(
+      (
+        total,
+        record,
+      ) =>
+        total +
+        record.amount,
+      0,
+    );
 
-      // Match the environment filter.
-      const matchesEnvironment =
-        environmentFilter === "all" ||
-        record.environment ===
-          environmentFilter;
+  // Determine whether the imported month contains material spend.
+  const hasMaterialSpend =
+    Math.abs(
+      costs.month_to_date,
+    ) >= 0.005;
 
-      // Return only records satisfying all filters.
-      return (
-        matchesSearch &&
-        matchesService &&
-        matchesEnvironment
-      );
-    });
-  }, [
-    // Recalculate when search changes.
-    searchQuery,
-
-    // Recalculate when service changes.
-    serviceFilter,
-
-    // Recalculate when environment changes.
-    environmentFilter,
-  ]);
-
-  // Calculate total cost for the visible records.
-  const visibleCost = filteredRecords.reduce(
-    // Add each visible record's cost.
-    (total, record) => total + record.cost,
-
-    // Start from zero.
-    0,
-  );
-
-  // Calculate the forecast for the visible records.
-  const visibleForecast = filteredRecords.reduce(
-    // Add each resource forecast.
-    (total, record) =>
-      total + record.forecastCost,
-
-    // Start from zero.
-    0,
-  );
-
-  // Render the Cost Explorer.
   return (
     <section className="space-y-6">
       <div>
@@ -154,23 +133,23 @@ export function CostExplorerPage() {
         </h1>
 
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Analyze cloud spending by resource, service, environment, owner,
-          and region.
+          Explore AWS Cost Explorer records imported into CloudOps.
         </p>
       </div>
 
-      {/* Display current filtered totals. */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>
-              Matching resources
+              Matching services
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {filteredRecords.length}
+              {
+                visibleServices.length
+              }
             </p>
           </CardContent>
         </Card>
@@ -184,7 +163,10 @@ export function CostExplorerPage() {
 
           <CardContent>
             <p className="text-2xl font-semibold">
-              {formatCurrency(visibleCost)}
+              {formatCurrency(
+                visibleCost,
+                costs.currency,
+              )}
             </p>
           </CardContent>
         </Card>
@@ -192,122 +174,79 @@ export function CostExplorerPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>
-              Visible forecast
+              Cost allocation
             </CardDescription>
           </CardHeader>
 
           <CardContent>
-            <p className="text-2xl font-semibold">
-              {formatCurrency(visibleForecast)}
+            <p className="text-lg font-semibold">
+              {
+                costs.resource_level_available
+                  ? "Resource level available"
+                  : "Service level"
+              }
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Display Cost Explorer controls. */}
+      {!hasMaterialSpend && (
+        <Card>
+          <CardContent className="py-5">
+            <p className="font-medium">
+              Only sub-cent AWS billing activity is currently recorded.
+            </p>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              CloudOps preserves the exact provider values in PostgreSQL,
+              while the interface rounds sub-cent amounts for readability.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Query</CardTitle>
+          <CardTitle>
+            Service query
+          </CardTitle>
 
           <CardDescription>
-            Filter resource-level cloud costs using operational dimensions.
+            Filter the genuine AWS service-level billing records for the current month.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_220px_220px]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
-              <Input
-                // Store the current search query.
-                value={searchQuery}
-
-                // Update search state as the user types.
-                onChange={(event) =>
-                  setSearchQuery(
-                    event.target.value,
-                  )
-                }
-
-                // Explain searchable dimensions.
-                placeholder="Search resource, service, owner or region..."
-
-                // Leave room for the search icon.
-                className="pl-9"
-              />
-            </div>
-
-            <NativeSelect
-              // Store the selected service.
-              value={serviceFilter}
-
-              // Update the service filter.
-              onChange={(event) =>
-                setServiceFilter(
-                  event.target.value,
+            <Input
+              value={
+                searchQuery
+              }
+              onChange={(
+                event,
+              ) =>
+                setSearchQuery(
+                  event.target
+                    .value,
                 )
               }
-            >
-              <NativeSelectOption value="all">
-                All services
-              </NativeSelectOption>
-
-              <NativeSelectOption value="Amazon EC2">
-                Amazon EC2
-              </NativeSelectOption>
-
-              <NativeSelectOption value="Amazon RDS">
-                Amazon RDS
-              </NativeSelectOption>
-
-              <NativeSelectOption value="Amazon S3">
-                Amazon S3
-              </NativeSelectOption>
-
-              <NativeSelectOption value="Elastic Load Balancing">
-                Elastic Load Balancing
-              </NativeSelectOption>
-            </NativeSelect>
-
-            <NativeSelect
-              // Store the selected environment.
-              value={environmentFilter}
-
-              // Update the environment filter.
-              onChange={(event) =>
-                setEnvironmentFilter(
-                  event.target.value,
-                )
-              }
-            >
-              <NativeSelectOption value="all">
-                All environments
-              </NativeSelectOption>
-
-              <NativeSelectOption value="development">
-                Development
-              </NativeSelectOption>
-
-              <NativeSelectOption value="staging">
-                Staging
-              </NativeSelectOption>
-
-              <NativeSelectOption value="production">
-                Production
-              </NativeSelectOption>
-            </NativeSelect>
+              placeholder="Search AWS service..."
+              className="pl-9"
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Display detailed resource-level cost records. */}
       <Card>
         <CardHeader>
-          <CardTitle>Resource costs</CardTitle>
+          <CardTitle>
+            Service costs
+          </CardTitle>
 
           <CardDescription>
-            Month-to-date resource cost, forecast, trend, and ownership.
+            Month-to-date AWS spending grouped by service.
           </CardDescription>
         </CardHeader>
 
@@ -316,103 +255,50 @@ export function CostExplorerPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Resource</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Environment</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>MTD</TableHead>
-                  <TableHead>Previous</TableHead>
-                  <TableHead>Forecast</TableHead>
-                  <TableHead>Change</TableHead>
-                  <TableHead />
+                  <TableHead>
+                    AWS service
+                  </TableHead>
+
+                  <TableHead className="text-right">
+                    Month-to-date
+                  </TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
-                {filteredRecords.length > 0 ? (
-                  filteredRecords.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>
-                        <div className="min-w-[200px]">
-                          <p className="font-medium">
-                            {record.resourceName}
-                          </p>
-
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {record.region}
-                          </p>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <Badge variant="outline">
-                          {record.service}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="capitalize">
-                        {record.environment}
-                      </TableCell>
-
-                      <TableCell className="whitespace-nowrap">
-                        {record.owner}
-                      </TableCell>
-
-                      <TableCell className="font-medium">
-                        {formatCurrency(record.cost)}
-                      </TableCell>
-
-                      <TableCell>
-                        {formatCurrency(record.previousCost)}
-                      </TableCell>
-
-                      <TableCell>
-                        {formatCurrency(record.forecastCost)}
-                      </TableCell>
-
-                      <TableCell>
-                        <span
-                          className={
-                            record.changePercentage > 0
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-emerald-600 dark:text-emerald-400"
+                {visibleServices.length >
+                0 ? (
+                  visibleServices.map(
+                    (record) => (
+                      <TableRow
+                        key={
+                          record.service
+                        }
+                      >
+                        <TableCell className="font-medium">
+                          {
+                            record.service
                           }
-                        >
-                          {record.changePercentage > 0 ? "+" : ""}
-                          {record.changePercentage.toFixed(1)}%
-                        </span>
-                      </TableCell>
+                        </TableCell>
 
-                      <TableCell>
-                        <Button
-                          // Render the action as a resource-detail link.
-                          render={
-                            <Link
-                              to={`/cloud/resources/${record.resourceId}`}
-                            />
-                          }
-
-                          // Keep the table action visually lightweight.
-                          variant="outline"
-
-                          // Use the compact button size.
-                          size="sm"
-                        >
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(
+                            record.amount,
+                            costs.currency,
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )
                 ) : (
                   <TableRow>
                     <TableCell
-                      // Span every table column.
-                      colSpan={9}
-
-                      // Display a centered empty state.
-                      className="h-40 text-center"
+                      colSpan={
+                        2
+                      }
+                      className="h-32 text-center text-muted-foreground"
                     >
-                      No cost records match the current query.
+                      No AWS services match the current search.
                     </TableCell>
                   </TableRow>
                 )}
@@ -420,6 +306,38 @@ export function CostExplorerPage() {
             </Table>
           </div>
         </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Database className="mt-0.5 size-5 text-primary" />
+
+            <div>
+              <CardTitle>
+                Resource-level allocation
+              </CardTitle>
+
+              <CardDescription className="mt-1">
+                {
+                  costs.resource_level_available
+                    ? "Mapped AWS resource-level billing records are available."
+                    : "AWS Cost Explorer resource-level granularity is not currently available for this connected account."
+                }
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+
+        {!costs.resource_level_available && (
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              CloudOps does not substitute demonstration values. Service-level
+              AWS costs remain available above, and resource attribution will
+              appear when AWS provides resource-level records.
+            </p>
+          </CardContent>
+        )}
       </Card>
     </section>
   );

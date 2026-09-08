@@ -36,3 +36,7 @@ class CostSummaryRead(BaseModel):
 
     # Return the reporting currency.
     currency: str
+
+    # Tell clients whether AWS resource-level billing records
+    # are currently available in CloudOps.
+    resource_level_available: bool

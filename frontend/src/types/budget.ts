@@ -1,9 +1,7 @@
 // Define the dimensions against which a budget can be applied.
 export type BudgetScopeType =
   | "account"
-  | "service"
-  | "environment"
-  | "team";
+  | "service";
 
 // Define the possible calculated budget states.
 export type BudgetStatus =

@@ -246,6 +246,9 @@ export interface CostSummaryApiResponse {
 
   // Store billing currency.
   currency: string;
+
+  // Tell the UI whether mapped resource-level billing data exists.
+  resource_level_available: boolean;
 }
 
 
@@ -265,6 +268,25 @@ export interface BudgetApiResponse {
   warning_threshold: number;
   critical_threshold: number;
   is_active: boolean;
+
+  // Store genuine backend-calculated month-to-date spend.
+  current_spend:
+    | number
+    | string;
+
+  // Store genuine backend-calculated utilization.
+  utilization_percentage:
+    | number
+    | string;
+
+  // Store healthy, warning, critical, or unsupported.
+  evaluation_status: string;
+
+  // Store the latest backend budget evaluation time.
+  last_evaluated_at:
+    | string
+    | null;
+
   created_at: string;
   updated_at: string;
 }
