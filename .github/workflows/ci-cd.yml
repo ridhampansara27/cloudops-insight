@@ -376,6 +376,42 @@ jobs:
 
 
   # ==========================================================
+  # Required image validation gate
+  # ==========================================================
+
+  image-validation-gate:
+    # Keep this exact display name because the main branch
+    # protection rules require this status-check context.
+    name: Build, scan and publish images
+
+    needs:
+      - build-images
+
+    # Always evaluate the matrix result so a failed or cancelled
+    # architecture cannot turn this required check into a skipped pass.
+    if: always()
+
+    runs-on: ubuntu-24.04
+
+    steps:
+
+      - name: Verify architecture build matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "build-images result: ${{ needs.build-images.result }}"
+
+          if [ "${{ needs.build-images.result }}" != "success" ]; then
+            echo "One or more architecture builds failed."
+            exit 1
+          fi
+
+          echo "Both amd64 and arm64 image builds passed."
+
+
+
+  # ==========================================================
   # Publish multi-platform manifests
   # ==========================================================
 
@@ -384,7 +420,7 @@ jobs:
 
     # Run only after BOTH native architecture jobs succeed.
     needs:
-      - build-images
+      - image-validation-gate
 
     if: >-
       github.event_name == 'push' ||
