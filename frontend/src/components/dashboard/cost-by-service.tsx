@@ -9,7 +9,7 @@ import {
 
 // Import shared monetary formatting.
 import {
-  formatCurrency,
+  formatBillingAmount,
 } from "@/lib/formatters";
 
 // Import the real API response type.
@@ -70,7 +70,7 @@ export function CostByService({
           services.map(
             (service) => {
               // Calculate this service's share of overall spending.
-              const percentage =
+              const rawPercentage =
                 total <= 0
                   ? 0
                   : (
@@ -78,6 +78,26 @@ export function CostByService({
                       total
                     ) *
                     100;
+
+              // Normalize percentages that round to zero so genuine
+              // tiny AWS credits never appear as confusing "-0.0%".
+              const percentage =
+                Math.abs(
+                  rawPercentage,
+                ) < 0.05
+                  ? 0
+                  : rawPercentage;
+
+              // Negative service credits cannot have a negative-width
+              // allocation bar, so clamp only the visual representation.
+              const barPercentage =
+                Math.max(
+                  0,
+                  Math.min(
+                    percentage,
+                    100,
+                  ),
+                );
 
               // Render one service.
               return (
@@ -106,7 +126,7 @@ export function CostByService({
                     </div>
 
                     <p className="text-sm font-semibold">
-                      {formatCurrency(
+                      {formatBillingAmount(
                         service.amount,
                         currency,
                       )}
@@ -117,10 +137,7 @@ export function CostByService({
                     <div
                       className="h-full rounded-full bg-primary"
                       style={{
-                        width: `${Math.min(
-                          percentage,
-                          100,
-                        )}%`,
+                        width: `${barPercentage}%`,
                       }}
                     />
                   </div>
