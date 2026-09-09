@@ -1,14 +1,20 @@
-// Import budget icon.
+// Import FinOps budget icons.
 import {
+  ArrowRight,
+  Gauge,
   WalletCards,
 } from "lucide-react";
 
-// Import progress bar.
+// Import navigation.
 import {
-  Progress,
-} from "@/components/ui/progress";
+  Link,
+} from "react-router-dom";
 
-// Import card components.
+// Import reusable UI.
+import {
+  Button,
+} from "@/components/ui/button";
+
 import {
   Card,
   CardContent,
@@ -17,75 +23,97 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import currency formatter.
 import {
+  Progress,
+} from "@/components/ui/progress";
+
+// Import currency formatters.
+import {
+  formatBillingAmount,
   formatCurrency,
 } from "@/lib/formatters";
 
 
 // Define budget-utilization properties.
 interface BudgetUtilizationProps {
-  // Supply current month spending.
+  // Current genuine month-to-date spending.
   currentSpend: number;
 
-  // Supply account budget when configured.
+  // Active account-level monthly budget.
   monthlyBudget:
     | number
     | null;
 
-  // Supply calculated run-rate forecast.
+  // Simple run-rate estimate when daily data exists.
   forecast:
     | number
     | null;
 
-  // Supply billing currency.
+  // Backend billing currency.
   currency: string;
 }
 
 
-// Export real budget-utilization card.
+// Export the account budget command card.
 export function BudgetUtilization({
-  // Receive current spending.
   currentSpend,
-
-  // Receive budget.
   monthlyBudget,
-
-  // Receive forecast.
   forecast,
-
-  // Receive currency.
   currency,
 }: BudgetUtilizationProps) {
-  // Handle missing budget configuration.
+  // Render an explicit configuration state when no budget exists.
   if (
     monthlyBudget ===
       null ||
-    monthlyBudget <= 0
+    monthlyBudget <=
+      0
   ) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Monthly budget
+      <Card className="overflow-hidden bg-card/72">
+        <CardHeader className="border-b border-border/50 pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <WalletCards className="size-4 text-amber-300" />
+
+            Account budget
           </CardTitle>
 
           <CardDescription>
-            No active account-level budget has been configured.
+            Month-to-date spending against an active account-level budget.
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Create an account budget from the Budgets page to track
-            utilization here.
+        <CardContent className="flex min-h-[260px] flex-col items-center justify-center text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-amber-400/15 bg-amber-400/8 text-amber-300">
+            <WalletCards className="size-5" />
+          </div>
+
+          <p className="mt-4 font-semibold">
+            No account budget configured
           </p>
+
+          <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Create an active account-level budget to track monthly
+            utilization and compare it with synchronized AWS spending.
+          </p>
+
+          <Button
+            className="mt-5 rounded-xl"
+            render={
+              <Link to="/costs/budgets" />
+            }
+            size="sm"
+            variant="outline"
+          >
+            Open Budgets
+
+            <ArrowRight className="ml-2 size-3.5" />
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
-  // Calculate current budget utilization.
+  // Calculate utilization directly from real cost and budget values.
   const utilization =
     (
       currentSpend /
@@ -93,9 +121,10 @@ export function BudgetUtilization({
     ) *
     100;
 
-  // Calculate forecast utilization when available.
+  // Calculate forecast utilization only when a run-rate exists.
   const forecastUtilization =
-    forecast === null
+    forecast ===
+    null
       ? null
       : (
           forecast /
@@ -103,82 +132,176 @@ export function BudgetUtilization({
         ) *
         100;
 
-  // Render budget status.
+  // Clamp only the visual progress bar.
+  const visualUtilization =
+    Math.min(
+      Math.max(
+        utilization,
+        0,
+      ),
+      100,
+    );
+
+  // Determine budget semantic state.
+  const utilizationState =
+    utilization >=
+    100
+      ? {
+          label:
+            "Budget exceeded",
+
+          className:
+            "border-rose-400/20 bg-rose-400/8 text-rose-300",
+        }
+      : utilization >=
+          80
+        ? {
+            label:
+              "Approaching limit",
+
+            className:
+              "border-amber-400/20 bg-amber-400/8 text-amber-300",
+          }
+        : {
+            label:
+              "Within budget",
+
+            className:
+              "border-emerald-400/20 bg-emerald-400/8 text-emerald-300",
+          };
+
+  // Render genuine budget utilization.
   return (
-    <Card>
-      <CardHeader>
+    <Card className="overflow-hidden bg-card/72">
+      <CardHeader className="border-b border-border/50 pb-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardTitle>
-              Monthly budget
+            <CardTitle className="flex items-center gap-2">
+              <WalletCards className="size-4 text-amber-300" />
+
+              Account budget
             </CardTitle>
 
             <CardDescription className="mt-1">
-              Real month-to-date cost against the configured account budget.
+              Synchronized AWS spending against the configured monthly limit.
             </CardDescription>
           </div>
 
-          <WalletCards className="size-5 text-primary" />
+          <span
+            className={`shrink-0 rounded-lg border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.11em] ${utilizationState.className}`}
+          >
+            {
+              utilizationState.label
+            }
+          </span>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-5 pt-2">
+        {/* Current spend and configured limit. */}
         <div>
-          <div className="mb-2 flex items-end justify-between gap-4">
-            <p className="text-2xl font-semibold">
-              {formatCurrency(
-                currentSpend,
-                currency,
-              )}
-            </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                Month-to-date
+              </p>
+
+              <p className="mt-1 text-3xl font-semibold tracking-[-0.04em]">
+                {formatBillingAmount(
+                  currentSpend,
+                  currency,
+                )}
+              </p>
+            </div>
 
             <p className="text-sm text-muted-foreground">
               of{" "}
-              {formatCurrency(
-                monthlyBudget,
-                currency,
-              )}
+              <span className="font-semibold text-foreground">
+                {formatCurrency(
+                  monthlyBudget,
+                  currency,
+                )}
+              </span>
             </p>
           </div>
 
           <Progress
-            value={Math.min(
-              utilization,
-              100,
-            )}
+            className="mt-4"
+            value={
+              visualUtilization
+            }
           />
 
-          <p className="mt-2 text-xs text-muted-foreground">
-            {
-              utilization.toFixed(
-                1,
-              )
-            }
-            % consumed
-          </p>
-        </div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {
+                utilization.toFixed(
+                  1,
+                )
+              }
+              % consumed
+            </p>
 
-        {forecast !==
-          null && (
-          <div className="rounded-lg border bg-muted/20 p-4">
-            <p className="text-sm font-medium">
-              Run-rate estimate:{" "}
+            <p className="text-xs text-muted-foreground">
               {formatCurrency(
-                forecast,
+                Math.max(
+                  monthlyBudget -
+                    currentSpend,
+                  0,
+                ),
                 currency,
               )}
-            </p>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              Approximately{" "}
-              {forecastUtilization?.toFixed(
-                1,
-              )}
-              % of the configured budget based on available daily
-              records.
+              {" "}
+              remaining
             </p>
           </div>
+        </div>
+
+        {/* Run-rate context uses only the simple derived estimate. */}
+        {forecast !==
+          null && (
+          <div className="rounded-xl border border-border/55 bg-background/20 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-violet-400/15 bg-violet-400/8 text-violet-300">
+                <Gauge className="size-4" />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold">
+                  Run-rate estimate{" "}
+                  {formatBillingAmount(
+                    forecast,
+                    currency,
+                  )}
+                </p>
+
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Approximately{" "}
+                  {forecastUtilization?.toFixed(
+                    1,
+                  )}
+                  % of the configured monthly budget based on
+                  available daily billing records.
+                </p>
+              </div>
+            </div>
+          </div>
         )}
+
+        <div className="flex justify-end">
+          <Button
+            className="rounded-xl"
+            render={
+              <Link to="/costs/budgets" />
+            }
+            size="sm"
+            variant="ghost"
+          >
+            Manage budgets
+
+            <ArrowRight className="ml-2 size-3.5" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
