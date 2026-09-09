@@ -10,6 +10,7 @@ import type {
 
 // Import shared currency formatting.
 import {
+  formatBillingAmount,
   formatCurrency,
 } from "@/lib/formatters";
 
@@ -127,7 +128,7 @@ export function createDashboardMetrics(
       label: "MTD cost",
 
       // Format the backend monetary value using its currency.
-      value: formatCurrency(
+      value: formatBillingAmount(
         summary.month_to_date_cost,
         summary.currency,
       ),

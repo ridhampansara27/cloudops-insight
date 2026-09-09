@@ -398,8 +398,8 @@ export function ResourceDetailPage() {
           </CardTitle>
 
           <CardDescription>
-            CloudWatch metrics will be connected during the AWS
-            monitoring integration phase.
+            CloudWatch metrics synchronized from AWS for the most recent
+            24-hour monitoring window.
           </CardDescription>
         </CardHeader>
 

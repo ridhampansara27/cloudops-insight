@@ -21,6 +21,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+// Import precise billing-chart formatting.
+import {
+  formatChartCurrency,
+} from "@/lib/formatters";
+
 // Import real API response type.
 import type {
   DailyCostApiResponse,
@@ -208,8 +213,17 @@ export function CostTrendChart({
 
         // Format values using the currency code.
         axisLabel: {
-          // Display compact billing values.
-          formatter: `${currency} {value}`,
+          // Preserve enough precision to make genuine AWS
+          // micro-cost movement visible instead of rounding it away.
+          formatter: (
+            value,
+          ) =>
+            formatChartCurrency(
+              Number(
+                value,
+              ),
+              currency,
+            ),
 
           // Use smaller mobile labels.
           fontSize: isMobile

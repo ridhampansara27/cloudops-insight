@@ -81,6 +81,58 @@ export function formatBillingAmount(
 }
 
 
+// Format very small billing values for charts without hiding
+// genuine AWS micro-cost activity behind two-decimal rounding.
+export function formatChartCurrency(
+  value: number,
+  currency = "USD",
+): string {
+  // Keep genuine zero consistent with the normal application formatter.
+  if (value === 0) {
+    return formatCurrency(
+      0,
+      currency,
+    );
+  }
+
+  // Inspect the magnitude so small AWS billing records receive
+  // enough decimal places to remain visually distinguishable.
+  const absoluteValue =
+    Math.abs(
+      value,
+    );
+
+  // Use progressively greater precision for smaller values.
+  const maximumFractionDigits =
+    absoluteValue >= 1
+      ? 2
+      : absoluteValue >= 0.01
+        ? 4
+        : absoluteValue >= 0.0001
+          ? 6
+          : 8;
+
+  // Preserve normal two-decimal currency presentation for values
+  // of at least one currency unit.
+  const minimumFractionDigits =
+    absoluteValue >= 1
+      ? 2
+      : 0;
+
+  return new Intl.NumberFormat(
+    "de-DE",
+    {
+      style: "currency",
+      currency,
+      minimumFractionDigits,
+      maximumFractionDigits,
+    },
+  ).format(
+    value,
+  );
+}
+
+
 // Format an ISO timestamp for the application UI.
 export function formatTimestamp(
   // Allow nullable API timestamps.
