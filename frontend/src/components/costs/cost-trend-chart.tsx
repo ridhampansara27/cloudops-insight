@@ -12,6 +12,12 @@ import type {
 // Import React ECharts wrapper.
 import ReactECharts from "echarts-for-react";
 
+// Import FinOps visualization icons.
+import {
+  ChartNoAxesCombined,
+  CircleDollarSign,
+} from "lucide-react";
+
 // Import reusable cards.
 import {
   Card,
@@ -21,43 +27,41 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import precise billing-chart formatting.
+// Import precise micro-cost-safe formatting.
 import {
   formatChartCurrency,
 } from "@/lib/formatters";
 
-// Import real API response type.
+// Import genuine API response type.
 import type {
   DailyCostApiResponse,
 } from "@/types/api";
 
 
-// Define component properties.
+// Define chart properties.
 interface CostTrendChartProps {
-  // Supply actual daily costs from FastAPI.
-  points: DailyCostApiResponse[];
+  // Supply actual daily AWS costs.
+  points:
+    DailyCostApiResponse[];
 
-  // Supply billing currency.
+  // Supply backend billing currency.
   currency: string;
 }
 
 
-// Export API-driven cost chart.
+// Export the genuine daily cost trajectory.
 export function CostTrendChart({
-  // Receive real billing points.
   points,
-
-  // Receive backend currency.
   currency,
 }: CostTrendChartProps) {
-  // Store mobile layout state.
+  // Store responsive chart state.
   const [
     isMobile,
     setIsMobile,
   ] =
     useState(false);
 
-  // Synchronize chart layout with browser width.
+  // Synchronize chart density with browser width.
   useEffect(() => {
     // Create narrow-screen media query.
     const mediaQuery =
@@ -65,25 +69,24 @@ export function CostTrendChart({
         "(max-width: 640px)",
       );
 
-    // Synchronize React state.
+    // Store current media-query state.
     const updateMobileState =
       () => {
-        // Store whether mobile layout applies.
         setIsMobile(
           mediaQuery.matches,
         );
       };
 
-    // Run immediately.
+    // Initialize state.
     updateMobileState();
 
-    // Listen for future changes.
+    // Watch future viewport changes.
     mediaQuery.addEventListener(
       "change",
       updateMobileState,
     );
 
-    // Remove listener after unmount.
+    // Remove the listener on unmount.
     return () => {
       mediaQuery.removeEventListener(
         "change",
@@ -92,129 +95,183 @@ export function CostTrendChart({
     };
   }, []);
 
-  // Convert API data into ECharts dataset records.
+  // Convert real API data into ECharts records.
   const chartSource =
     points.map(
-      (point) => ({
-        // Format billing date.
-        date: new Intl.DateTimeFormat(
-          "en-GB",
-          {
-            // Display day.
-            day: "2-digit",
+      (
+        point,
+      ) => ({
+        // Display compact billing date.
+        date:
+          new Intl.DateTimeFormat(
+            "en-GB",
+            {
+              day:
+                "2-digit",
 
-            // Display abbreviated month.
-            month: "short",
-          },
-        ).format(
-          new Date(
-            point.date,
+              month:
+                "short",
+            },
+          ).format(
+            new Date(
+              point.date,
+            ),
           ),
-        ),
 
-        // Store real daily cost.
-        Cost: point.amount,
+        // Preserve real daily cost.
+        Cost:
+          point.amount,
       }),
     );
 
-  // Configure the chart.
-  const option: EChartsOption =
-    {
-      // Use compact animation.
+  // Build dark command-center chart configuration.
+  const option:
+    EChartsOption = {
+      // Use restrained animation.
       animationDuration:
-        300,
+        450,
 
-      // Configure hover tooltip.
+      // Configure axis tooltip.
       tooltip: {
-        // Show data for the current date.
-        trigger: "axis",
+        trigger:
+          "axis",
 
-        // Keep tooltip inside chart.
-        confine: true,
+        confine:
+          true,
+
+        backgroundColor:
+          "rgba(8, 15, 29, 0.96)",
+
+        borderColor:
+          "rgba(56, 189, 248, 0.22)",
+
+        borderWidth:
+          1,
+
+        textStyle: {
+          color:
+            "#e2e8f0",
+
+          fontSize:
+            12,
+        },
+
+        // Preserve precise billing values inside the tooltip.
+        valueFormatter: (
+          value,
+        ) =>
+          formatChartCurrency(
+            Number(
+              value,
+            ),
+            currency,
+          ),
       },
 
-      // Configure chart area.
+      // Configure plot dimensions.
       grid: {
-        // Reserve y-axis space.
-        left: isMobile
-          ? 12
-          : 20,
+        left:
+          isMobile
+            ? 10
+            : 18,
 
-        // Reserve right spacing.
-        right: isMobile
-          ? 10
-          : 20,
+        right:
+          isMobile
+            ? 10
+            : 22,
 
-        // Reserve top spacing.
-        top: 20,
+        top:
+          18,
 
-        // Reserve date-label spacing.
-        bottom: isMobile
-          ? 28
-          : 38,
+        bottom:
+          isMobile
+            ? 28
+            : 34,
 
-        // Include labels in layout calculations.
-        containLabel: true,
+        containLabel:
+          true,
       },
 
-      // Supply real backend records.
+      // Supply genuine backend billing data.
       dataset: {
-        // Use normalized records.
         source:
           chartSource,
       },
 
-      // Configure billing date axis.
+      // Configure date axis.
       xAxis: {
-        // Treat dates as categories.
-        type: "category",
+        type:
+          "category",
 
-        // Align values with boundaries.
-        boundaryGap: false,
+        boundaryGap:
+          false,
 
-        // Configure date labels.
-        axisLabel: {
-          // Reduce mobile label density.
-          interval: isMobile
-            ? 1
-            : 0,
-
-          // Avoid visible overlap.
-          hideOverlap: true,
-
-          // Use responsive text size.
-          fontSize: isMobile
-            ? 9
-            : 11,
-
-          // Add spacing.
-          margin: 10,
+        axisLine: {
+          lineStyle: {
+            color:
+              "rgba(148, 163, 184, 0.18)",
+          },
         },
 
-        // Hide unnecessary ticks.
         axisTick: {
-          // Do not draw category ticks.
-          show: false,
+          show:
+            false,
+        },
+
+        axisLabel: {
+          color:
+            "#64748b",
+
+          fontSize:
+            isMobile
+              ? 9
+              : 10,
+
+          hideOverlap:
+            true,
+
+          interval:
+            isMobile
+              ? 1
+              : 0,
+
+          margin:
+            10,
         },
       },
 
-      // Configure cost axis.
+      // Configure monetary axis.
       yAxis: {
-        // Use numerical values.
-        type: "value",
+        type:
+          "value",
 
-        // Keep automatic scale.
-        scale: true,
+        scale:
+          true,
 
-        // Use fewer mobile grid lines.
-        splitNumber: isMobile
-          ? 4
-          : 5,
+        splitNumber:
+          isMobile
+            ? 4
+            : 5,
 
-        // Format values using the currency code.
+        axisLine: {
+          show:
+            false,
+        },
+
+        axisTick: {
+          show:
+            false,
+        },
+
         axisLabel: {
-          // Preserve enough precision to make genuine AWS
-          // micro-cost movement visible instead of rounding it away.
+          color:
+            "#64748b",
+
+          fontSize:
+            isMobile
+              ? 9
+              : 10,
+
           formatter: (
             value,
           ) =>
@@ -224,92 +281,135 @@ export function CostTrendChart({
               ),
               currency,
             ),
+        },
 
-          // Use smaller mobile labels.
-          fontSize: isMobile
-            ? 9
-            : 11,
+        splitLine: {
+          lineStyle: {
+            color:
+              "rgba(148, 163, 184, 0.09)",
+
+            type:
+              "dashed",
+          },
         },
       },
 
-      // Define real daily-cost series.
+      // Render the genuine daily-cost series.
       series: [
         {
-          // Name the series.
-          name: "Daily cost",
+          name:
+            "Daily cost",
 
-          // Draw as line chart.
-          type: "line",
+          type:
+            "line",
 
-          // Smooth daily movement.
-          smooth: true,
+          smooth:
+            true,
 
-          // Keep line inside chart.
-          clip: true,
+          clip:
+            true,
 
-          // Display point markers.
-          showSymbol: true,
+          showSymbol:
+            !isMobile,
 
-          // Use responsive marker size.
-          symbolSize: isMobile
-            ? 5
-            : 7,
+          symbol:
+            "circle",
 
-          // Add subtle filled area.
-          areaStyle: {
-            // Keep fill unobtrusive.
-            opacity: isMobile
-              ? 0.12
-              : 0.18,
+          symbolSize:
+            6,
+
+          lineStyle: {
+            width:
+              2,
+
+            color:
+              "#38bdf8",
           },
 
-          // Map dataset fields.
-          encode: {
-            // Map horizontal values.
-            x: "date",
+          itemStyle: {
+            color:
+              "#38bdf8",
+          },
 
-            // Map monetary values.
-            y: "Cost",
+          areaStyle: {
+            color:
+              "rgba(56, 189, 248, 0.09)",
+          },
+
+          emphasis: {
+            focus:
+              "series",
+          },
+
+          encode: {
+            x:
+              "date",
+
+            y:
+              "Cost",
           },
         },
       ],
     };
 
-  // Render real billing chart.
+  // Render the Cost Explorer trajectory card.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          Daily cost trend
-        </CardTitle>
+    <Card className="overflow-hidden bg-card/72 py-0">
+      <CardHeader className="border-b border-border/50 p-4 pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <ChartNoAxesCombined className="size-4 text-sky-300" />
 
-        <CardDescription>
-          Actual daily spending recorded in PostgreSQL.
-        </CardDescription>
+              Daily cost trajectory
+            </CardTitle>
+
+            <CardDescription className="mt-1">
+              Actual daily AWS billing records synchronized into PostgreSQL.
+            </CardDescription>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-muted/25 px-2.5 py-1 text-xs text-muted-foreground">
+            {
+              points.length
+            }
+            {" "}
+            daily records
+          </div>
+        </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-4">
         {points.length ===
         0 ? (
-          <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-            No daily billing data is available.
+          <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
+              <CircleDollarSign className="size-5" />
+            </div>
+
+            <p className="mt-4 font-semibold">
+              No daily billing records
+            </p>
+
+            <p className="mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
+              The daily AWS cost trajectory will appear after Cost Explorer
+              synchronization provides billing records.
+            </p>
           </div>
         ) : (
-          <div className="min-w-0 overflow-hidden">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-border/45 bg-background/15 p-1">
             <ReactECharts
+              lazyUpdate
+              notMerge
               option={
                 option
               }
-              notMerge
-              lazyUpdate
               style={{
-                // Use responsive chart height.
                 height:
                   isMobile
-                    ? 290
-                    : 360,
+                    ? 300
+                    : 370,
 
-                // Fill card width.
                 width:
                   "100%",
               }}

@@ -4,8 +4,18 @@ import {
   useState,
 } from "react";
 
-// Import reusable UI controls.
-import { Button } from "@/components/ui/button";
+// Import dialog presentation icons.
+import {
+  CircleDollarSign,
+  Gauge,
+  Target,
+  WalletCards,
+} from "lucide-react";
+
+// Import reusable controls.
+import {
+  Button,
+} from "@/components/ui/button";
 
 import {
   Dialog,
@@ -16,7 +26,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { Input } from "@/components/ui/input";
+import {
+  Input,
+} from "@/components/ui/input";
 
 import {
   NativeSelect,
@@ -29,7 +41,7 @@ import type {
   CloudAccountApiResponse,
 } from "@/types/api";
 
-// Import the supported budget-scope type.
+// Import supported budget scope type.
 import type {
   BudgetScopeType,
 } from "@/types/budget";
@@ -38,10 +50,16 @@ import type {
 // Define normalized values returned to the page.
 export interface BudgetFormValues {
   name: string;
-  scopeType: BudgetScopeType;
+
+  scopeType:
+    BudgetScopeType;
+
   scopeValue: string;
+
   monthlyLimit: number;
+
   warningThreshold: number;
+
   criticalThreshold: number;
 }
 
@@ -49,22 +67,27 @@ export interface BudgetFormValues {
 // Define dialog properties.
 interface BudgetDialogProps {
   open: boolean;
+
   onOpenChange: (
     open: boolean,
   ) => void;
+
   budget?:
     | BudgetApiResponse
     | null;
+
   onSave: (
-    values: BudgetFormValues,
+    values:
+      BudgetFormValues,
   ) => Promise<void>;
+
   isSaving?: boolean;
 
-  // Supply genuine connected AWS accounts.
+  // Genuine connected AWS accounts.
   accounts:
     CloudAccountApiResponse[];
 
-  // Supply genuine AWS services discovered from billing records.
+  // Genuine billed AWS services.
   services:
     string[];
 }
@@ -76,9 +99,10 @@ function normalizeScopeType(
     | string
     | undefined,
 ): BudgetScopeType {
-  return value === "service"
-    ? "service"
-    : "account";
+  return value ===
+    "service"
+      ? "service"
+      : "account";
 }
 
 
@@ -92,7 +116,7 @@ export function BudgetDialog({
   accounts,
   services,
 }: BudgetDialogProps) {
-  // Store the currently selected supported scope.
+  // Store currently selected scope for creation mode.
   const [
     scopeType,
     setScopeType,
@@ -103,7 +127,7 @@ export function BudgetDialog({
       ),
     );
 
-  // Display validation/API errors inside the form.
+  // Store visible validation/API error.
   const [
     formError,
     setFormError,
@@ -112,7 +136,7 @@ export function BudgetDialog({
       string | null
     >(null);
 
-  // Build genuine scope choices.
+  // Existing budget scope is intentionally immutable during editing.
   const effectiveScopeType =
     budget
       ? normalizeScopeType(
@@ -120,32 +144,40 @@ export function BudgetDialog({
         )
       : scopeType;
 
+  // Build scope choices only from genuine backend context.
   const scopeOptions =
     effectiveScopeType ===
     "account"
       ? accounts.map(
-          (account) => ({
+          (
+            account,
+          ) => ({
             value:
               account.id,
+
             label:
               `${account.name} (${account.external_account_id})`,
           }),
         )
       : services.map(
-          (service) => ({
+          (
+            service,
+          ) => ({
             value:
               service,
+
             label:
               service,
           }),
         );
 
-  // Preserve an existing scope if it is not currently returned
-  // by the supporting API.
+  // Preserve historical scope values no longer returned by supporting APIs.
   const options =
     budget &&
     !scopeOptions.some(
-      (option) =>
+      (
+        option,
+      ) =>
         option.value ===
         budget.scope_value,
     )
@@ -153,6 +185,7 @@ export function BudgetDialog({
           {
             value:
               budget.scope_value,
+
             label:
               budget.scope_value,
           },
@@ -160,28 +193,35 @@ export function BudgetDialog({
         ]
       : scopeOptions;
 
-  // Select a real default instead of asking the user for an
-  // internal CloudOps UUID.
+  // Select a real supporting option by default.
   const defaultScopeValue =
     budget?.scope_value ??
-    options[0]?.value ??
+    options[
+      0
+    ]?.value ??
     "";
 
-  // Handle form submission.
+  // Handle validated form submission.
   async function handleSubmit(
     event:
       FormEvent<HTMLFormElement>,
   ) {
+    // Prevent native page submission.
     event.preventDefault();
 
-    if (isSaving) {
+    // Ignore duplicate submission while API mutation is active.
+    if (
+      isSaving
+    ) {
       return;
     }
 
+    // Clear previous error.
     setFormError(
       null,
     );
 
+    // Read submitted form values.
     const formData =
       new FormData(
         event.currentTarget,
@@ -191,30 +231,34 @@ export function BudgetDialog({
       String(
         formData.get(
           "name",
-        ) ?? "",
+        ) ??
+        "",
       ).trim();
 
-    // Disabled edit fields are absent from FormData,
-    // so preserve their persisted values.
+    // Disabled edit fields are absent from FormData.
     const submittedScopeType =
       budget
         ? normalizeScopeType(
             budget.scope_type,
           )
-        : (String(
-            formData.get(
-              "scopeType",
-            ) ??
+        : (
+            String(
+              formData.get(
+                "scopeType",
+              ) ??
               "account",
-          ) as BudgetScopeType);
+            ) as BudgetScopeType
+          );
 
+    // Preserve immutable existing scope during editing.
     const scopeValue =
       (
         budget?.scope_value ??
         String(
           formData.get(
             "scopeValue",
-          ) ?? "",
+          ) ??
+          "",
         )
       ).trim();
 
@@ -239,10 +283,12 @@ export function BudgetDialog({
         ),
       );
 
-    // Validate required selections.
+    // Validate required identity/scope values.
     if (
-      name.length === 0 ||
-      scopeValue.length === 0
+      name.length ===
+        0 ||
+      scopeValue.length ===
+        0
     ) {
       setFormError(
         "Choose a valid budget scope and enter a budget name.",
@@ -251,12 +297,13 @@ export function BudgetDialog({
       return;
     }
 
-    // Validate monetary limit.
+    // Validate monthly monetary limit.
     if (
       !Number.isFinite(
         monthlyLimit,
       ) ||
-      monthlyLimit <= 0
+      monthlyLimit <=
+        0
     ) {
       setFormError(
         "Monthly limit must be greater than zero.",
@@ -289,7 +336,7 @@ export function BudgetDialog({
       return;
     }
 
-    // Critical threshold cannot precede warning.
+    // Critical threshold must not precede warning threshold.
     if (
       criticalThreshold <
       warningThreshold
@@ -302,285 +349,355 @@ export function BudgetDialog({
     }
 
     try {
+      // Persist through the existing API-backed callback.
       await onSave({
         name,
+
         scopeType:
           submittedScopeType,
+
         scopeValue,
+
         monthlyLimit,
+
         warningThreshold,
+
         criticalThreshold,
       });
 
-      // Close only after the API succeeds.
+      // Close only after persistence succeeds.
       onOpenChange(
         false,
       );
     } catch {
+      // Keep the dialog open after failure.
       setFormError(
         "CloudOps could not save this budget. Review the values and try again.",
       );
     }
   }
 
+  // Render the premium governance editor.
   return (
     <Dialog
-      open={
-        open
-      }
       onOpenChange={
         onOpenChange
       }
+      open={
+        open
+      }
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {
-              budget
-                ? "Edit budget"
-                : "Create budget"
-            }
-          </DialogTitle>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden border-border/70 bg-card/95 p-0 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:max-w-2xl">
+        {/* Add restrained FinOps atmosphere. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -top-28 size-64 rounded-full bg-cyan-400/8 blur-3xl"
+        />
 
-          <DialogDescription>
-            Configure a monthly AWS spending limit using a scope CloudOps can evaluate.
-          </DialogDescription>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-28 size-64 rounded-full bg-violet-500/8 blur-3xl"
+        />
+
+        <DialogHeader className="relative shrink-0 border-b border-border/50 px-5 py-4 text-left sm:px-6">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/8 text-primary">
+              <WalletCards className="size-[18px]" />
+            </div>
+
+            <div>
+              <DialogTitle>
+                {budget
+                  ? "Edit budget"
+                  : "Create budget"}
+              </DialogTitle>
+
+              <DialogDescription className="mt-1 leading-relaxed">
+                Configure a monthly AWS spending limit using a scope
+                CloudOps can evaluate from synchronized billing records.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <form
+          className="relative flex min-h-0 flex-1 flex-col"
           key={`${budget?.id ?? "new"}-${open}`}
           onSubmit={
             handleSubmit
           }
         >
-          <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="budget-name"
-              >
-                Budget name
-              </label>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 [scrollbar-color:rgba(148,163,184,0.28)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin] sm:px-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/30">
+            {/* Budget identity. */}
+            <div className="rounded-xl border border-border/55 bg-background/20 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Target className="size-4 text-primary" />
 
-              <Input
-                id="budget-name"
-                name="name"
-                defaultValue={
-                  budget?.name ??
-                  ""
-                }
-                placeholder="AWS monthly budget"
-                required
-                disabled={
-                  isSaving
-                }
-              />
+                <p className="text-sm font-semibold">
+                  Budget identity
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-medium text-muted-foreground"
+                  htmlFor="budget-name"
+                >
+                  Budget name
+                </label>
+
+                <Input
+                  className="rounded-xl bg-background/30"
+                  defaultValue={
+                    budget?.name ??
+                    ""
+                  }
+                  disabled={
+                    isSaving
+                  }
+                  id="budget-name"
+                  name="name"
+                  placeholder="AWS monthly budget"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="budget-scope-type"
-              >
-                Scope
-              </label>
+            {/* Evaluation scope. */}
+            <div className="rounded-xl border border-border/55 bg-background/20 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Gauge className="size-4 text-violet-300" />
 
-              <NativeSelect
-                id="budget-scope-type"
-                name="scopeType"
-                value={
-                  effectiveScopeType
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setScopeType(
-                    event.target
-                      .value as BudgetScopeType,
-                  )
-                }
-                disabled={
-                  Boolean(
-                    budget,
-                  ) ||
-                  isSaving
-                }
-              >
-                <NativeSelectOption value="account">
-                  AWS account
-                </NativeSelectOption>
+                <p className="text-sm font-semibold">
+                  Evaluation scope
+                </p>
+              </div>
 
-                <NativeSelectOption value="service">
-                  AWS service
-                </NativeSelectOption>
-              </NativeSelect>
-            </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="budget-scope-type"
+                  >
+                    Scope type
+                  </label>
 
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="budget-scope-value"
-              >
-                {
-                  effectiveScopeType ===
-                  "account"
-                    ? "Connected account"
-                    : "AWS service"
-                }
-              </label>
-
-              <NativeSelect
-                key={`${effectiveScopeType}-${budget?.id ?? "new"}`}
-                id="budget-scope-value"
-                name="scopeValue"
-                defaultValue={
-                  defaultScopeValue
-                }
-                disabled={
-                  Boolean(
-                    budget,
-                  ) ||
-                  isSaving
-                }
-                required
-              >
-                {options.length ===
-                0 ? (
-                  <NativeSelectOption value="">
-                    {
-                      scopeType ===
-                      "account"
-                        ? "No connected AWS accounts"
-                        : "No billed AWS services available"
+                  <NativeSelect
+                    disabled={
+                      Boolean(
+                        budget,
+                      ) ||
+                      isSaving
                     }
-                  </NativeSelectOption>
-                ) : (
-                  options.map(
-                    (
-                      option,
-                    ) => (
-                      <NativeSelectOption
-                        key={
-                          option.value
-                        }
-                        value={
-                          option.value
-                        }
-                      >
-                        {
-                          option.label
-                        }
+                    id="budget-scope-type"
+                    name="scopeType"
+                    onChange={(
+                      event,
+                    ) =>
+                      setScopeType(
+                        event.target
+                          .value as BudgetScopeType,
+                      )
+                    }
+                    value={
+                      effectiveScopeType
+                    }
+                  >
+                    <NativeSelectOption value="account">
+                      AWS account
+                    </NativeSelectOption>
+
+                    <NativeSelectOption value="service">
+                      AWS service
+                    </NativeSelectOption>
+                  </NativeSelect>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="budget-scope-value"
+                  >
+                    {effectiveScopeType ===
+                    "account"
+                      ? "Connected account"
+                      : "AWS service"}
+                  </label>
+
+                  <NativeSelect
+                    defaultValue={
+                      defaultScopeValue
+                    }
+                    disabled={
+                      Boolean(
+                        budget,
+                      ) ||
+                      isSaving
+                    }
+                    id="budget-scope-value"
+                    key={`${effectiveScopeType}-${budget?.id ?? "new"}`}
+                    name="scopeValue"
+                    required
+                  >
+                    {options.length ===
+                    0 ? (
+                      <NativeSelectOption value="">
+                        {effectiveScopeType ===
+                        "account"
+                          ? "No connected AWS accounts"
+                          : "No billed AWS services available"}
                       </NativeSelectOption>
-                    ),
-                  )
-                )}
-              </NativeSelect>
+                    ) : (
+                      options.map(
+                        (
+                          option,
+                        ) => (
+                          <NativeSelectOption
+                            key={
+                              option.value
+                            }
+                            value={
+                              option.value
+                            }
+                          >
+                            {
+                              option.label
+                            }
+                          </NativeSelectOption>
+                        ),
+                      )
+                    )}
+                  </NativeSelect>
+                </div>
+              </div>
+
+              {budget && (
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  Budget scope is fixed after creation. Limits and
+                  thresholds can still be edited.
+                </p>
+              )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium"
-                  htmlFor="budget-limit"
-                >
-                  Monthly limit
-                </label>
+            {/* Monetary control + alert thresholds. */}
+            <div className="rounded-xl border border-border/55 bg-background/20 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <CircleDollarSign className="size-4 text-emerald-300" />
 
-                <Input
-                  id="budget-limit"
-                  name="monthlyLimit"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  defaultValue={
-                    budget?.monthly_limit ??
-                    100
-                  }
-                  required
-                  disabled={
-                    isSaving
-                  }
-                />
+                <p className="text-sm font-semibold">
+                  Monthly guardrails
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium"
-                  htmlFor="warning-threshold"
-                >
-                  Warning %
-                </label>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="budget-limit"
+                  >
+                    Monthly limit
+                  </label>
 
-                <Input
-                  id="warning-threshold"
-                  name="warningThreshold"
-                  type="number"
-                  min="1"
-                  max="100"
-                  defaultValue={
-                    budget?.warning_threshold ??
-                    80
-                  }
-                  required
-                  disabled={
-                    isSaving
-                  }
-                />
-              </div>
+                  <Input
+                    className="rounded-xl bg-background/30"
+                    defaultValue={
+                      budget?.monthly_limit ??
+                      100
+                    }
+                    disabled={
+                      isSaving
+                    }
+                    id="budget-limit"
+                    min="0.01"
+                    name="monthlyLimit"
+                    required
+                    step="0.01"
+                    type="number"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium"
-                  htmlFor="critical-threshold"
-                >
-                  Critical %
-                </label>
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-medium text-amber-300"
+                    htmlFor="warning-threshold"
+                  >
+                    Warning %
+                  </label>
 
-                <Input
-                  id="critical-threshold"
-                  name="criticalThreshold"
-                  type="number"
-                  min="1"
-                  max="100"
-                  defaultValue={
-                    budget?.critical_threshold ??
-                    100
-                  }
-                  required
-                  disabled={
-                    isSaving
-                  }
-                />
+                  <Input
+                    className="rounded-xl border-amber-400/15 bg-background/30"
+                    defaultValue={
+                      budget?.warning_threshold ??
+                      80
+                    }
+                    disabled={
+                      isSaving
+                    }
+                    id="warning-threshold"
+                    max="100"
+                    min="1"
+                    name="warningThreshold"
+                    required
+                    type="number"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-medium text-rose-300"
+                    htmlFor="critical-threshold"
+                  >
+                    Critical %
+                  </label>
+
+                  <Input
+                    className="rounded-xl border-rose-400/15 bg-background/30"
+                    defaultValue={
+                      budget?.critical_threshold ??
+                      100
+                    }
+                    disabled={
+                      isSaving
+                    }
+                    id="critical-threshold"
+                    max="100"
+                    min="1"
+                    name="criticalThreshold"
+                    required
+                    type="number"
+                  />
+                </div>
               </div>
             </div>
 
             {formError && (
-              <p className="text-sm text-destructive">
+              <div className="rounded-xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
                 {
                   formError
                 }
-              </p>
+              </div>
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="shrink-0 border-t border-border/50 bg-background/75 px-5 py-3.5 backdrop-blur-xl sm:px-6">
             <Button
-              type="button"
-              variant="outline"
+              className="rounded-xl"
+              disabled={
+                isSaving
+              }
               onClick={() =>
                 onOpenChange(
                   false,
                 )
               }
-              disabled={
-                isSaving
-              }
+              type="button"
+              variant="outline"
             >
               Cancel
             </Button>
 
             <Button
-              type="submit"
+              className="rounded-xl"
               disabled={
                 isSaving ||
                 (
@@ -589,14 +706,13 @@ export function BudgetDialog({
                     0
                 )
               }
+              type="submit"
             >
-              {
-                isSaving
-                  ? "Saving..."
-                  : budget
-                    ? "Save changes"
-                    : "Create budget"
-              }
+              {isSaving
+                ? "Saving..."
+                : budget
+                  ? "Save changes"
+                  : "Create budget"}
             </Button>
           </DialogFooter>
         </form>

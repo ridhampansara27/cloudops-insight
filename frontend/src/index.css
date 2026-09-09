@@ -9,183 +9,131 @@
 
 /* Define the default light-theme design tokens. */
 :root {
-  /* Use a light application background. */
-  --background: oklch(1 0 0);
+  /* Main application canvas. */
+  --background: oklch(0.982 0.008 255);
 
-  /* Use a dark foreground for strong readability. */
-  --foreground: oklch(0.145 0 0);
+  /* Primary foreground text. */
+  --foreground: oklch(0.18 0.025 258);
 
-  /* Define the surface color used by cards. */
-  --card: oklch(1 0 0);
+  /* Elevated application surfaces. */
+  --card: oklch(1 0 0 / 92%);
+  --card-foreground: oklch(0.18 0.025 258);
 
-  /* Define text rendered on cards. */
-  --card-foreground: oklch(0.145 0 0);
+  /* Floating menus and overlays. */
+  --popover: oklch(1 0 0 / 98%);
+  --popover-foreground: oklch(0.18 0.025 258);
 
-  /* Define floating-panel surfaces. */
-  --popover: oklch(1 0 0);
+  /* CloudOps cyan-blue brand accent. */
+  --primary: oklch(0.57 0.19 248);
+  --primary-foreground: oklch(0.99 0.005 250);
 
-  /* Define floating-panel text. */
-  --popover-foreground: oklch(0.145 0 0);
+  /* Secondary controls and surfaces. */
+  --secondary: oklch(0.94 0.018 255);
+  --secondary-foreground: oklch(0.22 0.03 258);
 
-  /* Define the main brand-action color. */
-  --primary: oklch(0.205 0 0);
+  /* Muted regions. */
+  --muted: oklch(0.95 0.014 255);
+  --muted-foreground: oklch(0.49 0.035 255);
 
-  /* Define text displayed over the primary color. */
-  --primary-foreground: oklch(0.985 0 0);
+  /* Navigation and interactive hover surfaces. */
+  --accent: oklch(0.93 0.028 252);
+  --accent-foreground: oklch(0.22 0.04 255);
 
-  /* Define secondary controls. */
-  --secondary: oklch(0.97 0 0);
+  /* Destructive actions. */
+  --destructive: oklch(0.59 0.22 27);
 
-  /* Define secondary-control text. */
-  --secondary-foreground: oklch(0.205 0 0);
+  /* Structural boundaries. */
+  --border: oklch(0.82 0.025 255 / 62%);
+  --input: oklch(0.82 0.025 255 / 72%);
+  --ring: oklch(0.59 0.17 246);
 
-  /* Define low-emphasis surfaces. */
-  --muted: oklch(0.97 0 0);
+  /* Operational chart palette. */
+  --chart-1: oklch(0.61 0.18 240);
+  --chart-2: oklch(0.62 0.18 294);
+  --chart-3: oklch(0.63 0.16 158);
+  --chart-4: oklch(0.72 0.16 78);
+  --chart-5: oklch(0.61 0.20 24);
 
-  /* Define low-emphasis text. */
-  --muted-foreground: oklch(0.556 0 0);
+  /* Premium rounded geometry. */
+  --radius: 0.75rem;
 
-  /* Define highlighted navigation surfaces. */
-  --accent: oklch(0.97 0 0);
+  /* Desktop/mobile navigation system. */
+  --sidebar: oklch(0.965 0.012 258);
+  --sidebar-foreground: oklch(0.20 0.03 258);
+  --sidebar-primary: oklch(0.57 0.19 248);
+  --sidebar-primary-foreground: oklch(0.99 0.005 250);
+  --sidebar-accent: oklch(0.93 0.025 255);
+  --sidebar-accent-foreground: oklch(0.20 0.03 258);
+  --sidebar-border: oklch(0.81 0.025 255 / 62%);
+  --sidebar-ring: oklch(0.59 0.17 246);
 
-  /* Define highlighted navigation text. */
-  --accent-foreground: oklch(0.205 0 0);
-
-  /* Define destructive-action surfaces. */
-  --destructive: oklch(0.577 0.245 27.325);
-
-  /* Define form-control borders. */
-  --border: oklch(0.922 0 0);
-
-  /* Define input borders. */
-  --input: oklch(0.922 0 0);
-
-  /* Define focus rings. */
-  --ring: oklch(0.708 0 0);
-
-  /* Define the first chart series. */
-  --chart-1: oklch(0.87 0 0);
-
-  /* Define the second chart series. */
-  --chart-2: oklch(0.556 0 0);
-
-  /* Define the third chart series. */
-  --chart-3: oklch(0.439 0 0);
-
-  /* Define the fourth chart series. */
-  --chart-4: oklch(0.371 0 0);
-
-  /* Define the fifth chart series. */
-  --chart-5: oklch(0.269 0 0);
-
-  /* Define the standard border radius. */
-  --radius: 0.625rem;
-
-  /* Define the sidebar surface. */
-  --sidebar: oklch(0.985 0 0);
-
-  /* Define sidebar text. */
-  --sidebar-foreground: oklch(0.145 0 0);
-
-  /* Define the active sidebar item. */
-  --sidebar-primary: oklch(0.205 0 0);
-
-  /* Define active sidebar-item text. */
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-
-  /* Define sidebar hover surfaces. */
-  --sidebar-accent: oklch(0.97 0 0);
-
-  /* Define sidebar hover text. */
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-
-  /* Define sidebar borders. */
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Ambient shell effects. */
+  --cloudops-ambient-primary: oklch(0.61 0.18 240 / 11%);
+  --cloudops-ambient-secondary: oklch(0.61 0.18 294 / 7%);
+  --cloudops-grid-line: oklch(0.34 0.03 255 / 5%);
 }
 
 /* Override design tokens when dark mode is active. */
 .dark {
-  /* Define the dark application background. */
-  --background: oklch(0.145 0 0);
+  /* Deep graphite/navy canvas instead of generic black. */
+  --background: oklch(0.105 0.023 264);
 
-  /* Define foreground text in dark mode. */
-  --foreground: oklch(0.985 0 0);
+  /* High-contrast foreground without pure white glare. */
+  --foreground: oklch(0.955 0.010 250);
 
-  /* Define dark card surfaces. */
-  --card: oklch(0.205 0 0);
+  /* Layer-one elevated surface. */
+  --card: oklch(0.155 0.027 263 / 88%);
+  --card-foreground: oklch(0.955 0.010 250);
 
-  /* Define dark card text. */
-  --card-foreground: oklch(0.985 0 0);
+  /* Floating layer above cards. */
+  --popover: oklch(0.17 0.030 263 / 98%);
+  --popover-foreground: oklch(0.955 0.010 250);
 
-  /* Define dark floating surfaces. */
-  --popover: oklch(0.205 0 0);
+  /* Cyan-blue operational accent. */
+  --primary: oklch(0.72 0.17 238);
+  --primary-foreground: oklch(0.105 0.023 264);
 
-  /* Define dark floating-surface text. */
-  --popover-foreground: oklch(0.985 0 0);
+  /* Secondary interaction surface. */
+  --secondary: oklch(0.205 0.036 261);
+  --secondary-foreground: oklch(0.94 0.012 250);
 
-  /* Define the primary action color in dark mode. */
-  --primary: oklch(0.922 0 0);
+  /* Recessed surfaces. */
+  --muted: oklch(0.185 0.027 262);
+  --muted-foreground: oklch(0.68 0.031 254);
 
-  /* Define text over primary actions. */
-  --primary-foreground: oklch(0.205 0 0);
+  /* Hover/focus surface. */
+  --accent: oklch(0.225 0.052 257);
+  --accent-foreground: oklch(0.96 0.008 250);
 
-  /* Define dark secondary controls. */
-  --secondary: oklch(0.269 0 0);
+  /* Critical/destructive state. */
+  --destructive: oklch(0.68 0.195 24);
 
-  /* Define dark secondary-control text. */
-  --secondary-foreground: oklch(0.985 0 0);
+  /* Thin luminous structural lines. */
+  --border: oklch(0.34 0.042 260 / 48%);
+  --input: oklch(0.34 0.042 260 / 58%);
+  --ring: oklch(0.72 0.17 238);
 
-  /* Define dark muted surfaces. */
-  --muted: oklch(0.269 0 0);
+  /* Distinct operational chart dimensions. */
+  --chart-1: oklch(0.72 0.17 238);
+  --chart-2: oklch(0.72 0.18 295);
+  --chart-3: oklch(0.74 0.16 158);
+  --chart-4: oklch(0.80 0.16 78);
+  --chart-5: oklch(0.68 0.20 24);
 
-  /* Define muted text in dark mode. */
-  --muted-foreground: oklch(0.708 0 0);
+  /* Sidebar sits one visual level below the workspace. */
+  --sidebar: oklch(0.09 0.022 264 / 96%);
+  --sidebar-foreground: oklch(0.91 0.015 252);
+  --sidebar-primary: oklch(0.72 0.17 238);
+  --sidebar-primary-foreground: oklch(0.105 0.023 264);
+  --sidebar-accent: oklch(0.16 0.032 263);
+  --sidebar-accent-foreground: oklch(0.96 0.008 250);
+  --sidebar-border: oklch(0.32 0.041 260 / 42%);
+  --sidebar-ring: oklch(0.72 0.17 238);
 
-  /* Define dark accent surfaces. */
-  --accent: oklch(0.269 0 0);
-
-  /* Define dark accent text. */
-  --accent-foreground: oklch(0.985 0 0);
-
-  /* Define destructive actions in dark mode. */
-  --destructive: oklch(0.704 0.191 22.216);
-
-  /* Define dark borders. */
-  --border: oklch(1 0 0 / 10%);
-
-  /* Define dark input borders. */
-  --input: oklch(1 0 0 / 15%);
-
-  /* Define dark focus rings. */
-  --ring: oklch(0.556 0 0);
-
-  /* Define the dark sidebar background. */
-  --sidebar: oklch(0.205 0 0);
-
-  /* Define dark sidebar text. */
-  --sidebar-foreground: oklch(0.985 0 0);
-
-  /* Define the active dark sidebar item. */
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-
-  /* Define active dark sidebar-item text. */
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-
-  /* Define dark sidebar hover surfaces. */
-  --sidebar-accent: oklch(0.269 0 0);
-
-  /* Define dark sidebar hover text. */
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-
-  /* Define dark sidebar borders. */
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Atmospheric background effects. */
+  --cloudops-ambient-primary: oklch(0.66 0.19 238 / 13%);
+  --cloudops-ambient-secondary: oklch(0.62 0.19 296 / 8%);
+  --cloudops-grid-line: oklch(0.80 0.03 255 / 5%);
 }
 
 /* Map the CSS variables to Tailwind theme tokens. */
@@ -285,7 +233,7 @@
 
     /* Use a professional cross-platform system font stack. */
     font-family:
-      Inter,
+      "Geist Variable",
       ui-sans-serif,
       system-ui,
       -apple-system,
@@ -301,5 +249,293 @@
   /* Ensure React's root element fills the viewport. */
   #root {
     min-height: 100vh;
+  }
+}
+
+/* ==========================================================
+   CloudOps Command Center visual system
+   ========================================================== */
+
+@layer utilities {
+  /* Multi-layer atmospheric application background. */
+  .cloudops-backdrop {
+    background:
+      radial-gradient(
+        circle at 16% -10%,
+        var(--cloudops-ambient-primary) 0%,
+        transparent 38%
+      ),
+      radial-gradient(
+        circle at 92% 4%,
+        var(--cloudops-ambient-secondary) 0%,
+        transparent 31%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(
+          in oklab,
+          var(--background) 96%,
+          black 4%
+        ),
+        var(--background)
+      );
+  }
+
+  /* Very subtle infrastructure-style grid behind the workspace. */
+  .cloudops-grid-mask {
+    background-image:
+      linear-gradient(
+        to right,
+        var(--cloudops-grid-line) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        var(--cloudops-grid-line) 1px,
+        transparent 1px
+      );
+
+    background-size: 42px 42px;
+
+    -webkit-mask-image:
+      linear-gradient(
+        to bottom,
+        black,
+        transparent 82%
+      );
+
+    mask-image:
+      linear-gradient(
+        to bottom,
+        black,
+        transparent 82%
+      );
+  }
+
+  /* Reusable elevated glass surface. */
+  .cloudops-glass {
+    background:
+      color-mix(
+        in oklab,
+        var(--card) 90%,
+        transparent
+      );
+
+    backdrop-filter: blur(18px);
+  }
+
+  /* Premium interaction used by important command-center tiles. */
+  /*
+   * Give all important command-center surfaces a small
+   * physical lift without creating disruptive movement.
+   */
+  .cloudops-interactive {
+    transform:
+      translateY(0)
+      scale(1);
+
+    transform-origin: center;
+
+    will-change:
+      transform,
+      border-color,
+      box-shadow,
+      background-color;
+
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      border-color 220ms ease,
+      box-shadow 220ms ease,
+      background-color 220ms ease;
+  }
+
+
+  /*
+   * Lift cards toward the user and add a restrained
+   * CloudOps cyan surface highlight.
+   */
+  .cloudops-interactive:hover {
+    transform:
+      translateY(-4px)
+      scale(1.01);
+
+    border-color:
+      color-mix(
+        in oklab,
+        var(--primary) 42%,
+        var(--border)
+      );
+
+    background:
+      color-mix(
+        in oklab,
+        var(--card) 93%,
+        var(--primary) 7%
+      );
+
+    box-shadow:
+      0 26px 64px -34px
+        color-mix(
+          in oklab,
+          var(--primary) 45%,
+          transparent
+        ),
+      0 12px 30px -24px
+        rgba(0, 0, 0, 0.8),
+      inset 0 1px 0
+        color-mix(
+          in oklab,
+          white 7%,
+          transparent
+        );
+  }
+
+
+  /*
+   * Give sidebar destinations the same dimensional language,
+   * but keep the movement slightly smaller than full cards.
+   */
+  .cloudops-nav-pop {
+    position: relative;
+
+    transform:
+      translateY(0)
+      scale(1);
+
+    transform-origin: center;
+
+    will-change:
+      transform,
+      border-color,
+      background,
+      box-shadow;
+
+    transition:
+      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      border-color 180ms ease,
+      background 180ms ease,
+      box-shadow 180ms ease,
+      color 180ms ease;
+  }
+
+
+  /*
+   * Highlight inactive navigation entries using a softer
+   * version of the selected-navigation gradient.
+   */
+  .cloudops-nav-pop:hover {
+    transform:
+      translateY(-2px)
+      scale(1.015);
+
+    border-color:
+      color-mix(
+        in oklab,
+        var(--primary) 25%,
+        transparent
+      );
+
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(
+          in oklab,
+          var(--primary) 14%,
+          transparent
+        ),
+        color-mix(
+          in oklab,
+          var(--primary) 6%,
+          transparent
+        ),
+        transparent
+      );
+
+    box-shadow:
+      0 14px 32px -22px
+        color-mix(
+          in oklab,
+          var(--primary) 48%,
+          transparent
+        );
+  }
+
+
+  /*
+   * Keep the currently selected route visually stronger
+   * than a normal hover state.
+   */
+  .cloudops-nav-pop[aria-current="page"]:hover {
+    border-color:
+      color-mix(
+        in oklab,
+        var(--primary) 38%,
+        transparent
+      );
+
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(
+          in oklab,
+          var(--primary) 21%,
+          transparent
+        ),
+        color-mix(
+          in oklab,
+          var(--primary) 10%,
+          transparent
+        ),
+        transparent
+      );
+
+    box-shadow:
+      0 16px 38px -22px
+        color-mix(
+          in oklab,
+          var(--primary) 58%,
+          transparent
+        );
+  }
+
+
+  /*
+   * Add a subtle physical button-press response.
+   */
+  .cloudops-nav-pop:active {
+    transform:
+      translateY(0)
+      scale(0.985);
+  }
+}
+
+
+/* Keep motion comfortable for accessibility-sensitive users. */
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * Preserve layout transforms such as dialog centering while making
+   * animations and transitions effectively instantaneous.
+   */
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /*
+   * CloudOps interactive surfaces normally use a small elevation/scale
+   * effect. Remove those decorative transforms entirely for users who
+   * explicitly request reduced motion.
+   */
+  .cloudops-interactive:hover {
+    transform: none;
+  }
+
+  .cloudops-nav-pop:hover,
+  .cloudops-nav-pop:active {
+    transform: none;
   }
 }

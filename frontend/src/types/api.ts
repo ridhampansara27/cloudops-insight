@@ -312,6 +312,10 @@ export interface IncidentApiResponse {
   resolved_at:
     | string
     | null;
+
+  // Store whether the incident originated from monitoring
+  // automation or a manually created workflow.
+  source: string;
 }
 
 

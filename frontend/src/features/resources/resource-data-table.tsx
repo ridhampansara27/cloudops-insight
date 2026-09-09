@@ -9,18 +9,24 @@ import {
   useTable,
 } from "@tanstack/react-table";
 
-// Import pagination icons.
+// Import pagination and empty-inventory icons.
 import {
+  Boxes,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  SearchX,
 } from "lucide-react";
 
-// Import reusable button.
+// Import reusable UI.
 import {
   Button,
 } from "@/components/ui/button";
+
+import {
+  Card,
+} from "@/components/ui/card";
 
 // Import table primitives.
 import {
@@ -32,17 +38,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Import columns.
+// Import resource columns.
 import {
   resourceColumns,
 } from "@/features/resources/resource-columns";
 
-// Import feature configuration.
+// Import TanStack feature configuration.
 import {
   resourceTableFeatures,
 } from "@/features/resources/resource-table-features";
 
-// Import API resource type.
+// Import the genuine API resource type.
 import type {
   ResourceApiResponse,
 } from "@/types/api";
@@ -50,49 +56,43 @@ import type {
 
 // Define server-pagination properties.
 interface ResourceDataTableProps {
-  // Supply the current backend page.
-  data: ResourceApiResponse[];
+  // Current backend resource page.
+  data:
+    ResourceApiResponse[];
 
-  // Supply the current one-based page.
+  // One-based backend page.
   page: number;
 
-  // Supply page size.
+  // Backend page size.
   pageSize: number;
 
-  // Supply total matching resources.
+  // Total genuine matching resources.
   total: number;
 
-  // Supply total server page count.
+  // Total backend page count.
   totalPages: number;
 
-  // Allow the parent to change the backend page.
+  // Tell the empty state whether filters are active.
+  hasActiveFilters: boolean;
+
+  // Allow the parent page to request another backend page.
   onPageChange: (
     page: number,
   ) => void;
 }
 
 
-// Export the server-paginated resource table.
+// Export the premium server-backed inventory table.
 export function ResourceDataTable({
-  // Receive resources.
   data,
-
-  // Receive current page.
   page,
-
-  // Receive page size.
   pageSize,
-
-  // Receive total rows.
   total,
-
-  // Receive total pages.
   totalPages,
-
-  // Receive page callback.
+  hasActiveFilters,
   onPageChange,
 }: ResourceDataTableProps) {
-  // Store sorting for the currently loaded backend page.
+  // Sort only the currently loaded backend page.
   const [
     sorting,
     setSorting,
@@ -101,63 +101,88 @@ export function ResourceDataTable({
       [],
     );
 
-  // Create the TanStack table.
+  // Construct the TanStack table.
   const table =
     useTable({
-      // Enable sorting.
       features:
         resourceTableFeatures,
 
-      // Supply current server page.
       data,
 
-      // Supply columns.
       columns:
         resourceColumns,
 
-      // Store sorting state.
       onSortingChange:
         setSorting,
 
-      // Supply controlled state.
       state: {
-        // Supply sorting.
         sorting,
       },
     });
 
-  // Determine whether a previous server page exists.
+  // Determine available backend navigation directions.
   const canPrevious =
-    page > 1;
+    page >
+    1;
 
-  // Determine whether another server page exists.
   const canNext =
-    page < totalPages;
+    page <
+    totalPages;
 
-  // Calculate the first visible row number.
+  // Calculate the genuine visible record range.
   const firstVisible =
-    total === 0
+    total ===
+    0
       ? 0
       : (
-          page - 1
+          page -
+          1
         ) *
           pageSize +
         1;
 
-  // Calculate the final visible row number.
   const lastVisible =
     Math.min(
-      page * pageSize,
+      page *
+        pageSize,
       total,
     );
 
-  // Render table.
+  // Render the inventory surface.
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <Card className="overflow-hidden bg-card/72 py-0">
+        {/* Table identity strip. */}
+        <div className="flex flex-col gap-3 border-b border-border/60 bg-background/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
+              <Boxes className="size-4" />
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold">
+                Inventory records
+              </p>
+
+              <p className="text-xs text-muted-foreground">
+                Synchronized AWS resources returned by the current query.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-muted/25 px-2.5 py-1 text-xs text-muted-foreground">
+            {
+              total
+            }
+            {" "}
+            results
+          </div>
+        </div>
+
+        {/* Keep wide operational tables horizontally scrollable. */}
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/20">
               {table
                 .getHeaderGroups()
                 .map(
@@ -165,6 +190,7 @@ export function ResourceDataTable({
                     headerGroup,
                   ) => (
                     <TableRow
+                      className="border-border/60 hover:bg-transparent"
                       key={
                         headerGroup.id
                       }
@@ -174,10 +200,10 @@ export function ResourceDataTable({
                           header,
                         ) => (
                           <TableHead
+                            className="h-11 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
                             key={
                               header.id
                             }
-                            className="whitespace-nowrap"
                           >
                             {header.isPlaceholder
                               ? null
@@ -197,18 +223,23 @@ export function ResourceDataTable({
             </TableHeader>
 
             <TableBody>
-              {table.getRowModel()
-                .rows.length >
+              {table
+                .getRowModel()
+                .rows
+                .length >
               0 ? (
                 table
                   .getRowModel()
-                  .rows.map(
-                    (row) => (
+                  .rows
+                  .map(
+                    (
+                      row,
+                    ) => (
                       <TableRow
+                        className="group border-border/45 transition-all duration-200 hover:bg-primary/[0.045]"
                         key={
                           row.id
                         }
-                        className="hover:bg-muted/50"
                       >
                         {row
                           .getAllCells()
@@ -217,10 +248,10 @@ export function ResourceDataTable({
                               cell,
                             ) => (
                               <TableCell
+                                className="py-3.5"
                                 key={
                                   cell.id
                                 }
-                                className="py-3"
                               >
                                 <table.FlexRender
                                   cell={
@@ -236,48 +267,103 @@ export function ResourceDataTable({
               ) : (
                 <TableRow>
                   <TableCell
+                    className="h-[280px] text-center"
                     colSpan={
                       resourceColumns.length
                     }
-                    className="h-40 text-center"
                   >
-                    <p className="font-medium">
-                      No resources found
-                    </p>
+                    <div className="mx-auto flex max-w-sm flex-col items-center">
+                      <div className="flex size-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/8 text-primary">
+                        {hasActiveFilters ? (
+                          <SearchX className="size-5" />
+                        ) : (
+                          <Boxes className="size-5" />
+                        )}
+                      </div>
 
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Change your search or filter criteria.
-                    </p>
+                      <p className="mt-4 font-semibold">
+                        {hasActiveFilters
+                          ? "No resources match these filters"
+                          : "No synchronized resources"}
+                      </p>
+
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                        {hasActiveFilters
+                          ? "Change or clear the current search and filter criteria."
+                          : "AWS resources will appear after an inventory synchronization completes."}
+                      </p>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
-      </div>
+      </Card>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          Showing{" "}
-          {firstVisible}
-          –
-          {lastVisible} of{" "}
-          {total} resources
+      {/* Server-pagination command bar. */}
+      <div className="flex flex-col gap-3 rounded-xl border border-border/50 bg-card/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-muted-foreground">
+          {total === 0 ? (
+            <>
+              Showing{" "}
+              <span className="font-semibold text-foreground">
+                0
+              </span>
+              {" "}
+              of{" "}
+              <span className="font-semibold text-foreground">
+                0
+              </span>
+              {" "}
+              resources
+            </>
+          ) : (
+            <>
+              Showing{" "}
+              <span className="font-semibold text-foreground">
+                {
+                  firstVisible
+                }
+                ?
+                {
+                  lastVisible
+                }
+              </span>
+              {" "}
+              of{" "}
+              <span className="font-semibold text-foreground">
+                {
+                  total
+                }
+              </span>
+              {" "}
+              resources
+            </>
+          )}
         </p>
 
-        <div className="flex items-center gap-2">
-          <span className="mr-2 text-sm text-muted-foreground">
-            Page {page} of{" "}
-            {Math.max(
-              totalPages,
-              1,
-            )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs text-muted-foreground">
+            Page{" "}
+            <span className="font-semibold text-foreground">
+              {
+                page
+              }
+            </span>
+            {" "}
+            of{" "}
+            <span className="font-semibold text-foreground">
+              {Math.max(
+                totalPages,
+                1,
+              )}
+            </span>
           </span>
 
           <Button
             aria-label="Go to first page"
-            variant="outline"
-            size="icon"
+            className="rounded-xl"
             disabled={
               !canPrevious
             }
@@ -286,46 +372,51 @@ export function ResourceDataTable({
                 1,
               )
             }
+            size="icon"
+            variant="outline"
           >
             <ChevronsLeft className="size-4" />
           </Button>
 
           <Button
             aria-label="Go to previous page"
-            variant="outline"
-            size="icon"
+            className="rounded-xl"
             disabled={
               !canPrevious
             }
             onClick={() =>
               onPageChange(
-                page - 1,
+                page -
+                  1,
               )
             }
+            size="icon"
+            variant="outline"
           >
             <ChevronLeft className="size-4" />
           </Button>
 
           <Button
             aria-label="Go to next page"
-            variant="outline"
-            size="icon"
+            className="rounded-xl"
             disabled={
               !canNext
             }
             onClick={() =>
               onPageChange(
-                page + 1,
+                page +
+                  1,
               )
             }
+            size="icon"
+            variant="outline"
           >
             <ChevronRight className="size-4" />
           </Button>
 
           <Button
             aria-label="Go to last page"
-            variant="outline"
-            size="icon"
+            className="rounded-xl"
             disabled={
               !canNext
             }
@@ -334,6 +425,8 @@ export function ResourceDataTable({
                 totalPages,
               )
             }
+            size="icon"
+            variant="outline"
           >
             <ChevronsRight className="size-4" />
           </Button>

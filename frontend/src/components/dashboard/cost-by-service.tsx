@@ -1,4 +1,10 @@
-// Import reusable card components.
+// Import FinOps visualization icon.
+import {
+  BarChart3,
+  CircleDollarSign,
+} from "lucide-react";
+
+// Import reusable cards.
 import {
   Card,
   CardContent,
@@ -7,12 +13,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// Import shared monetary formatting.
+// Import billing-safe monetary formatting.
 import {
   formatBillingAmount,
 } from "@/lib/formatters";
 
-// Import the real API response type.
+// Import the genuine API cost model.
 import type {
   ServiceCostApiResponse,
 } from "@/types/api";
@@ -20,131 +26,175 @@ import type {
 
 // Define component properties.
 interface CostByServiceProps {
-  // Supply aggregated service costs from FastAPI.
-  services: ServiceCostApiResponse[];
+  // Genuine aggregated service costs from FastAPI.
+  services:
+    ServiceCostApiResponse[];
 
-  // Supply total month-to-date spending.
+  // Genuine month-to-date total.
   total: number;
 
-  // Supply the backend billing currency.
+  // Backend reporting currency.
   currency: string;
 }
 
 
-// Export the API-driven service-cost component.
+// Export the API-driven service-cost visualization.
 export function CostByService({
-  // Receive service costs.
   services,
-
-  // Receive total spending.
   total,
-
-  // Receive billing currency.
   currency,
 }: CostByServiceProps) {
-  // Render service cost distribution.
+  // Use positive AWS service charges as a fallback denominator
+  // when credits make the net month total non-positive.
+  const positiveServiceTotal =
+    services.reduce(
+      (
+        sum,
+        service,
+      ) =>
+        sum +
+        Math.max(
+          service.amount,
+          0,
+        ),
+      0,
+    );
+
+  const allocationTotal =
+    total > 0
+      ? total
+      : positiveServiceTotal;
+
+  // Render the FinOps command card.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          Cost by service
-        </CardTitle>
+    <Card className="overflow-hidden bg-card/72">
+      <CardHeader className="border-b border-border/50 pb-4">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="size-4 text-sky-300" />
 
-        <CardDescription>
-          Month-to-date cloud spending grouped by service.
-        </CardDescription>
-      </CardHeader>
+              Cost by service
+            </CardTitle>
 
-      <CardContent className="space-y-5">
-        {services.length === 0 ? (
-          <div className="py-10 text-center">
-            <p className="font-medium">
-              No cost data available
+            <CardDescription className="mt-1">
+              Month-to-date AWS spending grouped by billing service.
+            </CardDescription>
+          </div>
+
+          <div className="text-right">
+            <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+              MTD spend
             </p>
 
-            <p className="mt-1 text-sm text-muted-foreground">
-              Billing records will appear after cost synchronization.
+            <p className="mt-1 text-xl font-semibold tracking-tight">
+              {formatBillingAmount(
+                total,
+                currency,
+              )}
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-2">
+        {services.length ===
+        0 ? (
+          <div className="flex min-h-[230px] flex-col items-center justify-center text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
+              <CircleDollarSign className="size-5" />
+            </div>
+
+            <p className="mt-4 font-semibold">
+              No synchronized billing data
+            </p>
+
+            <p className="mt-1 max-w-xs text-sm leading-relaxed text-muted-foreground">
+              AWS service costs will appear here after Cost Explorer
+              synchronization completes.
             </p>
           </div>
         ) : (
-          services.map(
-            (service) => {
-              // Calculate this service's share of overall spending.
-              const rawPercentage =
-                total <= 0
-                  ? 0
-                  : (
-                      service.amount /
-                      total
-                    ) *
-                    100;
+          <div className="space-y-2.5">
+            {services.map(
+              (
+                service,
+                index,
+              ) => {
+                // Calculate a genuine positive-spend share.
+                const percentage =
+                  allocationTotal <=
+                  0
+                    ? 0
+                    : (
+                        Math.max(
+                          service.amount,
+                          0,
+                        ) /
+                        allocationTotal
+                      ) *
+                      100;
 
-              // Normalize percentages that round to zero so genuine
-              // tiny AWS credits never appear as confusing "-0.0%".
-              const percentage =
-                Math.abs(
-                  rawPercentage,
-                ) < 0.05
-                  ? 0
-                  : rawPercentage;
-
-              // Negative service credits cannot have a negative-width
-              // allocation bar, so clamp only the visual representation.
-              const barPercentage =
-                Math.max(
-                  0,
-                  Math.min(
-                    percentage,
-                    100,
-                  ),
-                );
-
-              // Render one service.
-              return (
-                <div
-                  key={
-                    service.service
-                  }
-                  className="space-y-2"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
+                // Render one AWS billing service.
+                return (
+                  <div
+                    key={
+                      service.service
+                    }
+                    className="group rounded-xl border border-transparent px-2 py-2.5 transition-all duration-200 hover:border-primary/15 hover:bg-accent/25"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground">
                         {
-                          service.service
+                          index +
+                          1
                         }
-                      </p>
+                      </div>
 
-                      <p className="text-xs text-muted-foreground">
-                        {
-                          percentage.toFixed(
-                            1,
-                          )
-                        }
-                        % of spend
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="truncate text-sm font-medium">
+                            {
+                              service.service
+                            }
+                          </p>
+
+                          <p className="shrink-0 text-sm font-semibold">
+                            {formatBillingAmount(
+                              service.amount,
+                              currency,
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/60">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-violet-400 shadow-[0_0_12px_rgba(56,189,248,0.35)] transition-[width] duration-500"
+                              style={{
+                                width:
+                                  `${Math.min(
+                                    percentage,
+                                    100,
+                                  )}%`,
+                              }}
+                            />
+                          </div>
+
+                          <span className="w-12 text-right text-[11px] tabular-nums text-muted-foreground">
+                            {percentage.toFixed(
+                              1,
+                            )}
+                            %
+                          </span>
+                        </div>
+                      </div>
                     </div>
-
-                    <p className="text-sm font-semibold">
-                      {formatBillingAmount(
-                        service.amount,
-                        currency,
-                      )}
-                    </p>
                   </div>
-
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{
-                        width: `${barPercentage}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            },
-          )
+                );
+              },
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
