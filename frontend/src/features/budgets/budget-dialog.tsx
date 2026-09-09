@@ -387,7 +387,7 @@ export function BudgetDialog({
         open
       }
     >
-      <DialogContent className="overflow-hidden border-border/70 bg-card/95 p-0 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:max-w-2xl">
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden border-border/70 bg-card/95 p-0 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:max-w-2xl">
         {/* Add restrained FinOps atmosphere. */}
         <div
           aria-hidden="true"
@@ -399,7 +399,7 @@ export function BudgetDialog({
           className="pointer-events-none absolute -right-24 -top-28 size-64 rounded-full bg-violet-500/8 blur-3xl"
         />
 
-        <DialogHeader className="relative border-b border-border/50 px-6 py-5 text-left">
+        <DialogHeader className="relative shrink-0 border-b border-border/50 px-5 py-4 text-left sm:px-6">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/8 text-primary">
               <WalletCards className="size-[18px]" />
@@ -421,13 +421,13 @@ export function BudgetDialog({
         </DialogHeader>
 
         <form
-          className="relative"
+          className="relative flex min-h-0 flex-1 flex-col"
           key={`${budget?.id ?? "new"}-${open}`}
           onSubmit={
             handleSubmit
           }
         >
-          <div className="space-y-5 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 [scrollbar-color:rgba(148,163,184,0.28)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin] sm:px-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/30">
             {/* Budget identity. */}
             <div className="rounded-xl border border-border/55 bg-background/20 p-4">
               <div className="mb-4 flex items-center gap-2">
@@ -679,7 +679,7 @@ export function BudgetDialog({
             )}
           </div>
 
-          <DialogFooter className="border-t border-border/50 bg-background/20 px-6 py-4">
+          <DialogFooter className="shrink-0 border-t border-border/50 bg-background/75 px-5 py-3.5 backdrop-blur-xl sm:px-6">
             <Button
               className="rounded-xl"
               disabled={

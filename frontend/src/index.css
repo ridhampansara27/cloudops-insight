@@ -512,16 +512,26 @@
 
 /* Keep motion comfortable for accessibility-sensitive users. */
 @media (prefers-reduced-motion: reduce) {
-  .cloudops-interactive {
-    transition: none;
+  /*
+   * Preserve layout transforms such as dialog centering while making
+   * animations and transitions effectively instantaneous.
+   */
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 
+  /*
+   * CloudOps interactive surfaces normally use a small elevation/scale
+   * effect. Remove those decorative transforms entirely for users who
+   * explicitly request reduced motion.
+   */
   .cloudops-interactive:hover {
     transform: none;
-  }
-
-  .cloudops-nav-pop {
-    transition: none;
   }
 
   .cloudops-nav-pop:hover,

@@ -11,8 +11,6 @@ interface ImportMetaEnv {
   // Define the server-sent events URL.
   readonly VITE_EVENTS_URL: string;
 
-  // Define whether mock API responses are enabled.
-  readonly VITE_ENABLE_MOCKS: string;
 
   // Define the visible deployment environment.
   readonly VITE_APP_ENV: string;
