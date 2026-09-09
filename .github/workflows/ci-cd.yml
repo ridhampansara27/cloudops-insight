@@ -239,40 +239,49 @@ jobs:
   # Docker build, scan and publish
   # ==========================================================
 
-  publish-images:
-    name: Build, scan and publish images
+  build-images:
+    name: Build and scan images (${{ matrix.arch }})
 
     needs:
       - backend-quality
       - frontend-quality
 
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    # Build each architecture natively.
+    #
+    # amd64 -> standard Ubuntu runner
+    # arm64 -> native GitHub ARM64 runner
+    runs-on: ${{ matrix.runner }}
 
     permissions:
-      # Read application source.
       contents: read
-
-      # Publish containers into GHCR.
       packages: write
 
     steps:
 
-      # Checkout application repository.
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # Enable ARM64 emulation on the amd64 GitHub-hosted runner.
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm64
-
-      # Configure Docker Buildx.
+      # Buildx is still used for consistent Docker builds,
+      # caching and explicit platform selection.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      # Authenticate to GitHub Container Registry only when images
-      # are allowed to be published.
+      # Authenticate only when this workflow is allowed to publish.
+      #
+      # Pull requests therefore build and scan without modifying GHCR.
       - name: Log in to GHCR
         if: >-
           github.event_name == 'push' ||
@@ -287,26 +296,28 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # ------------------------------------------------------
-      # Backend image - linux/amd64
+      # Backend
       # ------------------------------------------------------
 
-      - name: Build backend image (amd64)
+      - name: Build backend image (${{ matrix.arch }})
         uses: docker/build-push-action@v7
         with:
           context: ./backend
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
           load: true
           push: false
           tags: >-
-            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}-amd64
-          cache-from: type=gha,scope=backend-amd64
-          cache-to: type=gha,mode=max,scope=backend-amd64
+            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}-${{ matrix.arch }}
+          cache-from: >-
+            type=gha,scope=backend-${{ matrix.arch }}
+          cache-to: >-
+            type=gha,mode=max,scope=backend-${{ matrix.arch }}
 
-      - name: Scan backend image (amd64)
+      - name: Scan backend image (${{ matrix.arch }})
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: >-
-            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}-amd64
+            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}-${{ matrix.arch }}
           format: table
           severity: HIGH,CRITICAL
           exit-code: "1"
@@ -314,93 +325,39 @@ jobs:
           vuln-type: os,library
 
       # ------------------------------------------------------
-      # Backend image - linux/arm64
+      # Frontend
       # ------------------------------------------------------
 
-      - name: Build backend image (arm64)
-        uses: docker/build-push-action@v7
-        with:
-          context: ./backend
-          platforms: linux/arm64
-          load: true
-          push: false
-          tags: >-
-            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}-arm64
-          cache-from: type=gha,scope=backend-arm64
-          cache-to: type=gha,mode=max,scope=backend-arm64
-
-      - name: Scan backend image (arm64)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: >-
-            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}-arm64
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
-
-      # ------------------------------------------------------
-      # Frontend image - linux/amd64
-      # ------------------------------------------------------
-
-      - name: Build frontend image (amd64)
+      - name: Build frontend image (${{ matrix.arch }})
         uses: docker/build-push-action@v7
         with:
           context: ./frontend
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
           load: true
           push: false
           tags: >-
-            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}-amd64
+            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}-${{ matrix.arch }}
           build-args: |
             VITE_API_BASE_URL=
-          cache-from: type=gha,scope=frontend-amd64
-          cache-to: type=gha,mode=max,scope=frontend-amd64
+          cache-from: >-
+            type=gha,scope=frontend-${{ matrix.arch }}
+          cache-to: >-
+            type=gha,mode=max,scope=frontend-${{ matrix.arch }}
 
-      - name: Scan frontend image (amd64)
+      - name: Scan frontend image (${{ matrix.arch }})
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: >-
-            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}-amd64
+            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}-${{ matrix.arch }}
           format: table
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
           vuln-type: os,library
 
-      # ------------------------------------------------------
-      # Frontend image - linux/arm64
-      # ------------------------------------------------------
-
-      - name: Build frontend image (arm64)
-        uses: docker/build-push-action@v7
-        with:
-          context: ./frontend
-          platforms: linux/arm64
-          load: true
-          push: false
-          tags: >-
-            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}-arm64
-          build-args: |
-            VITE_API_BASE_URL=
-          cache-from: type=gha,scope=frontend-arm64
-          cache-to: type=gha,mode=max,scope=frontend-arm64
-
-      - name: Scan frontend image (arm64)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: >-
-            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}-arm64
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
-
-      # Publish only after all four architecture-specific images
-      # have successfully built and passed the Trivy security gate.
-      - name: Push validated architecture images
+      # Publish architecture-specific images only after both
+      # backend and frontend have passed Trivy on this architecture.
+      - name: Push validated ${{ matrix.arch }} images
         if: >-
           github.event_name == 'push' ||
           (
@@ -411,21 +368,51 @@ jobs:
         run: |
           set -euo pipefail
 
-          docker push "${BACKEND_IMAGE}:${IMAGE_TAG}-amd64"
-          docker push "${BACKEND_IMAGE}:${IMAGE_TAG}-arm64"
+          docker push \
+            "${BACKEND_IMAGE}:${IMAGE_TAG}-${{ matrix.arch }}"
 
-          docker push "${FRONTEND_IMAGE}:${IMAGE_TAG}-amd64"
-          docker push "${FRONTEND_IMAGE}:${IMAGE_TAG}-arm64"
+          docker push \
+            "${FRONTEND_IMAGE}:${IMAGE_TAG}-${{ matrix.arch }}"
 
-      # Combine the validated architecture images behind the same
-      # immutable application tag used by GitOps.
+
+  # ==========================================================
+  # Publish multi-platform manifests
+  # ==========================================================
+
+  publish-manifests:
+    name: Publish multi-platform manifests
+
+    # Run only after BOTH native architecture jobs succeed.
+    needs:
+      - build-images
+
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main'
+      )
+
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Combine native amd64 and arm64 images behind one immutable tag.
       - name: Create multi-platform image manifests
-        if: >-
-          github.event_name == 'push' ||
-          (
-            github.event_name == 'workflow_dispatch' &&
-            github.ref == 'refs/heads/main'
-          )
         shell: bash
         run: |
           set -euo pipefail
@@ -440,15 +427,9 @@ jobs:
             "${FRONTEND_IMAGE}:${IMAGE_TAG}-amd64" \
             "${FRONTEND_IMAGE}:${IMAGE_TAG}-arm64"
 
-      # Fail publication if either final manifest does not expose
-      # both required Linux architectures.
+      # Verify the final immutable image tag contains both
+      # architectures before GitOps is allowed to continue.
       - name: Verify multi-platform image manifests
-        if: >-
-          github.event_name == 'push' ||
-          (
-            github.event_name == 'workflow_dispatch' &&
-            github.ref == 'refs/heads/main'
-          )
         shell: bash
         run: |
           set -euo pipefail
@@ -487,7 +468,7 @@ jobs:
       )
 
     needs:
-      - publish-images
+      - publish-manifests
 
     runs-on: ubuntu-24.04
 
