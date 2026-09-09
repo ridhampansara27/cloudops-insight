@@ -18,7 +18,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   // Compose all global providers in one place.
   return (
     <ThemeProvider
-      defaultTheme="system"
+      defaultTheme="dark"
       storageKey="cloudops-ui-theme"
     >
       <QueryClientProvider client={queryClient}>
