@@ -18,7 +18,7 @@ import {
 export function AppLayout() {
   // Render atmospheric background layers underneath real page content.
   return (
-    <div className="relative flex min-h-screen overflow-x-hidden bg-background">
+    <div className="relative flex min-h-screen overflow-x-clip bg-background">
       {/* Render the dark-first ambient gradient system. */}
       <div
         aria-hidden="true"
