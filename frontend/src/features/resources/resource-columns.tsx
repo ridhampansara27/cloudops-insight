@@ -3,22 +3,27 @@ import {
   createColumnHelper,
 } from "@tanstack/react-table";
 
-// Import sorting icon.
+// Import inventory presentation icons.
 import {
   ArrowUpDown,
+  ArrowUpRight,
+  Box,
+  Clock3,
+  MapPin,
+  UserRound,
 } from "lucide-react";
 
-// Import React Router navigation.
+// Import React Router resource navigation.
 import {
   Link,
 } from "react-router-dom";
 
-// Import resource-health badge.
+// Import resource-health presentation.
 import {
   ResourceHealthBadge,
 } from "@/components/shared/resource-health-badge";
 
-// Import reusable UI components.
+// Import reusable UI.
 import {
   Badge,
 } from "@/components/ui/badge";
@@ -27,23 +32,23 @@ import {
   Button,
 } from "@/components/ui/button";
 
-// Import shared formatting.
+// Import shared timestamp formatting.
 import {
   formatTimestamp,
 } from "@/lib/formatters";
 
-// Import resource table feature typing.
+// Import table feature typing.
 import type {
   ResourceTableFeatures,
 } from "@/features/resources/resource-table-features";
 
-// Import the real API resource type.
+// Import the genuine API resource model.
 import type {
   ResourceApiResponse,
 } from "@/types/api";
 
 
-// Create a strongly typed column helper.
+// Create a strongly typed resource-column helper.
 const columnHelper =
   createColumnHelper<
     ResourceTableFeatures,
@@ -51,92 +56,104 @@ const columnHelper =
   >();
 
 
-// Export the resource columns.
+// Export the production Resource Explorer columns.
 export const resourceColumns =
   columnHelper.columns([
-    // Resource identity column.
+    // ========================================================
+    // Resource identity
+    // ========================================================
     columnHelper.accessor(
       "name",
       {
-        // Render sortable header.
         header: ({
           column,
         }) => (
           <Button
-            variant="ghost"
-            className="-ml-3"
+            className="-ml-3 h-8 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
             onClick={() =>
               column.toggleSorting(
                 column.getIsSorted() ===
                   "asc",
               )
             }
+            variant="ghost"
           >
             Resource
 
-            <ArrowUpDown className="ml-2 size-4" />
+            <ArrowUpDown className="ml-2 size-3.5" />
           </Button>
         ),
 
-        // Render resource identity.
         cell: ({
           row,
         }) => (
-          <div className="min-w-[220px]">
-            <Link
-              to={`/cloud/resources/${row.original.id}`}
-              className="font-medium text-foreground hover:text-primary hover:underline"
-            >
-              {
-                row.original.name
-              }
-            </Link>
+          <div className="flex min-w-[250px] items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300 transition-colors group-hover:border-cyan-400/25 group-hover:bg-cyan-400/12">
+              <Box className="size-4" />
+            </div>
 
-            <p className="mt-1 max-w-[280px] truncate text-xs text-muted-foreground">
-              {
-                row.original
-                  .provider_resource_id
-              }
-            </p>
+            <div className="min-w-0">
+              <Link
+                className="block max-w-[280px] truncate text-sm font-semibold text-foreground transition-colors hover:text-primary"
+                to={`/cloud/resources/${row.original.id}`}
+              >
+                {
+                  row.original.name
+                }
+              </Link>
+
+              <p className="mt-1 max-w-[300px] truncate font-mono text-[10px] text-muted-foreground">
+                {
+                  row.original
+                    .provider_resource_id
+                }
+              </p>
+            </div>
           </div>
         ),
 
-        // Sort names alphabetically.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Service column.
+    // ========================================================
+    // AWS service
+    // ========================================================
     columnHelper.accessor(
       "service",
       {
-        // Display service heading.
-        header: "Service",
+        header:
+          "Service",
 
-        // Display service badge.
         cell: ({
           row,
         }) => (
-          <Badge variant="outline">
+          <Badge
+            className="border-sky-400/20 bg-sky-400/8 text-sky-300"
+            variant="outline"
+          >
             {
-              row.original.service
+              row.original
+                .service
             }
           </Badge>
         ),
 
-        // Sort alphabetically.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Health column.
+    // ========================================================
+    // CloudOps health
+    // ========================================================
     columnHelper.accessor(
       "health_state",
       {
-        // Display health heading.
-        header: "Health",
+        header:
+          "Health",
 
-        // Display health badge.
         cell: ({
           row,
         }) => (
@@ -148,25 +165,26 @@ export const resourceColumns =
           />
         ),
 
-        // Sort alphabetically.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Cloud state column.
+    // ========================================================
+    // Native provider state
+    // ========================================================
     columnHelper.accessor(
       "cloud_state",
       {
-        // Display state heading.
-        header: "Cloud state",
+        header:
+          "Cloud state",
 
-        // Display provider state.
         cell: ({
           row,
         }) => (
           <Badge
+            className="border-border/70 bg-muted/35 capitalize text-foreground"
             variant="secondary"
-            className="capitalize"
           >
             {
               row.original
@@ -175,91 +193,101 @@ export const resourceColumns =
           </Badge>
         ),
 
-        // Sort state values.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Environment column.
+    // ========================================================
+    // Deployment environment
+    // ========================================================
     columnHelper.accessor(
       "environment",
       {
-        // Display heading.
-        header: "Environment",
+        header:
+          "Environment",
 
-        // Render environment safely.
         cell: ({
           row,
         }) => (
-          <span className="capitalize">
+          <span className="inline-flex rounded-md border border-violet-400/15 bg-violet-400/7 px-2 py-1 text-xs capitalize text-violet-200">
             {row.original
               .environment ??
               "Unassigned"}
           </span>
         ),
 
-        // Sort environment names.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Region column.
+    // ========================================================
+    // AWS region
+    // ========================================================
     columnHelper.accessor(
       "region",
       {
-        // Display region heading.
-        header: "Region",
+        header:
+          "Region",
 
-        // Render AWS region.
         cell: ({
           row,
         }) => (
-          <span className="whitespace-nowrap text-sm">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+            <MapPin className="size-3.5 text-sky-300" />
+
             {
               row.original.region
             }
           </span>
         ),
 
-        // Sort regions.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Owner column.
+    // ========================================================
+    // Resource ownership
+    // ========================================================
     columnHelper.accessor(
       "owner",
       {
-        // Display owner heading.
-        header: "Owner",
+        header:
+          "Owner",
 
-        // Render owner.
         cell: ({
           row,
         }) => (
-          <span className="whitespace-nowrap">
+          <span className="inline-flex max-w-[180px] items-center gap-1.5 truncate text-xs text-muted-foreground">
+            <UserRound className="size-3.5 shrink-0" />
+
             {row.original.owner ??
               "Unassigned"}
           </span>
         ),
 
-        // Sort owners.
-        sortFn: "text",
+        sortFn:
+          "text",
       },
     ),
 
-    // Synchronization timestamp.
+    // ========================================================
+    // Synchronization freshness
+    // ========================================================
     columnHelper.accessor(
       "last_synced_at",
       {
-        // Display sync heading.
-        header: "Last synced",
+        header:
+          "Last synced",
 
-        // Render localized timestamp.
         cell: ({
           row,
         }) => (
-          <span className="whitespace-nowrap text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted-foreground">
+            <Clock3 className="size-3.5" />
+
             {formatTimestamp(
               row.original
                 .last_synced_at,
@@ -267,33 +295,37 @@ export const resourceColumns =
           </span>
         ),
 
-        // Sort timestamp strings.
-        sortFn: "alphanumeric",
+        sortFn:
+          "alphanumeric",
       },
     ),
 
-    // Resource navigation action.
+    // ========================================================
+    // Resource investigation action
+    // ========================================================
     columnHelper.display({
-      // Give the column an ID.
-      id: "actions",
+      id:
+        "actions",
 
-      // Keep the heading empty.
-      header: "",
+      header:
+        "",
 
-      // Render the detail button.
       cell: ({
         row,
       }) => (
         <Button
+          className="rounded-xl border-primary/15 bg-primary/5 text-primary hover:bg-primary/10"
           render={
             <Link
               to={`/cloud/resources/${row.original.id}`}
             />
           }
-          variant="outline"
           size="sm"
+          variant="outline"
         >
-          View
+          Inspect
+
+          <ArrowUpRight className="ml-1.5 size-3.5" />
         </Button>
       ),
     }),
