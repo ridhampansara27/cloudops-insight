@@ -1,4 +1,4 @@
-"""Business logic for cloud account management."""
+"""Business logic for tenant-owned cloud account management."""
 
 from uuid import UUID
 
@@ -15,121 +15,121 @@ from app.services.aws_account_validator import (
 
 
 class CloudAccountService:
-    """Coordinates cloud-account business rules."""
+    """Coordinate tenant-aware cloud-account business rules."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+    ) -> None:
         self.session = session
-        self.repository = CloudAccountRepository(session)
+        self.repository = CloudAccountRepository(
+            session,
+        )
 
     async def create(
         self,
+        *,
         payload: CloudAccountCreate,
         user_id: UUID,
+        organization_id: UUID,
     ) -> CloudAccount:
-        """Create a cloud account owned by the authenticated user."""
+        """Create a cloud account inside one organization."""
 
-        existing = await self.repository.get_by_external_account_id(
-            payload.external_account_id
+        existing = await self.repository.get_by_external_id(
+            provider=payload.provider.lower(),
+            external_account_id=payload.external_account_id,
         )
 
         if existing is not None:
+            # Keep this response generic so account ownership is not leaked.
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Cloud account already registered",
+                detail="Cloud account is already registered or unavailable.",
             )
 
-        # Validate that the AWS account ID and IAM role ARN are structurally valid
-        # and that the account ID inside the ARN matches the supplied account ID.
-        #
-        # This performs local validation only.
-        # We are NOT calling AWS STS yet.
         try:
             validate_aws_account_configuration(
                 payload.external_account_id,
                 payload.role_arn,
             )
-        except AWSAccountValidationError as exc:
-            # Return HTTP 422 because the submitted cloud-account configuration
-            # is syntactically valid JSON but semantically invalid.
+
+        except AWSAccountValidationError as error:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(exc),
-            ) from exc
+                detail=str(
+                    error,
+                ),
+            ) from error
 
-        cloud_account = CloudAccount(
-            provider=payload.provider,
-            name=payload.name,
-            external_account_id=payload.external_account_id,
-            role_arn=payload.role_arn,
-            external_id=payload.external_id,
-            enabled_regions=payload.enabled_regions,
-            # Initial state until AWS validation/synchronization runs.
-            status="pending",
+        return await self.repository.create(
+            payload=payload,
             created_by_id=user_id,
+            organization_id=organization_id,
         )
 
-        await self.repository.create(cloud_account)
-
-        # Commit the transaction only after repository operations succeed.
-        await self.session.commit()
-
-        return cloud_account
-
-    async def list_for_user(self, user_id: UUID) -> list[CloudAccount]:
-        """List cloud accounts owned by the authenticated user."""
-
-        return await self.repository.list_for_user(user_id)
-
-    async def get_for_user(
+    async def list_for_organization(
         self,
-        account_id: UUID,
-        user_id: UUID,
-    ) -> CloudAccount:
-        """Return one owned account or raise 404."""
+        organization_id: UUID,
+    ) -> list[CloudAccount]:
+        """Return only accounts owned by one organization."""
 
-        cloud_account = await self.repository.get_for_user(
-            account_id,
-            user_id,
+        return await self.repository.list_for_organization(
+            organization_id,
         )
 
-        if cloud_account is None:
-            # 404 prevents leaking existence of another user's account.
+    async def get_for_organization(
+        self,
+        *,
+        account_id: UUID,
+        organization_id: UUID,
+    ) -> CloudAccount:
+        """Return one tenant-owned account or deliberately return 404."""
+
+        account = await self.repository.get_by_id_for_organization(
+            account_id=account_id,
+            organization_id=organization_id,
+        )
+
+        if account is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cloud account not found",
+                detail="Cloud account not found.",
             )
 
-        return cloud_account
+        return account
 
     async def update(
         self,
+        *,
         account_id: UUID,
-        user_id: UUID,
+        organization_id: UUID,
         payload: CloudAccountUpdate,
     ) -> CloudAccount:
-        """Partially update a cloud account."""
+        """Update only a cloud account belonging to this organization."""
 
-        cloud_account = await self.get_for_user(account_id, user_id)
+        account = await self.get_for_organization(
+            account_id=account_id,
+            organization_id=organization_id,
+        )
 
-        # exclude_unset ensures PATCH changes only supplied fields.
-        update_data = payload.model_dump(exclude_unset=True)
-
-        for field, value in update_data.items():
-            setattr(cloud_account, field, value)
-
-        await self.session.commit()
-        await self.session.refresh(cloud_account)
-
-        return cloud_account
+        return await self.repository.update(
+            account=account,
+            payload=payload,
+        )
 
     async def delete(
         self,
+        *,
         account_id: UUID,
-        user_id: UUID,
+        organization_id: UUID,
     ) -> None:
-        """Delete one owned cloud account."""
+        """Delete only a cloud account belonging to this organization."""
 
-        cloud_account = await self.get_for_user(account_id, user_id)
+        account = await self.get_for_organization(
+            account_id=account_id,
+            organization_id=organization_id,
+        )
 
-        await self.repository.delete(cloud_account)
-        await self.session.commit()
+        await self.repository.delete(
+            account,
+        )

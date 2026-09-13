@@ -5,7 +5,6 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-
 # Define every organization-level role supported by the SaaS.
 TENANT_ROLES = frozenset(
     {

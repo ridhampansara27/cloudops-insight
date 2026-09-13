@@ -41,7 +41,6 @@ from app.models.user import User
 # Import the user repository.
 from app.repositories.user_repository import UserRepository
 
-
 # Tell FastAPI where clients obtain bearer tokens.
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
