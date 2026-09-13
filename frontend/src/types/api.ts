@@ -60,6 +60,11 @@ export interface CloudAccountApiResponse {
 
   // Store modification timestamp.
   updated_at: string;
+
+  // Store when CloudOps access to this provider integration stopped.
+  disconnected_at:
+    | string
+    | null;
 }
 
 
@@ -92,6 +97,22 @@ export interface CloudAccountValidationApiResponse {
   connected: boolean;
   account_id: string;
   caller_arn: string;
+  message: string;
+}
+
+
+// Define safe AWS integration-disconnect response.
+export interface CloudAccountDisconnectApiResponse {
+  account_id: string;
+
+  status: string;
+
+  disconnected_at: string;
+
+  connection_revision: number;
+
+  account_budgets_deactivated: number;
+
   message: string;
 }
 

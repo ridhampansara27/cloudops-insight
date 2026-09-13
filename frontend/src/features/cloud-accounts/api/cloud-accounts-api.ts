@@ -18,6 +18,7 @@ import {
 // Import API models.
 import type {
   CloudAccountApiResponse,
+  CloudAccountDisconnectApiResponse,
   CloudAccountOnboardingApiResponse,
   CloudAccountSyncQueuedResponse,
   CloudAccountValidationApiResponse,
@@ -124,6 +125,25 @@ async function validateCloudAccount(
 }
 
 
+// Safely disconnect CloudOps provider access.
+//
+// This deliberately uses POST /disconnect rather than DELETE.
+// CloudOps history is retained and customer AWS resources are
+// never deleted by this operation.
+async function disconnectCloudAccount(
+  accountId: string,
+): Promise<CloudAccountDisconnectApiResponse> {
+  return apiRequest<
+    CloudAccountDisconnectApiResponse
+  >(
+    `/api/v1/cloud-accounts/${accountId}/disconnect`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+
 // Queue genuine AWS inventory discovery.
 async function syncCloudAccount(
   accountId: string,
@@ -213,6 +233,26 @@ export function useValidateCloudAccount() {
   return useMutation({
     mutationFn:
       validateCloudAccount,
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey:
+          queryKeys.cloudAccounts
+            .all,
+      });
+    },
+  });
+}
+
+
+// Safely disconnect one AWS integration.
+export function useDisconnectCloudAccount() {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn:
+      disconnectCloudAccount,
 
     onSuccess: async () => {
       await queryClient.invalidateQueries({

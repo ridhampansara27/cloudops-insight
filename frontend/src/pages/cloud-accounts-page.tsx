@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ServerCog,
   ShieldCheck,
+  Unplug,
   Wifi,
 } from "lucide-react";
 
@@ -65,17 +66,24 @@ import {
   AwsOnboardingDialog,
 } from "@/features/cloud-accounts/aws-onboarding-dialog";
 
+// Import safe disconnect confirmation.
+import {
+  AwsDisconnectDialog,
+} from "@/features/cloud-accounts/aws-disconnect-dialog";
+
 // Import genuine backend operations.
 import {
   useCloudAccountOnboarding,
   useCloudAccounts,
   useCreateCloudAccount,
+  useDisconnectCloudAccount,
   useSyncCloudAccount,
   useUpdateCloudAccountRole,
   useValidateCloudAccount,
 } from "@/features/cloud-accounts/api/cloud-accounts-api";
 
 import type {
+  CloudAccountApiResponse,
   CloudAccountOnboardingApiResponse,
 } from "@/types/api";
 
@@ -138,6 +146,38 @@ function getConnectionStyle(
 
       Icon:
         ShieldCheck,
+    };
+  }
+
+  if (
+    status ===
+    "disconnected"
+  ) {
+    return {
+      badge:
+        "border-slate-400/20 bg-slate-400/8 text-slate-300",
+
+      label:
+        "Disconnected",
+
+      Icon:
+        Unplug,
+    };
+  }
+
+  if (
+    status ===
+    "disconnecting"
+  ) {
+    return {
+      badge:
+        "border-amber-400/20 bg-amber-400/8 text-amber-300",
+
+      label:
+        "Disconnecting",
+
+      Icon:
+        Unplug,
     };
   }
 
@@ -266,6 +306,15 @@ export function CloudAccountsPage() {
       CloudAccountOnboardingApiResponse | null
     >(null);
 
+  // Store the account selected for safe disconnect confirmation.
+  const [
+    disconnectAccount,
+    setDisconnectAccount,
+  ] =
+    useState<
+      CloudAccountApiResponse | null
+    >(null);
+
   // Load registered AWS account configurations.
   // The API hook already polls every five seconds so Celery
   // synchronization state updates automatically.
@@ -281,6 +330,9 @@ export function CloudAccountsPage() {
 
   const updateAccountRole =
     useUpdateCloudAccountRole();
+
+  const disconnectCloudAccount =
+    useDisconnectCloudAccount();
 
   const validateAccount =
     useValidateCloudAccount();
@@ -446,6 +498,42 @@ export function CloudAccountsPage() {
     }
   }
 
+  // Stop CloudOps provider access without deleting AWS resources.
+  async function handleDisconnect() {
+    if (!disconnectAccount) {
+      return;
+    }
+
+    try {
+      const result =
+        await disconnectCloudAccount.mutateAsync(
+          disconnectAccount.id,
+        );
+
+      setDisconnectAccount(
+        null,
+      );
+
+      const budgetMessage =
+        result.account_budgets_deactivated > 0
+          ? ` ${result.account_budgets_deactivated} account budget${
+              result.account_budgets_deactivated === 1
+                ? ""
+                : "s"
+            } deactivated.`
+          : "";
+
+      toast.success(
+        `AWS integration disconnected.${budgetMessage}`,
+      );
+    } catch {
+      toast.error(
+        "Unable to disconnect AWS integration.",
+      );
+    }
+  }
+
+
   // Queue genuine resource discovery through Celery.
   async function handleSync(
     accountId:
@@ -504,14 +592,16 @@ export function CloudAccountsPage() {
         "connected",
     );
 
-  // Count accounts that still require first validation.
+  // Count integrations requiring setup, validation or reconnection.
   const pendingAccounts =
     accounts.filter(
       (
         account,
       ) =>
         account.status ===
-        "pending",
+          "pending" ||
+        account.status ===
+          "disconnected",
     );
 
   // Count Celery resource synchronizations currently in flight.
@@ -603,12 +693,12 @@ export function CloudAccountsPage() {
                 "Validation required",
 
               description:
-                `${pendingAccounts.length} registered AWS account${
+                `${pendingAccounts.length} AWS account${
                   pendingAccounts.length ===
                   1
                     ? ""
                     : "s"
-                } must be validated before inventory synchronization.`,
+                } require IAM setup, validation or reconnection before synchronization.`,
 
               classes:
                 "border-amber-400/20 bg-amber-400/8 text-amber-300",
@@ -1273,6 +1363,27 @@ export function CloudAccountsPage() {
                     </div>
                   )}
 
+                  {account.disconnected_at && (
+                    <div className="rounded-xl border border-slate-400/15 bg-slate-400/[0.045] p-3">
+                      <div className="flex items-start gap-2">
+                        <Unplug className="mt-0.5 size-4 shrink-0 text-slate-300" />
+
+                        <div>
+                          <p className="text-xs font-semibold text-slate-200">
+                            Integration disconnected
+                          </p>
+
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            CloudOps AWS access stopped{" "}
+                            {formatTimestamp(
+                              account.disconnected_at,
+                            )}. Historical data remains available.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Existing backend actions. */}
                   <div className="flex flex-wrap gap-2 border-t border-border/45 pt-4">
                     {account.status ===
@@ -1314,9 +1425,12 @@ export function CloudAccountsPage() {
 
                         {loadingOnboardingThisAccount
                           ? "Loading setup..."
-                          : account.role_arn
-                            ? "Review IAM setup"
-                            : "Continue setup"}
+                          : account.status ===
+                              "disconnected"
+                            ? "Reconnect"
+                            : account.role_arn
+                              ? "Review IAM setup"
+                              : "Continue setup"}
                       </Button>
                     )}
 
@@ -1349,9 +1463,35 @@ export function CloudAccountsPage() {
                     </Button>
 
                     {account.status !==
+                      "disconnected" &&
+                      account.status !==
+                        "disconnecting" && (
+                      <Button
+                        className="rounded-xl"
+                        disabled={
+                          disconnectCloudAccount.isPending
+                        }
+                        onClick={() =>
+                          setDisconnectAccount(
+                            account,
+                          )
+                        }
+                        size="sm"
+                        variant="destructive"
+                      >
+                        <Unplug className="mr-2 size-3.5" />
+
+                        Disconnect
+                      </Button>
+                    )}
+
+                    {account.status !==
                       "connected" && (
                       <p className="self-center text-xs text-muted-foreground">
-                        Complete IAM setup and validate AWS access before synchronization.
+                        {account.status ===
+                        "disconnected"
+                          ? "Historical CloudOps data is retained. Reconnect to resume AWS synchronization."
+                          : "Complete IAM setup and validate AWS access before synchronization."}
                       </p>
                     )}
                   </div>
@@ -1404,6 +1544,31 @@ export function CloudAccountsPage() {
         }
         open={
           onboardingOpen
+        }
+      />
+
+      <AwsDisconnectDialog
+        account={
+          disconnectAccount
+        }
+        isDisconnecting={
+          disconnectCloudAccount.isPending
+        }
+        onConfirm={
+          handleDisconnect
+        }
+        onOpenChange={(
+          nextOpen,
+        ) => {
+          if (!nextOpen) {
+            setDisconnectAccount(
+              null,
+            );
+          }
+        }}
+        open={
+          disconnectAccount !==
+          null
         }
       />
     </section>
