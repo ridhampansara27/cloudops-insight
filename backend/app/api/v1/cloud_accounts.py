@@ -10,14 +10,15 @@ from app.api.dependencies import (
     DatabaseSession,
     TenantOwnerOrAdmin,
 )
+from app.core.config import settings
 from app.providers.aws.connection import (
     AwsConnectionError,
     AwsConnectionService,
 )
 from app.providers.aws.types import AwsAccountConfig
-from app.repositories.cloud_account_repository import CloudAccountRepository
 from app.schemas.cloud_account import (
     CloudAccountCreate,
+    CloudAccountOnboardingRead,
     CloudAccountRead,
     CloudAccountUpdate,
     CloudAccountValidationResponse,
@@ -27,6 +28,15 @@ from app.schemas.resource_sync import (
     ResourceSyncQueuedResponse,
     ResourceSyncStatusResponse,
 )
+from app.services.aws_account_validator import (
+    AWSAccountValidationError,
+    validate_aws_account_configuration,
+)
+from app.services.aws_onboarding_service import (
+    SUGGESTED_ROLE_NAME,
+    build_assume_role_trust_policy,
+)
+from app.services.cloud_account_service import CloudAccountService
 from app.services.cost_sync_service import CostSyncService
 from app.services.monitoring_sync_service import MonitoringSyncService
 from app.tasks.aws_sync import sync_aws_account_task
@@ -40,28 +50,49 @@ class CostSyncResponse(BaseModel):
 router = APIRouter()
 
 
-async def _get_tenant_account(
-    *,
-    account_id: UUID,
-    organization_id: UUID,
-    session: DatabaseSession,
-):
-    """Load an account without revealing records owned by another tenant."""
+def _build_onboarding_response(
+    account,
+) -> CloudAccountOnboardingRead:
+    """Return ExternalId only through the owner/admin onboarding surface."""
 
-    account = await CloudAccountRepository(
-        session,
-    ).get_by_id_for_organization(
-        account_id=account_id,
-        organization_id=organization_id,
-    )
-
-    if account is None:
+    if not account.external_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This legacy integration does not have a CloudOps "
+                "ExternalId and requires migration."
+            ),
         )
 
-    return account
+    platform_principal_arn = (
+        settings.aws_platform_principal_arn.strip()
+        if settings.aws_platform_principal_arn
+        else None
+    )
+
+    trust_policy = (
+        build_assume_role_trust_policy(
+            platform_principal_arn=platform_principal_arn,
+            external_id=account.external_id,
+        )
+        if platform_principal_arn
+        else None
+    )
+
+    public_account = CloudAccountRead.model_validate(
+        account,
+    )
+
+    return CloudAccountOnboardingRead(
+        **public_account.model_dump(),
+        external_id=account.external_id,
+        platform_principal_arn=platform_principal_arn,
+        suggested_role_name=SUGGESTED_ROLE_NAME,
+        trust_policy=trust_policy,
+        onboarding_ready=bool(
+            platform_principal_arn,
+        ),
+    )
 
 
 @router.get(
@@ -72,7 +103,7 @@ async def list_cloud_accounts(
     tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> list[CloudAccountRead]:
-    accounts = await CloudAccountRepository(
+    accounts = await CloudAccountService(
         session,
     ).list_for_organization(
         tenant.organization_id,
@@ -86,6 +117,54 @@ async def list_cloud_accounts(
     ]
 
 
+@router.post(
+    "",
+    response_model=CloudAccountOnboardingRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_cloud_account(
+    payload: CloudAccountCreate,
+    tenant: TenantOwnerOrAdmin,
+    session: DatabaseSession,
+) -> CloudAccountOnboardingRead:
+    """Begin secure AWS onboarding and generate the ExternalId."""
+
+    account = await CloudAccountService(
+        session,
+    ).create(
+        payload=payload,
+        user_id=tenant.user_id,
+        organization_id=tenant.organization_id,
+    )
+
+    return _build_onboarding_response(
+        account,
+    )
+
+
+@router.get(
+    "/{account_id}/onboarding",
+    response_model=CloudAccountOnboardingRead,
+)
+async def get_cloud_account_onboarding(
+    account_id: UUID,
+    tenant: TenantOwnerOrAdmin,
+    session: DatabaseSession,
+) -> CloudAccountOnboardingRead:
+    """Reload the IAM trust material for a pending integration."""
+
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
+    )
+
+    return _build_onboarding_response(
+        account,
+    )
+
+
 @router.get(
     "/{account_id}",
     response_model=CloudAccountRead,
@@ -95,10 +174,11 @@ async def get_cloud_account(
     tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> CloudAccountRead:
-    account = await _get_tenant_account(
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
-        session=session,
     )
 
     return CloudAccountRead.model_validate(
@@ -115,10 +195,11 @@ async def get_cloud_account_sync_status(
     tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> ResourceSyncStatusResponse:
-    account = await _get_tenant_account(
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
-        session=session,
     )
 
     return ResourceSyncStatusResponse(
@@ -130,42 +211,24 @@ async def get_cloud_account_sync_status(
     )
 
 
-@router.post(
-    "",
+@router.patch(
+    "/{account_id}",
     response_model=CloudAccountRead,
-    status_code=status.HTTP_201_CREATED,
 )
-async def create_cloud_account(
-    payload: CloudAccountCreate,
+async def update_cloud_account(
+    account_id: UUID,
+    payload: CloudAccountUpdate,
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountRead:
-    if payload.provider.lower() != "aws":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only AWS accounts are currently supported.",
-        )
+    """Submit or change the customer IAM role."""
 
-    repository = CloudAccountRepository(
+    account = await CloudAccountService(
         session,
-    )
-
-    existing = await repository.get_by_external_id(
-        provider=payload.provider.lower(),
-        external_account_id=payload.external_account_id,
-    )
-
-    if existing is not None:
-        # Do not reveal which organization owns the provider account.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cloud account is already registered or unavailable.",
-        )
-
-    account = await repository.create(
-        payload=payload,
-        created_by_id=tenant.user_id,
+    ).update(
+        account_id=account_id,
         organization_id=tenant.organization_id,
+        payload=payload,
     )
 
     return CloudAccountRead.model_validate(
@@ -182,11 +245,37 @@ async def validate_cloud_account(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountValidationResponse:
-    account = await _get_tenant_account(
+    """Validate the configured AssumeRole + ExternalId with AWS STS."""
+
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
-        session=session,
     )
+
+    if not account.role_arn or not account.external_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Complete the cross-account IAM role setup before "
+                "validating this AWS integration."
+            ),
+        )
+
+    try:
+        validate_aws_account_configuration(
+            account.external_account_id,
+            account.role_arn,
+        )
+
+    except AWSAccountValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(
+                error,
+            ),
+        ) from error
 
     aws_account = AwsAccountConfig(
         account_id=account.external_account_id,
@@ -249,10 +338,11 @@ async def sync_cloud_account(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> ResourceSyncQueuedResponse:
-    account = await _get_tenant_account(
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
-        session=session,
     )
 
     if account.status != "connected":
@@ -309,13 +399,18 @@ async def sync_cloud_account_metrics(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> MonitoringSyncResponse:
-    # Security boundary: prove tenant ownership before calling a service
-    # whose internal API currently accepts only account_id.
-    await _get_tenant_account(
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
-        session=session,
     )
+
+    if account.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS account is not connected.",
+        )
 
     samples = await MonitoringSyncService(
         session,
@@ -338,13 +433,18 @@ async def sync_cloud_account_costs(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CostSyncResponse:
-    # Security boundary: never allow a caller to trigger another
-    # organization's Cost Explorer synchronization by UUID.
-    await _get_tenant_account(
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
-        session=session,
     )
+
+    if account.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS account is not connected.",
+        )
 
     imported = await CostSyncService(
         session,
@@ -358,41 +458,6 @@ async def sync_cloud_account_costs(
     )
 
 
-@router.patch(
-    "/{account_id}",
-    response_model=CloudAccountRead,
-)
-async def update_cloud_account(
-    account_id: UUID,
-    payload: CloudAccountUpdate,
-    tenant: TenantOwnerOrAdmin,
-    session: DatabaseSession,
-) -> CloudAccountRead:
-    repository = CloudAccountRepository(
-        session,
-    )
-
-    account = await repository.get_by_id_for_organization(
-        account_id=account_id,
-        organization_id=tenant.organization_id,
-    )
-
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
-        )
-
-    account = await repository.update(
-        account=account,
-        payload=payload,
-    )
-
-    return CloudAccountRead.model_validate(
-        account,
-    )
-
-
 @router.delete(
     "/{account_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -402,27 +467,11 @@ async def delete_cloud_account(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> None:
-    """Delete one tenant-owned integration.
+    """Temporary compatibility endpoint; safe disconnect replaces this next."""
 
-    This endpoint remains temporarily for compatibility.
-    The dedicated safe Disconnect lifecycle replaces it in a later stage.
-    """
-
-    repository = CloudAccountRepository(
+    await CloudAccountService(
         session,
-    )
-
-    account = await repository.get_by_id_for_organization(
+    ).delete(
         account_id=account_id,
         organization_id=tenant.organization_id,
-    )
-
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
-        )
-
-    await repository.delete(
-        account,
     )

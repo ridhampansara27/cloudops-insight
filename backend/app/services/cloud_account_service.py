@@ -1,4 +1,4 @@
-"""Business logic for tenant-owned cloud account management."""
+"""Business logic for tenant-owned cloud account onboarding."""
 
 from uuid import UUID
 
@@ -11,11 +11,13 @@ from app.schemas.cloud_account import CloudAccountCreate, CloudAccountUpdate
 from app.services.aws_account_validator import (
     AWSAccountValidationError,
     validate_aws_account_configuration,
+    validate_aws_account_id,
 )
+from app.services.aws_onboarding_service import generate_external_id
 
 
 class CloudAccountService:
-    """Coordinate tenant-aware cloud-account business rules."""
+    """Coordinate secure tenant-aware AWS account onboarding."""
 
     def __init__(
         self,
@@ -33,7 +35,26 @@ class CloudAccountService:
         user_id: UUID,
         organization_id: UUID,
     ) -> CloudAccount:
-        """Create a cloud account inside one organization."""
+        """Create phase-one onboarding state with a new ExternalId."""
+
+        if payload.provider.lower() != "aws":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only AWS accounts are currently supported.",
+            )
+
+        try:
+            validate_aws_account_id(
+                payload.external_account_id,
+            )
+
+        except AWSAccountValidationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(
+                    error,
+                ),
+            ) from error
 
         existing = await self.repository.get_by_external_id(
             provider=payload.provider.lower(),
@@ -41,38 +62,24 @@ class CloudAccountService:
         )
 
         if existing is not None:
-            # Keep this response generic so account ownership is not leaked.
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Cloud account is already registered or unavailable.",
             )
 
-        try:
-            validate_aws_account_configuration(
-                payload.external_account_id,
-                payload.role_arn,
-            )
-
-        except AWSAccountValidationError as error:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(
-                    error,
-                ),
-            ) from error
+        external_id = generate_external_id()
 
         return await self.repository.create(
             payload=payload,
             created_by_id=user_id,
             organization_id=organization_id,
+            external_id=external_id,
         )
 
     async def list_for_organization(
         self,
         organization_id: UUID,
     ) -> list[CloudAccount]:
-        """Return only accounts owned by one organization."""
-
         return await self.repository.list_for_organization(
             organization_id,
         )
@@ -83,8 +90,6 @@ class CloudAccountService:
         account_id: UUID,
         organization_id: UUID,
     ) -> CloudAccount:
-        """Return one tenant-owned account or deliberately return 404."""
-
         account = await self.repository.get_by_id_for_organization(
             account_id=account_id,
             organization_id=organization_id,
@@ -105,12 +110,46 @@ class CloudAccountService:
         organization_id: UUID,
         payload: CloudAccountUpdate,
     ) -> CloudAccount:
-        """Update only a cloud account belonging to this organization."""
+        """Safely update customer-controlled integration settings."""
 
         account = await self.get_for_organization(
             account_id=account_id,
             organization_id=organization_id,
         )
+
+        changes = payload.model_dump(
+            exclude_unset=True,
+        )
+
+        if "role_arn" in changes:
+            role_arn = changes["role_arn"]
+
+            if role_arn is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="AWS IAM role ARN cannot be cleared.",
+                )
+
+            try:
+                validate_aws_account_configuration(
+                    account.external_account_id,
+                    role_arn,
+                )
+
+            except AWSAccountValidationError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=str(
+                        error,
+                    ),
+                ) from error
+
+            # Any role change invalidates the prior trust validation.
+            account.status = "pending"
+            account.last_validated_at = None
+            account.last_validation_error = None
+            account.sync_status = "idle"
+            account.last_sync_error = None
 
         return await self.repository.update(
             account=account,
@@ -123,8 +162,6 @@ class CloudAccountService:
         account_id: UUID,
         organization_id: UUID,
     ) -> None:
-        """Delete only a cloud account belonging to this organization."""
-
         account = await self.get_for_organization(
             account_id=account_id,
             organization_id=organization_id,

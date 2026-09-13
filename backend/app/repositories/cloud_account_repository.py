@@ -10,7 +10,7 @@ from app.schemas.cloud_account import CloudAccountCreate, CloudAccountUpdate
 
 
 class CloudAccountRepository:
-    """Persist cloud accounts while exposing tenant-safe read operations."""
+    """Persist cloud accounts while exposing tenant-safe operations."""
 
     def __init__(
         self,
@@ -22,8 +22,6 @@ class CloudAccountRepository:
         self,
         organization_id: UUID,
     ) -> list[CloudAccount]:
-        """Return only cloud accounts owned by one organization."""
-
         statement = (
             select(
                 CloudAccount,
@@ -50,8 +48,6 @@ class CloudAccountRepository:
         account_id: UUID,
         organization_id: UUID,
     ) -> CloudAccount | None:
-        """Return one tenant-owned account without leaking other tenants."""
-
         statement = select(
             CloudAccount,
         ).where(
@@ -71,14 +67,6 @@ class CloudAccountRepository:
         provider: str,
         external_account_id: str,
     ) -> CloudAccount | None:
-        """Check global provider-account uniqueness.
-
-        The database currently enforces global uniqueness for
-        provider + external_account_id, so this lookup intentionally
-        remains global. Customer-facing callers must not serialize
-        or disclose the returned record.
-        """
-
         statement = select(
             CloudAccount,
         ).where(
@@ -98,16 +86,19 @@ class CloudAccountRepository:
         payload: CloudAccountCreate,
         created_by_id: UUID,
         organization_id: UUID,
+        external_id: str,
     ) -> CloudAccount:
-        """Create one cloud integration inside the selected organization."""
+        """Create a pending account with a server-controlled ExternalId."""
 
         account = CloudAccount(
             organization_id=organization_id,
             provider=payload.provider.lower(),
             name=payload.name,
             external_account_id=payload.external_account_id,
-            role_arn=payload.role_arn,
-            external_id=payload.external_id,
+            # Role is intentionally absent during phase one.
+            role_arn=None,
+            # Never accept this value from the client.
+            external_id=external_id,
             enabled_regions=payload.enabled_regions,
             status="pending",
             created_by_id=created_by_id,
@@ -131,8 +122,6 @@ class CloudAccountRepository:
         account: CloudAccount,
         payload: CloudAccountUpdate,
     ) -> CloudAccount:
-        """Update an account already proven to belong to the tenant."""
-
         changes = payload.model_dump(
             exclude_unset=True,
         )
@@ -156,8 +145,6 @@ class CloudAccountRepository:
         self,
         account: CloudAccount,
     ) -> None:
-        """Delete an account already proven to belong to the tenant."""
-
         await self.session.delete(
             account,
         )

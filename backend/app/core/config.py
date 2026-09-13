@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # Define the development administrator password.
     seed_admin_password: str = ""
 
+    # Define the AWS IAM principal customers must trust.
+    # Production must configure this to the CloudOps platform
+    # IAM user or role used to call sts:AssumeRole.
+    aws_platform_principal_arn: str | None = None
+
     # Define the AWS region used for STS and default AWS clients.
     aws_default_region: str = "eu-central-1"
 
