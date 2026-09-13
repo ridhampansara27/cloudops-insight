@@ -18,6 +18,7 @@ from app.providers.aws.connection import (
 from app.providers.aws.types import AwsAccountConfig
 from app.schemas.cloud_account import (
     CloudAccountCreate,
+    CloudAccountDisconnectResponse,
     CloudAccountOnboardingRead,
     CloudAccountRead,
     CloudAccountUpdate,
@@ -36,6 +37,10 @@ from app.services.aws_onboarding_service import (
     SUGGESTED_ROLE_NAME,
     build_assume_role_trust_policy,
 )
+from app.services.cloud_account_connection_guard import (
+    StaleCloudAccountConnectionError,
+    require_connection_revision,
+)
 from app.services.cloud_account_service import CloudAccountService
 from app.services.cost_sync_service import CostSyncService
 from app.services.monitoring_sync_service import MonitoringSyncService
@@ -53,8 +58,6 @@ router = APIRouter()
 def _build_onboarding_response(
     account,
 ) -> CloudAccountOnboardingRead:
-    """Return ExternalId only through the owner/admin onboarding surface."""
-
     if not account.external_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -127,8 +130,6 @@ async def create_cloud_account(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountOnboardingRead:
-    """Begin secure AWS onboarding and generate the ExternalId."""
-
     account = await CloudAccountService(
         session,
     ).create(
@@ -151,8 +152,6 @@ async def get_cloud_account_onboarding(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountOnboardingRead:
-    """Reload the IAM trust material for a pending integration."""
-
     account = await CloudAccountService(
         session,
     ).get_for_organization(
@@ -221,8 +220,6 @@ async def update_cloud_account(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountRead:
-    """Submit or change the customer IAM role."""
-
     account = await CloudAccountService(
         session,
     ).update(
@@ -245,7 +242,7 @@ async def validate_cloud_account(
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountValidationResponse:
-    """Validate the configured AssumeRole + ExternalId with AWS STS."""
+    """Validate STS without allowing stale validation to reconnect access."""
 
     account = await CloudAccountService(
         session,
@@ -253,6 +250,17 @@ async def validate_cloud_account(
         account_id=account_id,
         organization_id=tenant.organization_id,
     )
+
+    if account.status in {
+        "disconnecting",
+        "disconnected",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Resume AWS onboarding before validating a disconnected integration."
+            ),
+        )
 
     if not account.role_arn or not account.external_id:
         raise HTTPException(
@@ -277,6 +285,14 @@ async def validate_cloud_account(
             ),
         ) from error
 
+    expected_revision = account.connection_revision
+
+    # Make validation mutually exclusive with connected synchronization.
+    account.status = "validating"
+    account.last_validation_error = None
+
+    await session.commit()
+
     aws_account = AwsAccountConfig(
         account_id=account.external_account_id,
         role_arn=account.role_arn,
@@ -295,6 +311,25 @@ async def validate_cloud_account(
         )
 
     except AwsConnectionError as error:
+        await session.rollback()
+
+        try:
+            account = await require_connection_revision(
+                session,
+                account_id=account_id,
+                expected_revision=expected_revision,
+                required_status="validating",
+                for_update=True,
+            )
+
+        except StaleCloudAccountConnectionError as stale_error:
+            await session.rollback()
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=("AWS integration changed while validation was running."),
+            ) from stale_error
+
         account.last_validated_at = datetime.now(
             UTC,
         )
@@ -312,11 +347,29 @@ async def validate_cloud_account(
             ),
         ) from error
 
+    try:
+        account = await require_connection_revision(
+            session,
+            account_id=account_id,
+            expected_revision=expected_revision,
+            required_status="validating",
+            for_update=True,
+        )
+
+    except StaleCloudAccountConnectionError as error:
+        await session.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=("AWS integration changed while validation was running."),
+        ) from error
+
     account.last_validated_at = datetime.now(
         UTC,
     )
     account.status = "connected"
     account.last_validation_error = None
+    account.disconnected_at = None
 
     await session.commit()
 
@@ -360,6 +413,8 @@ async def sync_cloud_account(
             detail="AWS synchronization is already in progress.",
         )
 
+    queued_revision = account.connection_revision
+
     account.sync_status = "queued"
     account.last_sync_error = None
 
@@ -370,6 +425,7 @@ async def sync_cloud_account(
             str(
                 account_id,
             ),
+            queued_revision,
         )
 
     except Exception as error:
@@ -416,6 +472,7 @@ async def sync_cloud_account_metrics(
         session,
     ).sync_account(
         account_id,
+        account.connection_revision,
     )
 
     return MonitoringSyncResponse(
@@ -450,6 +507,7 @@ async def sync_cloud_account_costs(
         session,
     ).sync_account(
         account_id,
+        account.connection_revision,
     )
 
     return CostSyncResponse(
@@ -458,20 +516,37 @@ async def sync_cloud_account_costs(
     )
 
 
-@router.delete(
-    "/{account_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+@router.post(
+    "/{account_id}/disconnect",
+    response_model=CloudAccountDisconnectResponse,
 )
-async def delete_cloud_account(
+async def disconnect_cloud_account(
     account_id: UUID,
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
-) -> None:
-    """Temporary compatibility endpoint; safe disconnect replaces this next."""
+) -> CloudAccountDisconnectResponse:
+    """Safely revoke CloudOps integration activity without deleting history."""
 
-    await CloudAccountService(
+    account, budgets_deactivated = await CloudAccountService(
         session,
-    ).delete(
+    ).disconnect(
         account_id=account_id,
         organization_id=tenant.organization_id,
+    )
+
+    if account.disconnected_at is None:
+        raise RuntimeError(
+            "Disconnected account is missing disconnect timestamp.",
+        )
+
+    return CloudAccountDisconnectResponse(
+        account_id=account.id,
+        status=account.status,
+        disconnected_at=account.disconnected_at,
+        connection_revision=account.connection_revision,
+        account_budgets_deactivated=budgets_deactivated,
+        message=(
+            "AWS integration disconnected. Historical CloudOps data "
+            "was retained and no AWS resources were modified."
+        ),
     )

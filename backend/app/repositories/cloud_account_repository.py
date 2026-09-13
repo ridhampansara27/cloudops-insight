@@ -88,16 +88,12 @@ class CloudAccountRepository:
         organization_id: UUID,
         external_id: str,
     ) -> CloudAccount:
-        """Create a pending account with a server-controlled ExternalId."""
-
         account = CloudAccount(
             organization_id=organization_id,
             provider=payload.provider.lower(),
             name=payload.name,
             external_account_id=payload.external_account_id,
-            # Role is intentionally absent during phase one.
             role_arn=None,
-            # Never accept this value from the client.
             external_id=external_id,
             enabled_regions=payload.enabled_regions,
             status="pending",
@@ -140,13 +136,3 @@ class CloudAccountRepository:
         )
 
         return account
-
-    async def delete(
-        self,
-        account: CloudAccount,
-    ) -> None:
-        await self.session.delete(
-            account,
-        )
-
-        await self.session.commit()

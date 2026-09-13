@@ -1,10 +1,13 @@
-"""Business logic for tenant-owned cloud account onboarding."""
+"""Business logic for tenant-owned cloud integrations."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.budget import Budget
 from app.models.cloud_account import CloudAccount
 from app.repositories.cloud_account_repository import CloudAccountRepository
 from app.schemas.cloud_account import CloudAccountCreate, CloudAccountUpdate
@@ -17,13 +20,14 @@ from app.services.aws_onboarding_service import generate_external_id
 
 
 class CloudAccountService:
-    """Coordinate secure tenant-aware AWS account onboarding."""
+    """Coordinate tenant-safe cloud integration lifecycle operations."""
 
     def __init__(
         self,
         session: AsyncSession,
     ) -> None:
         self.session = session
+
         self.repository = CloudAccountRepository(
             session,
         )
@@ -35,8 +39,6 @@ class CloudAccountService:
         user_id: UUID,
         organization_id: UUID,
     ) -> CloudAccount:
-        """Create phase-one onboarding state with a new ExternalId."""
-
         if payload.provider.lower() != "aws":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -67,13 +69,11 @@ class CloudAccountService:
                 detail="Cloud account is already registered or unavailable.",
             )
 
-        external_id = generate_external_id()
-
         return await self.repository.create(
             payload=payload,
             created_by_id=user_id,
             organization_id=organization_id,
-            external_id=external_id,
+            external_id=generate_external_id(),
         )
 
     async def list_for_organization(
@@ -110,7 +110,7 @@ class CloudAccountService:
         organization_id: UUID,
         payload: CloudAccountUpdate,
     ) -> CloudAccount:
-        """Safely update customer-controlled integration settings."""
+        """Update configuration while invalidating obsolete queued work."""
 
         account = await self.get_for_organization(
             account_id=account_id,
@@ -120,6 +120,9 @@ class CloudAccountService:
         changes = payload.model_dump(
             exclude_unset=True,
         )
+
+        role_changed = False
+        regions_changed = False
 
         if "role_arn" in changes:
             role_arn = changes["role_arn"]
@@ -144,29 +147,119 @@ class CloudAccountService:
                     ),
                 ) from error
 
-            # Any role change invalidates the prior trust validation.
+            role_changed = role_arn != account.role_arn
+
+            # Supplying the role explicitly is also the safe
+            # reconnect path for a disconnected account.
             account.status = "pending"
+            account.disconnected_at = None
             account.last_validated_at = None
             account.last_validation_error = None
             account.sync_status = "idle"
+            account.sync_started_at = None
             account.last_sync_error = None
+
+        if "enabled_regions" in changes:
+            new_regions = changes["enabled_regions"]
+
+            regions_changed = new_regions != account.enabled_regions
+
+        # Any AWS-access configuration change creates a new generation.
+        if role_changed or regions_changed:
+            account.connection_revision += 1
 
         return await self.repository.update(
             account=account,
             payload=payload,
         )
 
-    async def delete(
+    async def disconnect(
         self,
         *,
         account_id: UUID,
         organization_id: UUID,
-    ) -> None:
+    ) -> tuple[
+        CloudAccount,
+        int,
+    ]:
+        """Disconnect CloudOps access without deleting cloud or history."""
+
         account = await self.get_for_organization(
             account_id=account_id,
             organization_id=organization_id,
         )
 
-        await self.repository.delete(
+        # Idempotent disconnect.
+        if account.status == "disconnected":
+            if account.disconnected_at is None:
+                account.disconnected_at = datetime.now(
+                    UTC,
+                )
+
+                await self.session.commit()
+
+                await self.session.refresh(
+                    account,
+                )
+
+            return (
+                account,
+                0,
+            )
+
+        # Phase one is the security boundary:
+        # increment revision and stop eligibility before any cleanup.
+        if account.status != "disconnecting":
+            account.status = "disconnecting"
+            account.connection_revision += 1
+
+            account.sync_status = "idle"
+            account.sync_started_at = None
+            account.last_sync_error = None
+
+            await self.session.commit()
+
+            await self.session.refresh(
+                account,
+            )
+
+        # Account-scoped budgets no longer have a live integration.
+        budget_result = await self.session.execute(
+            update(
+                Budget,
+            )
+            .where(
+                Budget.organization_id == organization_id,
+                Budget.scope_type == "account",
+                Budget.scope_value
+                == str(
+                    account.id,
+                ),
+                Budget.is_active.is_(
+                    True,
+                ),
+            )
+            .values(
+                is_active=False,
+            ),
+        )
+
+        deactivated = budget_result.rowcount or 0
+
+        # Historical resources, costs, metrics, incidents and
+        # recommendations intentionally remain untouched.
+        account.status = "disconnected"
+        account.disconnected_at = datetime.now(
+            UTC,
+        )
+
+        await self.session.commit()
+
+        await self.session.refresh(
             account,
+        )
+
+        return (
+            account,
+            deactivated,
         )

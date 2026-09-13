@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 # Import SQLAlchemy database constructs.
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 
 # Import PostgreSQL JSON storage.
 from sqlalchemy.dialects.postgresql import JSONB
@@ -182,5 +182,25 @@ class CloudAccount(
             1024,
         ),
         # Successful accounts have no error.
+        nullable=True,
+    )
+
+    # Increment whenever AWS connectivity is invalidated or reconfigured.
+    #
+    # Celery tasks capture this value when queued. A task whose captured
+    # revision no longer matches this value must not access AWS or persist
+    # provider data.
+    connection_revision: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default="1",
+        nullable=False,
+    )
+
+    # Record when customer access to AWS was intentionally disconnected.
+    disconnected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(
+            timezone=True,
+        ),
         nullable=True,
     )

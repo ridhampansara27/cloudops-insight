@@ -22,7 +22,6 @@ class CloudAccountCreate(BaseModel):
         max_length=32,
     )
 
-    # AWS account IDs are exactly 12 decimal digits.
     external_account_id: str = Field(
         min_length=12,
         max_length=12,
@@ -47,7 +46,6 @@ class CloudAccountUpdate(BaseModel):
         max_length=160,
     )
 
-    # Role ARN is supplied only after CloudOps generated the ExternalId.
     role_arn: str | None = Field(
         default=None,
         min_length=20,
@@ -58,7 +56,7 @@ class CloudAccountUpdate(BaseModel):
 
 
 class CloudAccountRead(BaseModel):
-    """Public integration representation without exposing ExternalId."""
+    """Public representation without exposing ExternalId."""
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -79,20 +77,18 @@ class CloudAccountRead(BaseModel):
     sync_status: str
     sync_started_at: datetime | None
     last_sync_error: str | None
+    disconnected_at: datetime | None
 
 
 class CloudAccountOnboardingRead(CloudAccountRead):
-    """Owner/Admin-only information required to configure customer IAM."""
+    """Owner/Admin-only IAM onboarding material."""
 
     external_id: str
 
-    # This is the AWS IAM identity the customer's role must trust.
     platform_principal_arn: str | None
 
     suggested_role_name: str
 
-    # Null only when the development environment has not configured
-    # a platform AWS principal yet.
     trust_policy: dict[str, Any] | None
 
     onboarding_ready: bool
@@ -102,4 +98,20 @@ class CloudAccountValidationResponse(BaseModel):
     connected: bool
     account_id: str
     caller_arn: str
+    message: str
+
+
+class CloudAccountDisconnectResponse(BaseModel):
+    """Describe a safe CloudOps integration disconnect."""
+
+    account_id: UUID
+
+    status: str
+
+    disconnected_at: datetime
+
+    connection_revision: int
+
+    account_budgets_deactivated: int
+
     message: str

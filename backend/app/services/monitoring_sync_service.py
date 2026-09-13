@@ -1,136 +1,69 @@
-# Import partial for worker-thread keyword arguments.
-# Import datetime helpers.
-from datetime import (
-    UTC,
-    datetime,
-    timedelta,
-)
-from functools import partial
+"""Synchronize CloudWatch data for a current cloud connection generation."""
 
-# Import UUID typing.
+from datetime import UTC, datetime, timedelta
+from functools import partial
 from uuid import UUID
 
-# Import AnyIO thread execution.
 from anyio import to_thread
-
-# Import SQLAlchemy querying.
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import asynchronous database session.
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
+from app.models.resource import CloudResource
+from app.providers.aws.cloudwatch import CloudWatchProvider
+from app.providers.aws.session import AwsSessionFactory
+from app.providers.aws.types import AwsAccountConfig
+from app.repositories.metric_repository import MetricRepository
+from app.services.cloud_account_connection_guard import (
+    require_connection_revision,
 )
-
-# Import cloud account and resource models.
-from app.models.cloud_account import (
-    CloudAccount,
-)
-from app.models.resource import (
-    CloudResource,
-)
-
-# Import AWS CloudWatch provider.
-from app.providers.aws.cloudwatch import (
-    CloudWatchProvider,
-)
-
-# Import AWS account session factory.
-from app.providers.aws.session import (
-    AwsSessionFactory,
-)
-
-# Import AWS account configuration.
-from app.providers.aws.types import (
-    AwsAccountConfig,
-)
-
-# Import metric persistence.
-from app.repositories.metric_repository import (
-    MetricRepository,
-)
-
-# Import resource health evaluator.
-from app.services.health_evaluation_service import (
-    HealthEvaluationService,
-)
-
-# Import monitoring incident reconciliation.
-from app.services.monitoring_incident_service import (
-    MonitoringIncidentService,
-)
-
-# Import monitoring query construction.
-from app.services.monitoring_query_factory import (
-    build_metric_queries,
-)
-
-# Import FinOps recommendation evaluation.
-from app.services.recommendation_engine import (
-    RecommendationEngine,
-)
+from app.services.health_evaluation_service import HealthEvaluationService
+from app.services.monitoring_incident_service import MonitoringIncidentService
+from app.services.monitoring_query_factory import build_metric_queries
+from app.services.recommendation_engine import RecommendationEngine
 
 
-# Coordinate CloudWatch metric synchronization.
 class MonitoringSyncService:
-    # Create service.
+    """Synchronize metrics without allowing disconnected jobs to persist."""
+
     def __init__(
         self,
         session: AsyncSession,
     ) -> None:
-        # Store database session.
         self.session = session
-
-        # Create AWS session factory.
         self.session_factory = AwsSessionFactory()
-
-        # Create CloudWatch provider.
         self.cloudwatch = CloudWatchProvider()
-
-        # Create metric repository.
         self.repository = MetricRepository(
             session,
         )
 
-    # Synchronize monitoring data for one account.
     async def sync_account(
         self,
         account_id: UUID,
+        expected_connection_revision: int,
     ) -> int:
-        # Retrieve cloud account.
-        account = await self.session.get(
-            CloudAccount,
-            account_id,
+        """Fetch first, then generation-lock before persistence."""
+
+        account = await require_connection_revision(
+            self.session,
+            account_id=account_id,
+            expected_revision=expected_connection_revision,
+            required_status="connected",
         )
 
-        # Reject missing accounts.
-        if account is None:
-            raise RuntimeError(
-                "Cloud account not found.",
-            )
-
-        # Require validated AWS connection.
-        if account.status != "connected":
-            raise RuntimeError(
-                "AWS account is not connected.",
-            )
-
-        # Build provider account configuration.
         aws_account = AwsAccountConfig(
-            account_id=(account.external_account_id),
-            role_arn=(account.role_arn),
-            external_id=(account.external_id),
+            account_id=account.external_account_id,
+            role_arn=account.role_arn,
+            external_id=account.external_id,
             enabled_regions=tuple(
                 account.enabled_regions,
             ),
         )
 
-        # Create assumed-role AWS session.
         aws_session = await to_thread.run_sync(
             self.session_factory.create_account_session,
             aws_account,
         )
 
-        # Retrieve active inventory.
         result = await self.session.execute(
             select(
                 CloudResource,
@@ -142,32 +75,26 @@ class MonitoringSyncService:
             ),
         )
 
-        # Store resources.
         resources = list(
             result.scalars().all(),
         )
 
-        # Define one-hour overlapping synchronization window.
         end_time = datetime.now(
             UTC,
         )
 
-        # Start one hour earlier.
         start_time = end_time - timedelta(
             hours=1,
         )
 
-        # Track persisted point count.
-        total_points = 0
+        # Keep provider results in memory until the final generation check.
+        all_points = []
 
-        # Process one AWS region at a time.
         for region in account.enabled_regions:
-            # Select resources belonging to the region.
             regional_resources = [
                 resource for resource in resources if resource.region == region
             ]
 
-            # Build metric queries.
             queries = [
                 query
                 for resource in regional_resources
@@ -176,11 +103,9 @@ class MonitoringSyncService:
                 )
             ]
 
-            # Skip regions without supported metrics.
             if not queries:
                 continue
 
-            # Create a blocking CloudWatch call with arguments already bound.
             fetch_operation = partial(
                 self.cloudwatch.fetch_metrics,
                 session=aws_session,
@@ -191,55 +116,55 @@ class MonitoringSyncService:
                 period_seconds=300,
             )
 
-            # Run synchronous Boto3 outside the async event loop.
             points = await to_thread.run_sync(
                 fetch_operation,
             )
 
-            # Persist normalized metric data.
-            total_points += await self.repository.upsert_points(
+            all_points.extend(
                 points,
             )
 
-        # Create health evaluator.
+        # Lock immediately before writing provider-derived state.
+        await require_connection_revision(
+            self.session,
+            account_id=account_id,
+            expected_revision=expected_connection_revision,
+            required_status="connected",
+            for_update=True,
+        )
+
+        total_points = await self.repository.upsert_points(
+            all_points,
+        )
+
         health_service = HealthEvaluationService(
             self.session,
         )
 
-        # Create automatic incident evaluator.
         incident_service = MonitoringIncidentService(
             self.session,
         )
 
-        # Create the FinOps recommendation evaluator.
         recommendation_engine = RecommendationEngine(
             self.session,
         )
 
-        # Evaluate every active resource.
         for resource in resources:
-            # Evaluate real monitoring state.
             evaluation = await health_service.evaluate(
                 resource,
             )
 
-            # Persist health.
             resource.health_state = evaluation.state
 
-            # Reconcile automatic incident state.
             await incident_service.reconcile(
                 resource=resource,
                 evaluation=evaluation,
             )
 
-            # Refresh optimization recommendations using the
-            # latest real CloudWatch observations.
             await recommendation_engine.evaluate_resource(
                 resource,
             )
 
-        # Commit all metric updates.
         await self.session.commit()
 
-        # Return synchronization count.
         return total_points
