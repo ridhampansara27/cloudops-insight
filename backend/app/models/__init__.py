@@ -13,6 +13,9 @@ from app.models.incident import Incident
 # Export the CloudWatch time-series model.
 from app.models.metric import MetricSample
 
+# Import organization tenancy models.
+from app.models.organization import Organization, OrganizationMembership
+
 # Import optimization recommendations.
 from app.models.recommendation import Recommendation
 
@@ -30,6 +33,8 @@ __all__ = [
     "CostRecord",
     "Incident",
     "MetricSample",
+    "Organization",
+    "OrganizationMembership",
     "Recommendation",
     "ResourceTag",
     "User",
