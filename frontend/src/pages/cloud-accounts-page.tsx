@@ -60,13 +60,24 @@ import type {
   AwsAccountFormValues,
 } from "@/features/cloud-accounts/aws-account-dialog";
 
+// Import guided phase-two IAM setup.
+import {
+  AwsOnboardingDialog,
+} from "@/features/cloud-accounts/aws-onboarding-dialog";
+
 // Import genuine backend operations.
 import {
+  useCloudAccountOnboarding,
   useCloudAccounts,
   useCreateCloudAccount,
   useSyncCloudAccount,
+  useUpdateCloudAccountRole,
   useValidateCloudAccount,
 } from "@/features/cloud-accounts/api/cloud-accounts-api";
+
+import type {
+  CloudAccountOnboardingApiResponse,
+} from "@/types/api";
 
 // Import timestamp formatting.
 import {
@@ -123,7 +134,7 @@ function getConnectionStyle(
         "border-amber-400/20 bg-amber-400/8 text-amber-300",
 
       label:
-        "Validation required",
+        "IAM setup required",
 
       Icon:
         ShieldCheck,
@@ -239,6 +250,22 @@ export function CloudAccountsPage() {
   ] =
     useState(false);
 
+  // Store secure phase-two onboarding dialog visibility.
+  const [
+    onboardingOpen,
+    setOnboardingOpen,
+  ] =
+    useState(false);
+
+  // Store owner/admin-only onboarding material only while needed.
+  const [
+    onboardingAccount,
+    setOnboardingAccount,
+  ] =
+    useState<
+      CloudAccountOnboardingApiResponse | null
+    >(null);
+
   // Load registered AWS account configurations.
   // The API hook already polls every five seconds so Celery
   // synchronization state updates automatically.
@@ -249,52 +276,155 @@ export function CloudAccountsPage() {
   const createAccount =
     useCreateCloudAccount();
 
+  const onboardingQuery =
+    useCloudAccountOnboarding();
+
+  const updateAccountRole =
+    useUpdateCloudAccountRole();
+
   const validateAccount =
     useValidateCloudAccount();
 
   const syncAccount =
     useSyncCloudAccount();
 
-  // Register one genuine AWS account.
+  // Start secure phase-one AWS onboarding.
   async function handleCreate(
     values:
       AwsAccountFormValues,
   ) {
     try {
-      await createAccount.mutateAsync({
-        name:
-          values.name,
+      const onboarding =
+        await createAccount.mutateAsync({
+          name:
+            values.name,
 
-        provider:
-          "aws",
+          provider:
+            "aws",
 
-        external_account_id:
-          values.accountId,
+          external_account_id:
+            values.accountId,
 
-        role_arn:
-          values.roleArn,
+          enabled_regions:
+            values.enabledRegions,
+        });
 
-        external_id:
-          values.externalId,
+      // Immediately continue into generated IAM setup.
+      setOnboardingAccount(
+        onboarding,
+      );
 
-        enabled_regions:
-          values.enabledRegions,
-      });
+      setOnboardingOpen(
+        true,
+      );
 
       toast.success(
-        "AWS account added.",
+        "AWS account registered. Configure the IAM role next.",
       );
     } catch {
       toast.error(
-        "Unable to add AWS account.",
+        "Unable to start AWS onboarding.",
       );
 
-      // Keep the registration dialog open.
       throw new Error(
         "AWS account creation failed.",
       );
     }
   }
+
+
+  // Resume phase-two IAM setup for a pending/error integration.
+  async function handleContinueSetup(
+    accountId:
+      string,
+  ) {
+    try {
+      const onboarding =
+        await onboardingQuery.mutateAsync(
+          accountId,
+        );
+
+      setOnboardingAccount(
+        onboarding,
+      );
+
+      setOnboardingOpen(
+        true,
+      );
+    } catch {
+      toast.error(
+        "Unable to load AWS onboarding configuration.",
+      );
+    }
+  }
+
+
+  // Store the customer role then verify real AssumeRole connectivity.
+  async function handleSaveRoleAndValidate(
+    roleArn:
+      string,
+  ) {
+    if (!onboardingAccount) {
+      throw new Error(
+        "AWS onboarding state is unavailable.",
+      );
+    }
+
+    try {
+      const updated =
+        await updateAccountRole.mutateAsync({
+          accountId:
+            onboardingAccount.id,
+
+          roleArn,
+        });
+
+      // Keep the security material in memory while updating
+      // the public account fields returned from PATCH.
+      setOnboardingAccount(
+        (
+          current,
+        ) =>
+          current
+            ? {
+                ...current,
+                ...updated,
+                external_id:
+                  current.external_id,
+                platform_principal_arn:
+                  current.platform_principal_arn,
+                suggested_role_name:
+                  current.suggested_role_name,
+                trust_policy:
+                  current.trust_policy,
+                onboarding_ready:
+                  current.onboarding_ready,
+              }
+            : null,
+      );
+
+      await validateAccount.mutateAsync(
+        onboardingAccount.id,
+      );
+
+      toast.success(
+        "AWS connection validated successfully.",
+      );
+
+      setOnboardingAccount(
+        null,
+      );
+    } catch {
+      toast.error(
+        "AWS connection validation failed.",
+      );
+
+      throw new Error(
+        "AWS onboarding validation failed.",
+      );
+    }
+  }
+
 
   // Validate one account through the existing AWS STS endpoint.
   async function handleValidate(
@@ -888,6 +1018,11 @@ export function CloudAccountsPage() {
                   account.id
               );
 
+            const loadingOnboardingThisAccount =
+              onboardingQuery.isPending &&
+              onboardingQuery.variables ===
+                account.id;
+
             // Resolve genuine connection semantics.
             const connectionStyle =
               getConnectionStyle(
@@ -1140,28 +1275,50 @@ export function CloudAccountsPage() {
 
                   {/* Existing backend actions. */}
                   <div className="flex flex-wrap gap-2 border-t border-border/45 pt-4">
-                    <Button
-                      className="rounded-xl"
-                      disabled={
-                        validateAccount.isPending
-                      }
-                      onClick={() =>
-                        void handleValidate(
-                          account.id,
-                        )
-                      }
-                      size="sm"
-                      variant="outline"
-                    >
-                      <ShieldCheck className="mr-2 size-3.5" />
+                    {account.status ===
+                    "connected" ? (
+                      <Button
+                        className="rounded-xl"
+                        disabled={
+                          validateAccount.isPending
+                        }
+                        onClick={() =>
+                          void handleValidate(
+                            account.id,
+                          )
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        <ShieldCheck className="mr-2 size-3.5" />
 
-                      {validatingThisAccount
-                        ? "Validating..."
-                        : account.status ===
-                            "connected"
-                          ? "Revalidate"
-                          : "Validate"}
-                    </Button>
+                        {validatingThisAccount
+                          ? "Validating..."
+                          : "Revalidate"}
+                      </Button>
+                    ) : (
+                      <Button
+                        className="rounded-xl border-violet-400/20 bg-violet-400/8 text-violet-200 hover:bg-violet-400/12"
+                        disabled={
+                          onboardingQuery.isPending
+                        }
+                        onClick={() =>
+                          void handleContinueSetup(
+                            account.id,
+                          )
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        <KeyRound className="mr-2 size-3.5" />
+
+                        {loadingOnboardingThisAccount
+                          ? "Loading setup..."
+                          : account.role_arn
+                            ? "Review IAM setup"
+                            : "Continue setup"}
+                      </Button>
+                    )}
 
                     <Button
                       className="rounded-xl"
@@ -1194,7 +1351,7 @@ export function CloudAccountsPage() {
                     {account.status !==
                       "connected" && (
                       <p className="self-center text-xs text-muted-foreground">
-                        Validate AWS access before synchronization.
+                        Complete IAM setup and validate AWS access before synchronization.
                       </p>
                     )}
                   </div>
@@ -1218,6 +1375,35 @@ export function CloudAccountsPage() {
         }
         open={
           dialogOpen
+        }
+      />
+
+      <AwsOnboardingDialog
+        isSaving={
+          updateAccountRole.isPending ||
+          validateAccount.isPending
+        }
+        onboarding={
+          onboardingAccount
+        }
+        onOpenChange={(
+          nextOpen,
+        ) => {
+          setOnboardingOpen(
+            nextOpen,
+          );
+
+          if (!nextOpen) {
+            setOnboardingAccount(
+              null,
+            );
+          }
+        }}
+        onSaveAndValidate={
+          handleSaveRoleAndValidate
+        }
+        open={
+          onboardingOpen
         }
       />
     </section>
