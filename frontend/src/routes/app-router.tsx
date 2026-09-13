@@ -30,6 +30,54 @@ async function loadLoginRoute() {
 }
 
 
+// Load commercial signup only when visited.
+async function loadSignupRoute() {
+  const {
+    SignupPage,
+  } =
+    await import(
+      "@/pages/signup-page"
+    );
+
+  return {
+    Component:
+      SignupPage,
+  };
+}
+
+
+// Load email verification only when opened from an email link.
+async function loadVerifyEmailRoute() {
+  const {
+    VerifyEmailPage,
+  } =
+    await import(
+      "@/pages/verify-email-page"
+    );
+
+  return {
+    Component:
+      VerifyEmailPage,
+  };
+}
+
+
+// Load verification resend only when requested.
+async function loadResendVerificationRoute() {
+  const {
+    ResendVerificationPage,
+  } =
+    await import(
+      "@/pages/resend-verification-page"
+    );
+
+  return {
+    Component:
+      ResendVerificationPage,
+  };
+}
+
+
 // Load the operational dashboard only when visited.
 async function loadDashboardRoute() {
   const {
@@ -201,6 +249,30 @@ export const appRouter =
       // Code-split the public authentication page.
       lazy:
         loadLoginRoute,
+    },
+    {
+      // Commercial tenant-owner registration.
+      path:
+        "/signup",
+
+      lazy:
+        loadSignupRoute,
+    },
+    {
+      // Consume one email verification link.
+      path:
+        "/verify-email",
+
+      lazy:
+        loadVerifyEmailRoute,
+    },
+    {
+      // Request another verification email.
+      path:
+        "/resend-verification",
+
+      lazy:
+        loadResendVerificationRoute,
     },
     {
       // Protect every application route.

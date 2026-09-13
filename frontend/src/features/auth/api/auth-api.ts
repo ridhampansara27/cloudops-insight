@@ -6,57 +6,104 @@ import {
 // Import authentication models.
 import type {
   AuthenticatedUser,
+  AuthMessageResponse,
   LoginResponse,
+  SignupInput,
 } from "@/types/auth";
+
 
 // Define login input.
 export interface LoginInput {
-  // Use email as OAuth2's username field.
   email: string;
 
-  // Store the entered password.
   password: string;
 }
+
 
 // Authenticate against FastAPI.
 export async function login(
   input: LoginInput,
 ): Promise<LoginResponse> {
-  // Create OAuth2 form fields.
   const form =
     new URLSearchParams();
 
-  // FastAPI's OAuth2 form expects "username".
   form.set(
     "username",
     input.email,
   );
 
-  // Add the password.
   form.set(
     "password",
     input.password,
   );
 
-  // Call the public login endpoint.
   return apiRequest<LoginResponse>(
     "/api/v1/auth/login",
     {
-      // Use POST.
       method: "POST",
-
-      // Send form-encoded credentials.
       form,
-
-      // Login itself does not require authentication.
       requiresAuth: false,
     },
   );
 }
 
+
+// Register the first owner of a new organization.
+//
+// The backend intentionally returns the same response for a newly
+// created email and an already-existing email.
+export async function signup(
+  input: SignupInput,
+): Promise<AuthMessageResponse> {
+  return apiRequest<AuthMessageResponse>(
+    "/api/v1/auth/signup",
+    {
+      method: "POST",
+      json: input,
+      requiresAuth: false,
+    },
+  );
+}
+
+
+// Consume one verification bearer from the email link.
+export async function verifyEmail(
+  token: string,
+): Promise<AuthMessageResponse> {
+  return apiRequest<AuthMessageResponse>(
+    "/api/v1/auth/verify-email",
+    {
+      method: "POST",
+      json: {
+        token,
+      },
+      requiresAuth: false,
+    },
+  );
+}
+
+
+// Request another verification message.
+//
+// The backend intentionally does not reveal whether the email exists.
+export async function resendVerification(
+  email: string,
+): Promise<AuthMessageResponse> {
+  return apiRequest<AuthMessageResponse>(
+    "/api/v1/auth/resend-verification",
+    {
+      method: "POST",
+      json: {
+        email,
+      },
+      requiresAuth: false,
+    },
+  );
+}
+
+
 // Retrieve the authenticated user's profile.
 export async function getCurrentUser(): Promise<AuthenticatedUser> {
-  // Call the JWT-protected current-user endpoint.
   return apiRequest<AuthenticatedUser>(
     "/api/v1/auth/me",
   );
