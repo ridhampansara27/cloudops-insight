@@ -25,6 +25,19 @@ class Budget(
     # Define the database table.
     __tablename__ = "budgets"
 
+    # Store the organization that owns this budget.
+    #
+    # This remains nullable temporarily while legacy data and all
+    # write paths are migrated to explicit tenant ownership.
+    organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "organizations.id",
+            ondelete="RESTRICT",
+        ),
+        index=True,
+        nullable=True,
+    )
+
     # Store the budget display name.
     name: Mapped[str] = mapped_column(
         # Allow descriptive budget names.
