@@ -1,5 +1,7 @@
+from datetime import datetime
+
 # Import SQLAlchemy column types.
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, DateTime, String, func
 
 # Import SQLAlchemy ORM typing helpers.
 from sqlalchemy.orm import Mapped, mapped_column
@@ -65,5 +67,29 @@ class User(
         # Activate new users by default.
         default=True,
         # Require an explicit active state.
+        nullable=False,
+    )
+
+    # Store when ownership of the login email was confirmed.
+    #
+    # Existing production users are backfilled as verified by the
+    # migration. New commercial signups will remain NULL until they
+    # complete the one-time verification link.
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(
+            timezone=True,
+        ),
+        nullable=True,
+    )
+
+    # Record the latest password-change boundary.
+    #
+    # This is useful for security-event auditing and later invalidating
+    # authentication sessions created before a credential change.
+    password_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(
+            timezone=True,
+        ),
+        server_default=func.now(),
         nullable=False,
     )

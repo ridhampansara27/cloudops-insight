@@ -72,6 +72,22 @@ class Settings(BaseSettings):
     # IAM user or role used to call sts:AssumeRole.
     aws_platform_principal_arn: str | None = None
 
+    # Optional dedicated HMAC secret for opaque auth tokens.
+    #
+    # Until deployment configuration supplies a dedicated value,
+    # security helpers fall back to JWT_SECRET. Production readiness
+    # later requires a distinct AUTH_TOKEN_PEPPER secret.
+    auth_token_pepper: str = ""
+
+    # Lifetime of an email-verification link.
+    email_verification_token_expire_minutes: int = 1440
+
+    # Lifetime of a password-reset link.
+    password_reset_token_expire_minutes: int = 30
+
+    # Maximum lifetime of one refresh-session family.
+    refresh_session_expire_days: int = 30
+
     # Define the AWS region used for STS and default AWS clients.
     aws_default_region: str = "eu-central-1"
 

@@ -1,4 +1,6 @@
 # Import the budget model so SQLAlchemy registers its table metadata.
+# Import authentication security models.
+from app.models.auth import AuthToken, RefreshSession
 from app.models.budget import Budget
 
 # Import the cloud-account model.
@@ -27,6 +29,7 @@ from app.models.user import User
 
 # Explicitly define models exported by this package.
 __all__ = [
+    "AuthToken",
     "Budget",
     "CloudAccount",
     "CloudResource",
@@ -36,6 +39,7 @@ __all__ = [
     "Organization",
     "OrganizationMembership",
     "Recommendation",
+    "RefreshSession",
     "ResourceTag",
     "User",
 ]

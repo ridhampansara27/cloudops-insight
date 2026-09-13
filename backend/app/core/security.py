@@ -1,4 +1,7 @@
 # Import UTC-aware datetime and token-expiration utilities.
+import hashlib
+import hmac
+import secrets
 from datetime import UTC, datetime, timedelta
 
 # Import PyJWT.
@@ -103,3 +106,53 @@ def decode_access_token(
 
     # Return the authenticated user identifier.
     return subject
+
+
+# Use 384 bits of cryptographic randomness for bearer secrets that are
+# delivered through verification/reset links or refresh cookies.
+OPAQUE_TOKEN_RANDOM_BYTES = 48
+
+
+def generate_opaque_token() -> str:
+    """Generate a high-entropy bearer secret suitable for URLs/cookies."""
+
+    return secrets.token_urlsafe(
+        OPAQUE_TOKEN_RANDOM_BYTES,
+    )
+
+
+def hash_opaque_token(
+    token: str,
+) -> str:
+    """Produce the only token representation allowed in PostgreSQL.
+
+    Because generated tokens already contain high entropy, HMAC-SHA256
+    provides a compact lookup key while preventing a database leak from
+    exposing immediately usable bearer credentials.
+    """
+
+    pepper = settings.auth_token_pepper or settings.jwt_secret
+
+    return hmac.new(
+        pepper.encode(
+            "utf-8",
+        ),
+        token.encode(
+            "utf-8",
+        ),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def opaque_token_matches(
+    token: str,
+    expected_hash: str,
+) -> bool:
+    """Constant-time comparison helper for security-sensitive checks."""
+
+    return hmac.compare_digest(
+        hash_opaque_token(
+            token,
+        ),
+        expected_hash,
+    )
