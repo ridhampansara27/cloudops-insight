@@ -72,6 +72,25 @@ class Settings(BaseSettings):
     # IAM user or role used to call sts:AssumeRole.
     aws_platform_principal_arn: str | None = None
 
+    # Keep public commercial registration fail-closed until
+    # production email/session configuration is intentionally enabled.
+    public_signup_enabled: bool = False
+
+    # Base browser URL used to construct email-verification links.
+    frontend_base_url: str = "http://localhost:5173"
+
+    # SMTP delivery configuration.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "no-reply@cloudops-insight.local"
+    smtp_starttls: bool = True
+    smtp_timeout_seconds: int = 10
+
+    # Prevent immediate verification-email spam.
+    verification_resend_cooldown_seconds: int = 60
+
     # Optional dedicated HMAC secret for opaque auth tokens.
     #
     # Until deployment configuration supplies a dedicated value,

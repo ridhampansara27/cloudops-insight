@@ -1,65 +1,174 @@
-# Import dependency annotation support.
+"""Authentication API."""
+
 from typing import Annotated
 
-# Import FastAPI routing and HTTP exceptions.
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
     status,
 )
-
-# Import FastAPI's standard OAuth2 login form.
 from fastapi.security import OAuth2PasswordRequestForm
 
-# Import authentication dependencies.
 from app.api.dependencies import (
     CurrentUser,
     DatabaseSession,
 )
-
-# Import JWT generation.
 from app.core.security import create_access_token
-
-# Import response schemas.
-from app.schemas.auth import TokenResponse
+from app.schemas.auth import (
+    AuthMessageResponse,
+    ResendVerificationRequest,
+    SignupRequest,
+    TokenResponse,
+    VerifyEmailRequest,
+)
 from app.schemas.user import UserRead
-
-# Import the authentication service.
+from app.services.auth_email_service import AuthEmailService
 from app.services.auth_service import AuthService
+from app.services.registration_service import (
+    RegistrationService,
+    SignupEmailConfigurationError,
+    SignupUnavailableError,
+)
 
-# Create the authentication router.
 router = APIRouter()
 
 
-# Authenticate a user and issue a JWT.
+GENERIC_SIGNUP_MESSAGE = (
+    "If this email can be registered, check your inbox for a verification link."
+)
+
+GENERIC_RESEND_MESSAGE = (
+    "If an unverified account exists for this email, "
+    "a verification message may be sent."
+)
+
+
+@router.post(
+    "/signup",
+    response_model=AuthMessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def signup(
+    payload: SignupRequest,
+    session: DatabaseSession,
+) -> AuthMessageResponse:
+    """Create one tenant-owner registration while remaining fail-closed."""
+
+    service = RegistrationService(
+        session,
+    )
+
+    try:
+        await service.register(
+            payload,
+        )
+
+    except SignupUnavailableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Public signup is currently unavailable.",
+        ) from error
+
+    except SignupEmailConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Public signup is currently unavailable.",
+        ) from error
+
+    # Never reveal whether this email already existed.
+    return AuthMessageResponse(
+        message=GENERIC_SIGNUP_MESSAGE,
+    )
+
+
+@router.post(
+    "/verify-email",
+    response_model=AuthMessageResponse,
+)
+async def verify_email(
+    payload: VerifyEmailRequest,
+    session: DatabaseSession,
+) -> AuthMessageResponse:
+    """Consume one expiring email verification token."""
+
+    verified = await RegistrationService(
+        session,
+    ).verify_email(
+        payload.token,
+    )
+
+    if not verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification link is invalid or expired.",
+        )
+
+    return AuthMessageResponse(
+        message="Email address verified successfully.",
+    )
+
+
+@router.post(
+    "/resend-verification",
+    response_model=AuthMessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def resend_verification(
+    payload: ResendVerificationRequest,
+    session: DatabaseSession,
+) -> AuthMessageResponse:
+    """Rotate verification links without exposing user existence."""
+
+    email_service = AuthEmailService()
+
+    # Verification/resend stays available for already-created users even
+    # if new signup is subsequently disabled, but SMTP must be configured.
+    if not email_service.is_configured:
+        # Still use a generic availability response rather than revealing
+        # whether the requested identity exists.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Verification email delivery is currently unavailable.",
+        )
+
+    await RegistrationService(
+        session,
+        email_sender=email_service,
+    ).resend_verification(
+        str(
+            payload.email,
+        ),
+    )
+
+    return AuthMessageResponse(
+        message=GENERIC_RESEND_MESSAGE,
+    )
+
+
 @router.post(
     "/login",
     response_model=TokenResponse,
 )
 async def login(
-    # Read username and password from the OAuth2 form.
     form_data: Annotated[
         OAuth2PasswordRequestForm,
         Depends(),
     ],
-    # Receive the request database session.
     session: DatabaseSession,
 ) -> TokenResponse:
-    # Create the authentication service.
+    """Authenticate only active, email-verified users."""
+
     authentication = AuthService(
         session,
     )
 
-    # Treat OAuth2's username field as the user's email address.
     user = await authentication.authenticate(
         email=form_data.username,
         password=form_data.password,
     )
 
-    # Reject invalid credentials.
     if user is None:
-        # Return HTTP 401 without revealing whether the email exists.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password.",
@@ -68,28 +177,27 @@ async def login(
             },
         )
 
-    # Create an access token containing the user UUID.
     access_token = create_access_token(
-        subject=str(user.id),
+        subject=str(
+            user.id,
+        ),
     )
 
-    # Return the OAuth2 bearer-token response.
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
     )
 
 
-# Return information about the authenticated user.
 @router.get(
     "/me",
     response_model=UserRead,
 )
 async def read_current_user(
-    # Resolve the current user from the bearer token.
     current_user: CurrentUser,
 ) -> UserRead:
-    # Convert the SQLAlchemy model into the Pydantic response.
+    """Return the current authenticated identity."""
+
     return UserRead.model_validate(
         current_user,
     )
