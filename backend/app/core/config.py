@@ -151,6 +151,11 @@ class Settings(BaseSettings):
     # Define Celery's task-result backend.
     celery_result_backend: str = "redis://localhost:6379/2"
 
+    # Report whether the application is running in production.
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() == "production"
+
     # Convert comma-separated CORS origins into a Python list.
     @property
     def cors_origin_list(self) -> list[str]:
