@@ -106,6 +106,7 @@ class Settings(BaseSettings):
 
     # Prevent repeated password-reset email spam.
     password_reset_resend_cooldown_seconds: int = 60
+    workspace_invitation_expire_hours: int = 168
 
     # Maximum lifetime of one refresh-session family.
     refresh_session_expire_days: int = 30

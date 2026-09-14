@@ -17,6 +17,7 @@ from app.models.metric import MetricSample
 
 # Import organization tenancy models.
 from app.models.organization import Organization, OrganizationMembership
+from app.models.organization_invitation import OrganizationInvitation
 
 # Import optimization recommendations.
 from app.models.recommendation import Recommendation
@@ -37,6 +38,7 @@ __all__ = [
     "Incident",
     "MetricSample",
     "Organization",
+    "OrganizationInvitation",
     "OrganizationMembership",
     "Recommendation",
     "RefreshSession",
