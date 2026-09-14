@@ -1,91 +1,96 @@
-// Import Zustand's store creator.
-import { create } from "zustand";
-
-// Import persistence helpers.
 import {
-  createJSONStorage,
-  persist,
-} from "zustand/middleware";
+  create,
+} from "zustand";
 
-// Import the authenticated-user model.
 import type {
   AuthenticatedUser,
 } from "@/types/auth";
 
-// Define the authentication store.
+
+export type SessionStatus =
+  | "checking"
+  | "authenticated"
+  | "anonymous";
+
+
 interface AuthState {
-  // Store the current bearer token.
-  accessToken: string | null;
+  // Access JWT intentionally exists in JavaScript memory only.
+  accessToken:
+    | string
+    | null;
 
-  // Store the current authenticated user.
-  user: AuthenticatedUser | null;
+  user:
+    | AuthenticatedUser
+    | null;
 
-  // Save a newly issued token.
+  sessionStatus:
+    SessionStatus;
+
   setAccessToken: (
-    accessToken: string,
+    accessToken:
+      | string
+      | null,
   ) => void;
 
-  // Save the authenticated user.
   setUser: (
-    user: AuthenticatedUser,
+    user:
+      | AuthenticatedUser
+      | null,
   ) => void;
 
-  // Remove all authentication state.
+  setSessionStatus: (
+    status: SessionStatus,
+  ) => void;
+
   logout: () => void;
 }
 
-// Create the global authentication store.
+
 export const useAuthStore =
-  create<AuthState>()(
-    persist(
-      // Define the store implementation.
-      (set) => ({
-        // Start unauthenticated.
-        accessToken: null,
+  create<AuthState>(
+    (set) => ({
+      accessToken:
+        null,
 
-        // Start without user information.
-        user: null,
+      user:
+        null,
 
-        // Store a new access token.
-        setAccessToken: (
+      // On a fresh browser load we do not know whether an HttpOnly
+      // refresh cookie exists until the backend is asked once.
+      sessionStatus:
+        "checking",
+
+      setAccessToken: (
+        accessToken,
+      ) =>
+        set({
           accessToken,
-        ) =>
-          set({
-            accessToken,
-          }),
-
-        // Store current-user information.
-        setUser: (
-          user,
-        ) =>
-          set({
-            user,
-          }),
-
-        // Clear authentication information.
-        logout: () =>
-          set({
-            accessToken: null,
-            user: null,
-          }),
-      }),
-
-      // Configure session persistence.
-      {
-        // Store authentication under a predictable key.
-        name: "cloudops-auth",
-
-        // Persist into sessionStorage instead of localStorage.
-        storage: createJSONStorage(
-          () => sessionStorage,
-        ),
-
-        // Persist only authentication data.
-        partialize: (state) => ({
-          accessToken:
-            state.accessToken,
-          user: state.user,
         }),
-      },
-    ),
+
+      setUser: (
+        user,
+      ) =>
+        set({
+          user,
+        }),
+
+      setSessionStatus: (
+        sessionStatus,
+      ) =>
+        set({
+          sessionStatus,
+        }),
+
+      // This clears only browser-memory state. Server logout is invoked
+      // separately through the authenticated API workflow.
+      logout: () =>
+        set({
+          accessToken:
+            null,
+          user:
+            null,
+          sessionStatus:
+            "anonymous",
+        }),
+    }),
   );

@@ -90,6 +90,19 @@ export function LoginPage() {
         state.setUser,
     );
 
+  const setSessionStatus =
+    useAuthStore(
+      (state) =>
+        state.setSessionStatus,
+    );
+
+  const clearAuthentication =
+    useAuthStore(
+      (state) =>
+        state.logout,
+    );
+
+
   const navigate =
     useNavigate();
 
@@ -134,6 +147,10 @@ export function LoginPage() {
         currentUser,
       );
 
+      setSessionStatus(
+        "authenticated",
+      );
+
       const destination =
         locationState?.from
           ?.pathname ??
@@ -147,6 +164,8 @@ export function LoginPage() {
       );
 
     } catch (error) {
+      clearAuthentication();
+
       if (
         error instanceof ApiError
       ) {

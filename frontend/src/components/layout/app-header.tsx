@@ -43,6 +43,10 @@ import {
 
 // Import authenticated-user state.
 import {
+  logoutSession,
+} from "@/features/auth/api/auth-api";
+
+import {
   useAuthStore,
 } from "@/stores/auth-store";
 
@@ -77,6 +81,12 @@ export function AppHeader() {
     setSearchQuery,
   ] =
     useState("");
+
+  const [
+    isLoggingOut,
+    setIsLoggingOut,
+  ] =
+    useState(false);
 
   // Build a safe user-facing display name.
   const displayName =
@@ -150,19 +160,36 @@ export function AppHeader() {
     );
   }
 
-  // Preserve the existing sign-out behavior.
-  function handleLogout() {
-    // Clear authentication state.
-    logout();
+  // Revoke the server-side refresh family before clearing memory.
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
 
-    // Return the user to the login route.
-    navigate(
-      "/login",
-      {
-        replace:
-          true,
-      },
+    setIsLoggingOut(
+      true,
     );
+
+    try {
+      await logoutSession();
+
+      logout();
+
+      navigate(
+        "/login",
+        {
+          replace:
+            true,
+        },
+      );
+
+    } catch {
+      // Do not pretend logout succeeded while an HttpOnly session may
+      // still be active on the server/browser.
+      setIsLoggingOut(
+        false,
+      );
+    }
   }
 
   // Render the premium global command bar.
@@ -253,6 +280,9 @@ export function AppHeader() {
         <Button
           aria-label="Sign out"
           className="rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          disabled={
+            isLoggingOut
+          }
           onClick={
             handleLogout
           }

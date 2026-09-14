@@ -1,21 +1,17 @@
-// Import API error helpers.
 import {
   ApiError,
   getApiErrorMessage,
 } from "@/lib/api-error";
 
-// Import the global authentication store.
 import {
   useAuthStore,
 } from "@/stores/auth-store";
 
-// Read the optional external FastAPI URL.
-//
-// During normal Vite development this is:
-// http://127.0.0.1:8000
-//
-// In Docker/Kubernetes it can be empty,
-// causing the frontend to use the browser's current origin.
+import type {
+  LoginResponse,
+} from "@/types/auth";
+
+
 const API_BASE_URL = (
   import.meta.env
     .VITE_API_BASE_URL ??
@@ -25,133 +21,329 @@ const API_BASE_URL = (
   "",
 );
 
-// Define supported API-request configuration.
+
 interface ApiRequestOptions
   extends Omit<
     RequestInit,
-    "body"
+    "body" | "credentials"
   > {
-  // Allow JSON request bodies.
   json?: unknown;
 
-  // Allow URL-encoded form requests.
   form?: URLSearchParams;
 
-  // Allow public requests such as login.
   requiresAuth?: boolean;
 }
 
-// Send one request to FastAPI.
-export async function apiRequest<T>(
+
+type NetworkRequestOptions =
+  Omit<
+    ApiRequestOptions,
+    "requiresAuth"
+  >;
+
+
+let refreshPromise:
+  | Promise<
+      string | null
+    >
+  | null =
+    null;
+
+
+async function readResponseBody(
+  response: Response,
+): Promise<unknown> {
+  if (
+    response.status ===
+    204
+  ) {
+    return null;
+  }
+
+  return response
+    .json()
+    .catch(
+      () => null,
+    );
+}
+
+
+function isLoginResponse(
+  value: unknown,
+): value is LoginResponse {
+  if (
+    typeof value !==
+      "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const candidate =
+    value as Partial<LoginResponse>;
+
+  return (
+    typeof candidate.access_token ===
+      "string" &&
+    candidate.access_token.length >
+      0 &&
+    typeof candidate.token_type ===
+      "string"
+  );
+}
+
+
+async function performSessionRefresh():
+Promise<
+  string | null
+> {
+  try {
+    const response =
+      await fetch(
+        `${API_BASE_URL}/api/v1/auth/refresh`,
+        {
+          method:
+            "POST",
+
+          // Required for the browser-managed HttpOnly refresh cookie.
+          credentials:
+            "include",
+
+          headers: {
+            Accept:
+              "application/json",
+          },
+        },
+      );
+
+    const body =
+      await readResponseBody(
+        response,
+      );
+
+    if (
+      !response.ok ||
+      !isLoginResponse(
+        body,
+      )
+    ) {
+      useAuthStore
+        .getState()
+        .logout();
+
+      return null;
+    }
+
+    useAuthStore
+      .getState()
+      .setAccessToken(
+        body.access_token,
+      );
+
+    return body.access_token;
+
+  } catch {
+    useAuthStore
+      .getState()
+      .logout();
+
+    return null;
+  }
+}
+
+
+// Share one refresh request between every caller.
+//
+// This is security-critical with rotating refresh tokens: parallel 401
+// handlers must not independently rotate the same cookie.
+export function refreshAuthenticationSession():
+Promise<
+  string | null
+> {
+  if (
+    refreshPromise ===
+    null
+  ) {
+    refreshPromise =
+      performSessionRefresh()
+        .finally(
+          () => {
+            refreshPromise =
+              null;
+          },
+        );
+  }
+
+  return refreshPromise;
+}
+
+
+async function sendRequest(
   path: string,
-  options: ApiRequestOptions = {},
-): Promise<T> {
-  // Read authentication requirements.
+  options:
+    NetworkRequestOptions,
+  accessToken:
+    | string
+    | null,
+): Promise<Response> {
   const {
     json,
     form,
-    requiresAuth = true,
     headers,
     ...requestOptions
   } = options;
 
-  // Read the current token outside React components.
-  const accessToken =
-    useAuthStore.getState()
-      .accessToken;
-
-  // Create request headers.
   const requestHeaders =
     new Headers(
       headers,
     );
 
-  // Add bearer authentication when required and available.
-  if (
-    requiresAuth &&
-    accessToken
-  ) {
+  requestHeaders.set(
+    "Accept",
+    "application/json",
+  );
+
+  if (accessToken) {
     requestHeaders.set(
       "Authorization",
       `Bearer ${accessToken}`,
     );
   }
 
-  // Prepare the request body.
   let body:
     | string
     | URLSearchParams
     | undefined;
 
-  // Handle JSON requests.
-  if (json !== undefined) {
-    // Tell FastAPI that JSON is being sent.
+  if (
+    json !== undefined
+  ) {
     requestHeaders.set(
       "Content-Type",
       "application/json",
     );
 
-    // Convert the JavaScript value into JSON text.
     body = JSON.stringify(
       json,
     );
   }
 
-  // Handle form-based OAuth2 login requests.
-  if (form !== undefined) {
-    // Tell FastAPI that URL-encoded form data is being sent.
+  if (
+    form !== undefined
+  ) {
     requestHeaders.set(
       "Content-Type",
       "application/x-www-form-urlencoded",
     );
 
-    // Use URLSearchParams directly as the request body.
     body = form;
   }
 
-  // Send the HTTP request.
-  const response = await fetch(
+  return fetch(
     `${API_BASE_URL}${path}`,
     {
-      // Forward request configuration.
       ...requestOptions,
 
-      // Add calculated headers.
+      // Login receives the cookie; refresh/logout send it.
+      // The cookie itself remains inaccessible to JavaScript.
+      credentials:
+        "include",
+
       headers:
         requestHeaders,
 
-      // Add the calculated request body.
       body,
     },
   );
+}
 
-  // Handle successful requests without response content.
+
+function authenticationUnavailableError():
+ApiError {
+  return new ApiError(
+    "Authentication session is unavailable.",
+    401,
+    null,
+  );
+}
+
+
+export async function apiRequest<T>(
+  path: string,
+  options:
+    ApiRequestOptions = {},
+): Promise<T> {
+  const {
+    requiresAuth = true,
+    ...networkOptions
+  } = options;
+
+  let accessToken =
+    requiresAuth
+      ? useAuthStore
+          .getState()
+          .accessToken
+      : null;
+
+  // A protected request may arrive before a page has restored its
+  // in-memory access token. Restore it from the HttpOnly session once.
   if (
-    response.status === 204
+    requiresAuth &&
+    !accessToken
   ) {
-    // Return an empty typed result.
-    return undefined as T;
+    accessToken =
+      await refreshAuthenticationSession();
+
+    if (!accessToken) {
+      throw authenticationUnavailableError();
+    }
   }
 
-  // Read JSON when FastAPI returned a JSON body.
-  const responseBody =
-    await response
-      .json()
-      .catch(() => null);
+  let response =
+    await sendRequest(
+      path,
+      networkOptions,
+      accessToken,
+    );
 
-  // Handle unsuccessful responses.
+  // Access JWTs are intentionally short lived. Rotate the refresh bearer
+  // once and retry this protected request exactly once.
+  if (
+    requiresAuth &&
+    response.status ===
+      401
+  ) {
+    const refreshedToken =
+      await refreshAuthenticationSession();
+
+    if (!refreshedToken) {
+      throw authenticationUnavailableError();
+    }
+
+    response =
+      await sendRequest(
+        path,
+        networkOptions,
+        refreshedToken,
+      );
+  }
+
+  const responseBody =
+    await readResponseBody(
+      response,
+    );
+
   if (!response.ok) {
-    // Clear authentication when an existing session becomes unauthorized.
     if (
-      response.status === 401 &&
-      accessToken
+      requiresAuth &&
+      response.status ===
+        401
     ) {
       useAuthStore
         .getState()
         .logout();
     }
 
-    // Convert the backend failure into a typed error.
     throw new ApiError(
       getApiErrorMessage(
         responseBody,
@@ -161,6 +353,12 @@ export async function apiRequest<T>(
     );
   }
 
-  // Return the successful typed response.
+  if (
+    response.status ===
+    204
+  ) {
+    return undefined as T;
+  }
+
   return responseBody as T;
 }

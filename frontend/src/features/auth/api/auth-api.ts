@@ -139,6 +139,21 @@ export async function resetPassword(
 }
 
 
+// Revoke the browser's current refresh-session family.
+export async function logoutSession(): Promise<void> {
+  return apiRequest<void>(
+    "/api/v1/auth/logout",
+    {
+      method: "POST",
+
+      // Logout authenticates with the HttpOnly refresh cookie rather
+      // than requiring a still-valid access JWT.
+      requiresAuth: false,
+    },
+  );
+}
+
+
 // Retrieve the authenticated user's profile.
 export async function getCurrentUser(): Promise<AuthenticatedUser> {
   return apiRequest<AuthenticatedUser>(

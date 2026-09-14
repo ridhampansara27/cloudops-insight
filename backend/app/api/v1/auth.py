@@ -36,6 +36,7 @@ from app.services.auth_cookie_service import (
     set_refresh_cookie,
 )
 from app.services.auth_email_service import AuthEmailService
+from app.services.auth_request_security import enforce_trusted_browser_origin
 from app.services.auth_service import AuthService
 from app.services.password_reset_service import PasswordResetService
 from app.services.refresh_session_service import (
@@ -246,10 +247,15 @@ async def login(
         OAuth2PasswordRequestForm,
         Depends(),
     ],
+    request: Request,
     response: Response,
     session: DatabaseSession,
 ) -> TokenResponse:
     """Authenticate and create a rotating refresh-session family."""
+
+    enforce_trusted_browser_origin(
+        request,
+    )
 
     authentication = AuthService(
         session,
@@ -299,6 +305,10 @@ async def refresh_access_token(
     session: DatabaseSession,
 ) -> TokenResponse:
     """Rotate the refresh bearer and return a fresh access JWT."""
+
+    enforce_trusted_browser_origin(
+        request,
+    )
 
     raw_token = request.cookies.get(
         settings.refresh_cookie_name,
@@ -358,6 +368,10 @@ async def logout(
     session: DatabaseSession,
 ) -> None:
     """Revoke the current refresh family and clear its browser cookie."""
+
+    enforce_trusted_browser_origin(
+        request,
+    )
 
     raw_token = request.cookies.get(
         settings.refresh_cookie_name,
