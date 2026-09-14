@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     # Lifetime of a password-reset link.
     password_reset_token_expire_minutes: int = 30
 
+    # Prevent repeated password-reset email spam.
+    password_reset_resend_cooldown_seconds: int = 60
+
     # Maximum lifetime of one refresh-session family.
     refresh_session_expire_days: int = 30
 

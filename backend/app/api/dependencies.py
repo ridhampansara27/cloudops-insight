@@ -20,7 +20,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import JWT decoding.
-from app.core.security import decode_access_token
+from app.core.security import (
+    access_token_matches_password_state,
+    decode_access_token_claims,
+)
 
 # Import tenant authorization primitives.
 from app.core.tenancy import (
@@ -63,64 +66,72 @@ BearerToken = Annotated[
 
 # Resolve the currently authenticated user.
 async def get_current_user(
-    # Read the bearer token.
     token: BearerToken,
-    # Receive the request-scoped database session.
     session: DatabaseSession,
 ) -> User:
-    # Create the standard authentication error.
+    """Resolve an active user from a password-state-bound access JWT."""
+
     credentials_error = HTTPException(
-        # Return HTTP 401.
         status_code=status.HTTP_401_UNAUTHORIZED,
-        # Keep the response intentionally generic.
         detail="Could not validate credentials.",
-        # Tell clients that Bearer authentication is expected.
         headers={
             "WWW-Authenticate": "Bearer",
         },
     )
 
     try:
-        # Validate the token and read its subject.
-        subject = decode_access_token(
+        claims = decode_access_token_claims(
             token,
         )
 
-        # Convert the token subject into the user UUID.
-        user_id = UUID(subject)
+        subject = claims.get(
+            "sub",
+        )
+
+        if not isinstance(
+            subject,
+            str,
+        ):
+            raise InvalidTokenError(
+                "Token subject is missing.",
+            )
+
+        user_id = UUID(
+            subject,
+        )
 
     except (
         InvalidTokenError,
         ValueError,
     ) as error:
-        # Suppress sensitive parsing details from the API response.
         raise credentials_error from error
 
-    # Create the repository.
     repository = UserRepository(
         session,
     )
 
-    # Retrieve the authenticated user.
     user = await repository.get_by_id(
         user_id,
     )
 
-    # Reject tokens for users that no longer exist.
     if user is None:
         raise credentials_error
 
-    # Reject disabled users.
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive.",
         )
 
+    if not access_token_matches_password_state(
+        claims,
+        user.password_changed_at,
+    ):
+        raise credentials_error
+
     return user
 
 
-# Create an Annotated dependency usable directly by endpoints.
 CurrentUser = Annotated[
     User,
     Depends(get_current_user),

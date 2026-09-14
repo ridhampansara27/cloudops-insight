@@ -14,10 +14,15 @@ from app.api.dependencies import (
     CurrentUser,
     DatabaseSession,
 )
-from app.core.security import create_access_token
+from app.core.security import (
+    create_access_token,
+    password_state_version,
+)
 from app.schemas.auth import (
     AuthMessageResponse,
+    ForgotPasswordRequest,
     ResendVerificationRequest,
+    ResetPasswordRequest,
     SignupRequest,
     TokenResponse,
     VerifyEmailRequest,
@@ -25,6 +30,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserRead
 from app.services.auth_email_service import AuthEmailService
 from app.services.auth_service import AuthService
+from app.services.password_reset_service import PasswordResetService
 from app.services.registration_service import (
     RegistrationService,
     SignupEmailConfigurationError,
@@ -41,6 +47,11 @@ GENERIC_SIGNUP_MESSAGE = (
 GENERIC_RESEND_MESSAGE = (
     "If an unverified account exists for this email, "
     "a verification message may be sent."
+)
+
+GENERIC_FORGOT_PASSWORD_MESSAGE = (
+    "If an eligible account exists for this email, "
+    "a password reset message may be sent."
 )
 
 
@@ -64,19 +75,15 @@ async def signup(
             payload,
         )
 
-    except SignupUnavailableError as error:
+    except (
+        SignupUnavailableError,
+        SignupEmailConfigurationError,
+    ) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Public signup is currently unavailable.",
         ) from error
 
-    except SignupEmailConfigurationError as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Public signup is currently unavailable.",
-        ) from error
-
-    # Never reveal whether this email already existed.
     return AuthMessageResponse(
         message=GENERIC_SIGNUP_MESSAGE,
     )
@@ -90,7 +97,7 @@ async def verify_email(
     payload: VerifyEmailRequest,
     session: DatabaseSession,
 ) -> AuthMessageResponse:
-    """Consume one expiring email verification token."""
+    """Consume one expiring email-verification token."""
 
     verified = await RegistrationService(
         session,
@@ -122,11 +129,7 @@ async def resend_verification(
 
     email_service = AuthEmailService()
 
-    # Verification/resend stays available for already-created users even
-    # if new signup is subsequently disabled, but SMTP must be configured.
     if not email_service.is_configured:
-        # Still use a generic availability response rather than revealing
-        # whether the requested identity exists.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Verification email delivery is currently unavailable.",
@@ -143,6 +146,67 @@ async def resend_verification(
 
     return AuthMessageResponse(
         message=GENERIC_RESEND_MESSAGE,
+    )
+
+
+@router.post(
+    "/forgot-password",
+    response_model=AuthMessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    session: DatabaseSession,
+) -> AuthMessageResponse:
+    """Request password recovery without revealing account existence."""
+
+    email_service = AuthEmailService()
+
+    if not email_service.is_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Password recovery is currently unavailable.",
+        )
+
+    await PasswordResetService(
+        session,
+        email_sender=email_service,
+    ).request_reset(
+        str(
+            payload.email,
+        ),
+    )
+
+    return AuthMessageResponse(
+        message=GENERIC_FORGOT_PASSWORD_MESSAGE,
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=AuthMessageResponse,
+)
+async def reset_password(
+    payload: ResetPasswordRequest,
+    session: DatabaseSession,
+) -> AuthMessageResponse:
+    """Consume one reset bearer and replace the account password."""
+
+    reset = await PasswordResetService(
+        session,
+    ).reset_password(
+        raw_token=payload.token,
+        new_password=payload.new_password,
+    )
+
+    if not reset:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset link is invalid or expired.",
+        )
+
+    return AuthMessageResponse(
+        message="Password updated successfully.",
     )
 
 
@@ -180,6 +244,9 @@ async def login(
     access_token = create_access_token(
         subject=str(
             user.id,
+        ),
+        password_version=password_state_version(
+            user.password_changed_at,
         ),
     )
 

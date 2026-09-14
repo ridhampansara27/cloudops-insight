@@ -35,7 +35,6 @@ class SignupRequest(BaseModel):
         max_length=160,
     )
 
-    # Prefer password length over arbitrary composition rules.
     password: str = Field(
         min_length=12,
         max_length=128,
@@ -56,13 +55,41 @@ class VerifyEmailRequest(BaseModel):
 
 
 class ResendVerificationRequest(BaseModel):
-    """Request another verification message without enumerating accounts."""
+    """Request another verification message."""
 
     model_config = ConfigDict(
         extra="forbid",
     )
 
     email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request a password-reset email without account enumeration."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Consume one password-reset bearer and set a new password."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    token: str = Field(
+        min_length=32,
+        max_length=512,
+    )
+
+    new_password: str = Field(
+        min_length=12,
+        max_length=128,
+    )
 
 
 class AuthMessageResponse(BaseModel):

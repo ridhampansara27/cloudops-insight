@@ -1,6 +1,5 @@
 """Deliver authentication emails without exposing bearer secrets."""
 
-import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -12,13 +11,9 @@ from anyio import to_thread
 
 from app.core.config import settings
 
-logger = logging.getLogger(
-    __name__,
-)
-
 
 class VerificationEmailSender(Protocol):
-    """Interface used by registration tests and production SMTP delivery."""
+    """Interface for verification-email delivery."""
 
     async def send_verification_email(
         self,
@@ -29,8 +24,20 @@ class VerificationEmailSender(Protocol):
         """Deliver one verification link."""
 
 
+class PasswordResetEmailSender(Protocol):
+    """Interface for password-reset email delivery."""
+
+    async def send_password_reset_email(
+        self,
+        *,
+        recipient: str,
+        token: str,
+    ) -> None:
+        """Deliver one password-reset link."""
+
+
 class VerificationEmailConfigurationError(RuntimeError):
-    """Raised when production email delivery is not configured."""
+    """Raised when authentication SMTP delivery is unavailable."""
 
 
 class AuthEmailService:
@@ -40,7 +47,7 @@ class AuthEmailService:
     def is_configured(
         self,
     ) -> bool:
-        """Return whether an SMTP host and sender are configured."""
+        """Return whether required SMTP delivery settings exist."""
 
         return bool(settings.smtp_host.strip() and settings.smtp_from_email.strip())
 
@@ -50,7 +57,7 @@ class AuthEmailService:
         recipient: str,
         token: str,
     ) -> None:
-        """Deliver a verification link without logging the raw token."""
+        """Deliver an email-verification link."""
 
         if not self.is_configured:
             raise VerificationEmailConfigurationError(
@@ -85,6 +92,61 @@ If you did not request this account, you can ignore this email.
 """,
         )
 
+        await self._send_async(
+            message,
+        )
+
+    async def send_password_reset_email(
+        self,
+        *,
+        recipient: str,
+        token: str,
+    ) -> None:
+        """Deliver an expiring one-time password-reset link."""
+
+        if not self.is_configured:
+            raise VerificationEmailConfigurationError(
+                "Authentication email delivery is not configured.",
+            )
+
+        query = urlencode(
+            {
+                "token": token,
+            },
+        )
+
+        reset_url = f"{settings.frontend_base_url.rstrip('/')}/reset-password?{query}"
+
+        message = EmailMessage()
+
+        message["Subject"] = "Reset your CloudOps Insight password"
+
+        message["From"] = settings.smtp_from_email
+
+        message["To"] = recipient
+
+        message.set_content(
+            f"""A password reset was requested for your CloudOps Insight account.
+
+Set a new password using this link:
+{reset_url}
+
+This link expires automatically and can only be used once.
+
+If you did not request a password reset, you can ignore this email.
+""",
+        )
+
+        await self._send_async(
+            message,
+        )
+
+    async def _send_async(
+        self,
+        message: EmailMessage,
+    ) -> None:
+        """Run blocking SMTP communication outside the async event loop."""
+
         operation = partial(
             self._send_message,
             message,
@@ -98,7 +160,7 @@ If you did not request this account, you can ignore this email.
     def _send_message(
         message: EmailMessage,
     ) -> None:
-        """Execute blocking SMTP I/O outside FastAPI's event loop."""
+        """Send one prepared SMTP message."""
 
         smtp = smtplib.SMTP(
             host=settings.smtp_host,
@@ -127,6 +189,4 @@ If you did not request this account, you can ignore this email.
                 smtp.quit()
 
             except smtplib.SMTPException:
-                # The message operation has already completed or failed.
-                # Do not replace the original result with a quit failure.
                 pass

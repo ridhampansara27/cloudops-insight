@@ -1,120 +1,192 @@
-# Import UTC-aware datetime and token-expiration utilities.
+"""Cryptographic helpers for passwords and authentication bearer tokens."""
+
 import hashlib
 import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 
-# Import PyJWT.
 import jwt
-
-# Import PyJWT's invalid-token exception.
 from jwt.exceptions import InvalidTokenError
-
-# Import pwdlib's password hashing abstraction.
 from pwdlib import PasswordHash
 
-# Import application security settings.
 from app.core.config import settings
 
-# Create the recommended password-hashing configuration.
 password_hash = PasswordHash.recommended()
 
 
-# Create a fixed dummy hash used when a login email does not exist.
 DUMMY_PASSWORD_HASH = password_hash.hash(
     "cloudops-dummy-password",
 )
 
 
-# Hash a plaintext password before database storage.
 def hash_password(
     plain_password: str,
 ) -> str:
-    # Return a one-way password hash.
+    """Hash one plaintext password before persistence."""
+
     return password_hash.hash(
         plain_password,
     )
 
 
-# Verify a plaintext password against a stored hash.
 def verify_password(
     plain_password: str,
     hashed_password: str,
 ) -> bool:
-    # Return whether the password matches the stored hash.
+    """Verify one plaintext password against a stored hash."""
+
     return password_hash.verify(
         plain_password,
         hashed_password,
     )
 
 
-# Create a signed access token for one user.
-def create_access_token(
-    subject: str,
-) -> str:
-    # Calculate the UTC expiration time.
-    expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.access_token_expire_minutes,
+def password_state_version(
+    password_changed_at: datetime,
+) -> int:
+    """Convert the password boundary into an exact JWT-safe integer.
+
+    PostgreSQL timestamps retain microsecond precision. Encoding the
+    complete microsecond timestamp prevents same-second password changes
+    from accidentally validating old access tokens.
+    """
+
+    value = password_changed_at.astimezone(
+        UTC,
     )
 
-    # Build the JWT payload.
-    payload = {
-        # Store the user identifier in the standard subject claim.
+    return (
+        int(
+            value.timestamp(),
+        )
+        * 1_000_000
+        + value.microsecond
+    )
+
+
+def create_access_token(
+    subject: str,
+    *,
+    password_version: int | None = None,
+) -> str:
+    """Create one short-lived signed access token."""
+
+    now = datetime.now(
+        UTC,
+    )
+
+    payload: dict[
+        str,
+        object,
+    ] = {
         "sub": subject,
-        # Store the expiration time.
-        "exp": expires_at,
-        # Record when the token was issued.
-        "iat": datetime.now(UTC),
+        "exp": (
+            now
+            + timedelta(
+                minutes=settings.access_token_expire_minutes,
+            )
+        ),
+        "iat": now,
     }
 
-    # Encode and sign the token.
+    if password_version is not None:
+        payload["pwd"] = password_version
+
     return jwt.encode(
-        # Supply the JWT claims.
         payload,
-        # Sign with the application secret.
         settings.jwt_secret,
-        # Use the configured algorithm.
         algorithm=settings.jwt_algorithm,
     )
 
 
-# Decode a JWT and return the authenticated subject.
-def decode_access_token(
+def decode_access_token_claims(
     token: str,
-) -> str:
-    # Decode and cryptographically verify the JWT.
+) -> dict[
+    str,
+    object,
+]:
+    """Decode and cryptographically verify one access JWT."""
+
     payload = jwt.decode(
-        # Supply the encoded token.
         token,
-        # Supply the signing secret.
         settings.jwt_secret,
-        # Restrict decoding to the configured algorithm.
         algorithms=[
             settings.jwt_algorithm,
         ],
     )
 
-    # Read the user identifier.
-    subject = payload.get("sub")
+    subject = payload.get(
+        "sub",
+    )
 
-    # Reject tokens without a valid string subject.
-    if not isinstance(subject, str):
-        # Raise the same exception type used for invalid JWTs.
+    if not isinstance(
+        subject,
+        str,
+    ):
         raise InvalidTokenError(
             "Token subject is missing.",
         )
 
-    # Return the authenticated user identifier.
+    return payload
+
+
+def decode_access_token(
+    token: str,
+) -> str:
+    """Decode a JWT and return its authenticated subject."""
+
+    payload = decode_access_token_claims(
+        token,
+    )
+
+    subject = payload["sub"]
+
+    if not isinstance(
+        subject,
+        str,
+    ):
+        raise InvalidTokenError(
+            "Token subject is missing.",
+        )
+
     return subject
 
 
-# Use 384 bits of cryptographic randomness for bearer secrets that are
-# delivered through verification/reset links or refresh cookies.
+def access_token_matches_password_state(
+    claims: dict[
+        str,
+        object,
+    ],
+    password_changed_at: datetime,
+) -> bool:
+    """Reject access JWTs issued for an older password state."""
+
+    token_version = claims.get(
+        "pwd",
+    )
+
+    # Require the password-state claim for commercial sessions.
+    #
+    # This intentionally causes pre-migration access JWTs to require a
+    # fresh login when this architecture is eventually deployed.
+    if (
+        type(
+            token_version,
+        )
+        is not int
+    ):
+        return False
+
+    return token_version == password_state_version(
+        password_changed_at,
+    )
+
+
 OPAQUE_TOKEN_RANDOM_BYTES = 48
 
 
 def generate_opaque_token() -> str:
-    """Generate a high-entropy bearer secret suitable for URLs/cookies."""
+    """Generate a high-entropy bearer suitable for URLs or cookies."""
 
     return secrets.token_urlsafe(
         OPAQUE_TOKEN_RANDOM_BYTES,
@@ -124,12 +196,7 @@ def generate_opaque_token() -> str:
 def hash_opaque_token(
     token: str,
 ) -> str:
-    """Produce the only token representation allowed in PostgreSQL.
-
-    Because generated tokens already contain high entropy, HMAC-SHA256
-    provides a compact lookup key while preventing a database leak from
-    exposing immediately usable bearer credentials.
-    """
+    """Return the only opaque-token representation allowed in PostgreSQL."""
 
     pepper = settings.auth_token_pepper or settings.jwt_secret
 
@@ -148,7 +215,7 @@ def opaque_token_matches(
     token: str,
     expected_hash: str,
 ) -> bool:
-    """Constant-time comparison helper for security-sensitive checks."""
+    """Compare opaque authentication secrets in constant time."""
 
     return hmac.compare_digest(
         hash_opaque_token(
