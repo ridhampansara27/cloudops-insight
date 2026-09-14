@@ -31,6 +31,12 @@ import {
   Input,
 } from "@/components/ui/input";
 
+
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+
 // Import responsive navigation.
 import {
   MobileNavigation,
@@ -49,6 +55,15 @@ import {
 import {
   useAuthStore,
 } from "@/stores/auth-store";
+
+
+import {
+  useAvailableOrganizations,
+} from "@/features/workspace/api/workspace-api";
+
+import {
+  useWorkspaceStore,
+} from "@/features/workspace/workspace-store";
 
 
 // Export the global application command bar.
@@ -73,6 +88,25 @@ export function AppHeader() {
         state,
       ) =>
         state.logout,
+    );
+
+  const organizationsQuery =
+    useAvailableOrganizations();
+
+  const activeOrganizationId =
+    useWorkspaceStore(
+      (
+        state,
+      ) =>
+        state.activeOrganizationId,
+    );
+
+  const setActiveOrganizationId =
+    useWorkspaceStore(
+      (
+        state,
+      ) =>
+        state.setActiveOrganizationId,
     );
 
   // Store global Resource Explorer search input.
@@ -122,6 +156,26 @@ export function AppHeader() {
       .join("")
       .toUpperCase() ||
     "U";
+
+  function handleWorkspaceChange(
+    organizationId: string,
+  ) {
+    if (
+      organizationId ===
+      activeOrganizationId
+    ) {
+      return;
+    }
+
+    setActiveOrganizationId(
+      organizationId,
+    );
+
+    window.location.assign(
+      "/",
+    );
+  }
+
 
   // Preserve the existing global resource-search behavior.
   function handleSearch(
@@ -235,6 +289,46 @@ export function AppHeader() {
 
       {/* Render global operational controls. */}
       <div className="flex items-center gap-2">
+        {organizationsQuery.data &&
+          organizationsQuery.data.length > 1 &&
+          activeOrganizationId && (
+            <div className="hidden min-w-44 xl:block">
+              <NativeSelect
+                aria-label="Active workspace"
+                className="h-9 rounded-xl border-border/70 bg-card/45 text-xs shadow-sm backdrop-blur-xl"
+                onChange={(
+                  event,
+                ) =>
+                  handleWorkspaceChange(
+                    event.target.value,
+                  )
+                }
+                value={
+                  activeOrganizationId
+                }
+              >
+                {organizationsQuery.data.map(
+                  (
+                    organization,
+                  ) => (
+                    <NativeSelectOption
+                      key={
+                        organization.id
+                      }
+                      value={
+                        organization.id
+                      }
+                    >
+                      {
+                        organization.name
+                      }
+                    </NativeSelectOption>
+                  ),
+                )}
+              </NativeSelect>
+            </div>
+          )}
+
         <Button
           aria-label="View incidents"
           className="rounded-xl border border-border/70 bg-card/45 shadow-sm backdrop-blur-xl hover:border-primary/25 hover:bg-accent/70"

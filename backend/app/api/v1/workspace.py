@@ -8,6 +8,7 @@ from fastapi import (
     Response,
     status,
 )
+from sqlalchemy import select
 
 from app.api.dependencies import (
     CurrentTenant,
@@ -15,6 +16,10 @@ from app.api.dependencies import (
     DatabaseSession,
     TenantOwner,
     TenantOwnerOrAdmin,
+)
+from app.models.organization import (
+    Organization,
+    OrganizationMembership,
 )
 from app.schemas.workspace import (
     MemberRoleUpdate,
@@ -26,6 +31,7 @@ from app.schemas.workspace import (
     WorkspaceInvitationCreate,
     WorkspaceInvitationRead,
     WorkspaceMemberRead,
+    WorkspaceOrganizationChoice,
     WorkspaceProfileRead,
 )
 from app.services.auth_email_service import (
@@ -454,3 +460,48 @@ async def accept_workspace_invitation(
         role=accepted.role,
         account_created=accepted.account_created,
     )
+
+
+@router.get(
+    "/organizations",
+    response_model=list[WorkspaceOrganizationChoice],
+)
+async def list_available_organizations(
+    current_user: CurrentUser,
+    session: DatabaseSession,
+) -> list[WorkspaceOrganizationChoice]:
+    """List active organizations available to the authenticated user."""
+
+    result = await session.execute(
+        select(
+            OrganizationMembership,
+            Organization,
+        )
+        .join(
+            Organization,
+            Organization.id == OrganizationMembership.organization_id,
+        )
+        .where(
+            OrganizationMembership.user_id == current_user.id,
+            OrganizationMembership.is_active.is_(
+                True,
+            ),
+            Organization.is_active.is_(
+                True,
+            ),
+        )
+        .order_by(
+            OrganizationMembership.created_at,
+            OrganizationMembership.id,
+        )
+    )
+
+    return [
+        WorkspaceOrganizationChoice(
+            id=organization.id,
+            membership_id=membership.id,
+            name=organization.name,
+            role=membership.role,
+        )
+        for membership, organization in result.all()
+    ]

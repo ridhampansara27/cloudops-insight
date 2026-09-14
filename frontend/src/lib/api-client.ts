@@ -7,6 +7,11 @@ import {
   useAuthStore,
 } from "@/stores/auth-store";
 
+
+import {
+  useWorkspaceStore,
+} from "@/features/workspace/workspace-store";
+
 import type {
   LoginResponse,
 } from "@/types/auth";
@@ -208,6 +213,18 @@ async function sendRequest(
       "Authorization",
       `Bearer ${accessToken}`,
     );
+
+    const activeOrganizationId =
+      useWorkspaceStore
+        .getState()
+        .activeOrganizationId;
+
+    if (activeOrganizationId) {
+      requestHeaders.set(
+        "X-Organization-ID",
+        activeOrganizationId,
+      );
+    }
   }
 
   let body:

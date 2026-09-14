@@ -14,6 +14,11 @@ import {
 } from "@/features/auth/protected-route";
 
 
+import {
+  WorkspaceGate,
+} from "@/features/workspace/workspace-gate";
+
+
 // Load the login page only when needed.
 async function loadLoginRoute() {
   const {
@@ -330,7 +335,9 @@ export const appRouter =
       // Keep the shared authenticated shell mounted.
       element: (
         <ProtectedRoute>
-          <AppLayout />
+          <WorkspaceGate>
+            <AppLayout />
+          </WorkspaceGate>
         </ProtectedRoute>
       ),
 

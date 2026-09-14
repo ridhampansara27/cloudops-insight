@@ -195,3 +195,15 @@ class WorkspaceInvitationAcceptResponse(BaseModel):
     role: TenantRole
 
     account_created: bool
+
+
+class WorkspaceOrganizationChoice(BaseModel):
+    """One active workspace available to the authenticated user."""
+
+    id: UUID
+
+    membership_id: UUID
+
+    name: str
+
+    role: TenantRole
