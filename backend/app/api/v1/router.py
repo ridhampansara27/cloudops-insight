@@ -10,6 +10,7 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.incidents import router as incidents_router
 from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.resources import router as resources_router
+from app.api.v1.workspace import router as workspace_router
 
 # Import application settings.
 from app.core.config import settings
@@ -79,6 +80,14 @@ router.include_router(
     recommendations_router,
     prefix="/recommendations",
     tags=["Recommendations"],
+)
+
+
+# Register authenticated workspace administration routes.
+router.include_router(
+    workspace_router,
+    prefix="/workspace",
+    tags=["Workspace"],
 )
 
 
