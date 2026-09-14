@@ -1,4 +1,4 @@
-﻿// Import icons used by production-ready navigation entries.
+// Import icons used by production-ready navigation entries.
 import {
   Boxes,
   Cloud,
@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   ShieldAlert,
+  Settings,
   WalletCards,
 } from "lucide-react";
 
@@ -84,5 +85,15 @@ export const navigationGroups: NavigationGroup[] = [
         icon: Lightbulb,
       },
     ],
+  },  {
+    label: "Workspace",
+    items: [
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: Settings,
+      },
+    ],
   },
+
 ];

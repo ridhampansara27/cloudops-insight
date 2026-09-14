@@ -115,6 +115,38 @@ async function loadResetPasswordRoute() {
 }
 
 
+// Load public workspace invitation acceptance from an email link.
+async function loadInvitationAcceptRoute() {
+  const {
+    InvitationAcceptPage,
+  } =
+    await import(
+      "@/pages/invitation-accept-page"
+    );
+
+  return {
+    Component:
+      InvitationAcceptPage,
+  };
+}
+
+
+// Load commercial workspace settings only when visited.
+async function loadSettingsRoute() {
+  const {
+    SettingsPage,
+  } =
+    await import(
+      "@/pages/settings-page"
+    );
+
+  return {
+    Component:
+      SettingsPage,
+  };
+}
+
+
 // Load the operational dashboard only when visited.
 async function loadDashboardRoute() {
   const {
@@ -328,6 +360,14 @@ export const appRouter =
         loadResetPasswordRoute,
     },
     {
+      // Consume one opaque workspace invitation bearer from the URL fragment.
+      path:
+        "/invitations/accept",
+
+      lazy:
+        loadInvitationAcceptRoute,
+    },
+    {
       // Protect every application route.
       path:
         "/",
@@ -413,6 +453,14 @@ export const appRouter =
 
           lazy:
             loadRecommendationsRoute,
+        },
+        {
+          // Identity, workspace and team administration.
+          path:
+            "settings",
+
+          lazy:
+            loadSettingsRoute,
         },
         {
           // Unknown/removed routes.

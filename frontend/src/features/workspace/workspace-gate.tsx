@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   useEffect,
+  useMemo,
 } from "react";
 
 import {
@@ -64,8 +65,14 @@ export function WorkspaceGate({
 
 
   const organizations =
-    organizationsQuery.data ??
-    [];
+    useMemo(
+      () =>
+        organizationsQuery.data ??
+        [],
+      [
+        organizationsQuery.data,
+      ],
+    );
 
 
   const selectedOrganization =

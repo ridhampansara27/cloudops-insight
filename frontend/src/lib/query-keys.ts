@@ -13,6 +13,26 @@ export const queryKeys = {
       "workspace",
       "organizations",
     ] as const,
+
+    profile: [
+      "workspace",
+      "profile",
+    ] as const,
+
+    organization: [
+      "workspace",
+      "organization",
+    ] as const,
+
+    members: [
+      "workspace",
+      "members",
+    ] as const,
+
+    invitations: [
+      "workspace",
+      "invitations",
+    ] as const,
   },
 
 
