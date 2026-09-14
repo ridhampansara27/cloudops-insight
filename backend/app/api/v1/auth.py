@@ -6,6 +6,8 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
+    Response,
     status,
 )
 from fastapi.security import OAuth2PasswordRequestForm
@@ -14,6 +16,7 @@ from app.api.dependencies import (
     CurrentUser,
     DatabaseSession,
 )
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
     password_state_version,
@@ -28,9 +31,18 @@ from app.schemas.auth import (
     VerifyEmailRequest,
 )
 from app.schemas.user import UserRead
+from app.services.auth_cookie_service import (
+    clear_refresh_cookie,
+    set_refresh_cookie,
+)
 from app.services.auth_email_service import AuthEmailService
 from app.services.auth_service import AuthService
 from app.services.password_reset_service import PasswordResetService
+from app.services.refresh_session_service import (
+    InvalidRefreshSessionError,
+    RefreshSessionReuseError,
+    RefreshSessionService,
+)
 from app.services.registration_service import (
     RegistrationService,
     SignupEmailConfigurationError,
@@ -53,6 +65,21 @@ GENERIC_FORGOT_PASSWORD_MESSAGE = (
     "If an eligible account exists for this email, "
     "a password reset message may be sent."
 )
+
+
+def _create_user_access_token(
+    user: UserRead | object,
+) -> str:
+    """Create an access token bound to the current password state."""
+
+    return create_access_token(
+        subject=str(
+            user.id,
+        ),
+        password_version=password_state_version(
+            user.password_changed_at,
+        ),
+    )
 
 
 @router.post(
@@ -219,9 +246,10 @@ async def login(
         OAuth2PasswordRequestForm,
         Depends(),
     ],
+    response: Response,
     session: DatabaseSession,
 ) -> TokenResponse:
-    """Authenticate only active, email-verified users."""
+    """Authenticate and create a rotating refresh-session family."""
 
     authentication = AuthService(
         session,
@@ -241,18 +269,109 @@ async def login(
             },
         )
 
-    access_token = create_access_token(
-        subject=str(
-            user.id,
-        ),
-        password_version=password_state_version(
-            user.password_changed_at,
-        ),
+    refresh_issue = await RefreshSessionService(
+        session,
+    ).issue(
+        user,
+    )
+
+    set_refresh_cookie(
+        response,
+        token=refresh_issue.token,
+        expires_at=refresh_issue.expires_at,
     )
 
     return TokenResponse(
-        access_token=access_token,
+        access_token=_create_user_access_token(
+            user,
+        ),
         token_type="bearer",
+    )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+)
+async def refresh_access_token(
+    request: Request,
+    response: Response,
+    session: DatabaseSession,
+) -> TokenResponse:
+    """Rotate the refresh bearer and return a fresh access JWT."""
+
+    raw_token = request.cookies.get(
+        settings.refresh_cookie_name,
+    )
+
+    if not raw_token:
+        clear_refresh_cookie(
+            response,
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication session is unavailable.",
+        )
+
+    try:
+        refresh_issue = await RefreshSessionService(
+            session,
+        ).rotate(
+            raw_token,
+        )
+
+    except (
+        InvalidRefreshSessionError,
+        RefreshSessionReuseError,
+    ) as error:
+        clear_refresh_cookie(
+            response,
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication session is unavailable.",
+        ) from error
+
+    set_refresh_cookie(
+        response,
+        token=refresh_issue.token,
+        expires_at=refresh_issue.expires_at,
+    )
+
+    return TokenResponse(
+        access_token=_create_user_access_token(
+            refresh_issue.user,
+        ),
+        token_type="bearer",
+    )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def logout(
+    request: Request,
+    response: Response,
+    session: DatabaseSession,
+) -> None:
+    """Revoke the current refresh family and clear its browser cookie."""
+
+    raw_token = request.cookies.get(
+        settings.refresh_cookie_name,
+    )
+
+    if raw_token:
+        await RefreshSessionService(
+            session,
+        ).revoke_family_for_token(
+            raw_token,
+        )
+
+    clear_refresh_cookie(
+        response,
     )
 
 

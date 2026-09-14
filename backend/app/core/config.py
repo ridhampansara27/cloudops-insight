@@ -110,6 +110,17 @@ class Settings(BaseSettings):
     # Maximum lifetime of one refresh-session family.
     refresh_session_expire_days: int = 30
 
+    # Rotating refresh bearer cookie.
+    #
+    # Secure defaults to true so production fails toward the safer mode.
+    # Local HTTP development may explicitly override this with:
+    # REFRESH_COOKIE_SECURE=false
+    refresh_cookie_name: str = "cloudops_refresh"
+    refresh_cookie_secure: bool = True
+    refresh_cookie_samesite: str = "lax"
+    refresh_cookie_path: str = "/api/v1/auth"
+    refresh_cookie_domain: str = ""
+
     # Define the AWS region used for STS and default AWS clients.
     aws_default_region: str = "eu-central-1"
 
