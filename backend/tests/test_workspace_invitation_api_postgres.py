@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
 )
+from starlette.requests import Request
 
 from app.api.v1 import workspace as workspace_api
 from app.core.security import hash_password
@@ -35,6 +36,57 @@ pytestmark = pytest.mark.skipif(
     not TENANT_TEST_DATABASE_URL,
     reason="TENANT_TEST_DATABASE_URL is required.",
 )
+
+
+def _request() -> Request:
+    """Build one direct-call request for API-handler tests."""
+
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/workspace/invitations",
+            "headers": [],
+            "client": (
+                "127.0.0.1",
+                50000,
+            ),
+            "server": (
+                "testserver",
+                80,
+            ),
+            "scheme": "http",
+            "query_string": b"",
+        },
+    )
+
+
+@pytest.fixture(
+    autouse=True,
+)
+def _disable_route_rate_limits(
+    monkeypatch,
+):
+    """Keep invitation-handler tests focused on DB/API semantics."""
+
+    async def no_limit(
+        *args,
+        **kwargs,
+    ) -> None:
+        del args
+        del kwargs
+
+    monkeypatch.setattr(
+        workspace_api,
+        "limit_invitation_issue",
+        no_limit,
+    )
+
+    monkeypatch.setattr(
+        workspace_api,
+        "limit_invitation_accept",
+        no_limit,
+    )
 
 
 class CapturingApiInvitationEmail:
@@ -157,6 +209,7 @@ async def test_invitation_api_issue_list_accept_and_replay(
             )
 
             created = await workspace_api.create_workspace_invitation(
+                request=_request(),
                 payload=WorkspaceInvitationCreate(
                     email="new-api-member@example.com",
                     role="member",
@@ -197,6 +250,7 @@ async def test_invitation_api_issue_list_accept_and_replay(
             assert invitations[0].id == created.id
 
             accepted = await workspace_api.accept_workspace_invitation(
+                request=_request(),
                 payload=WorkspaceInvitationAcceptRequest(
                     token=raw_token,
                     full_name="New API Member",
@@ -217,6 +271,7 @@ async def test_invitation_api_issue_list_accept_and_replay(
                 HTTPException,
             ) as replay:
                 await workspace_api.accept_workspace_invitation(
+                    request=_request(),
                     payload=WorkspaceInvitationAcceptRequest(
                         token=raw_token,
                         full_name="Replay User",
@@ -313,6 +368,7 @@ async def test_invitation_api_revoke_is_tenant_scoped(
             )
 
             created = await workspace_api.create_workspace_invitation(
+                request=_request(),
                 payload=WorkspaceInvitationCreate(
                     email="tenant-b-api@example.com",
                     role="viewer",

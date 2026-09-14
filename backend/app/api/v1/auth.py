@@ -39,6 +39,15 @@ from app.services.auth_email_service import AuthEmailService
 from app.services.auth_request_security import enforce_trusted_browser_origin
 from app.services.auth_service import AuthService
 from app.services.password_reset_service import PasswordResetService
+from app.services.rate_limit_service import (
+    limit_forgot_password,
+    limit_login,
+    limit_refresh,
+    limit_resend_verification,
+    limit_reset_password,
+    limit_signup,
+    limit_verify_email,
+)
 from app.services.refresh_session_service import (
     InvalidRefreshSessionError,
     RefreshSessionReuseError,
@@ -90,9 +99,17 @@ def _create_user_access_token(
 )
 async def signup(
     payload: SignupRequest,
+    request: Request,
     session: DatabaseSession,
 ) -> AuthMessageResponse:
     """Create one tenant-owner registration while remaining fail-closed."""
+
+    await limit_signup(
+        request,
+        str(
+            payload.email,
+        ),
+    )
 
     service = RegistrationService(
         session,
@@ -123,9 +140,15 @@ async def signup(
 )
 async def verify_email(
     payload: VerifyEmailRequest,
+    request: Request,
     session: DatabaseSession,
 ) -> AuthMessageResponse:
     """Consume one expiring email-verification token."""
+
+    await limit_verify_email(
+        request,
+        payload.token,
+    )
 
     verified = await RegistrationService(
         session,
@@ -151,9 +174,17 @@ async def verify_email(
 )
 async def resend_verification(
     payload: ResendVerificationRequest,
+    request: Request,
     session: DatabaseSession,
 ) -> AuthMessageResponse:
     """Rotate verification links without exposing user existence."""
+
+    await limit_resend_verification(
+        request,
+        str(
+            payload.email,
+        ),
+    )
 
     email_service = AuthEmailService()
 
@@ -184,9 +215,17 @@ async def resend_verification(
 )
 async def forgot_password(
     payload: ForgotPasswordRequest,
+    request: Request,
     session: DatabaseSession,
 ) -> AuthMessageResponse:
     """Request password recovery without revealing account existence."""
+
+    await limit_forgot_password(
+        request,
+        str(
+            payload.email,
+        ),
+    )
 
     email_service = AuthEmailService()
 
@@ -216,9 +255,15 @@ async def forgot_password(
 )
 async def reset_password(
     payload: ResetPasswordRequest,
+    request: Request,
     session: DatabaseSession,
 ) -> AuthMessageResponse:
     """Consume one reset bearer and replace the account password."""
+
+    await limit_reset_password(
+        request,
+        payload.token,
+    )
 
     reset = await PasswordResetService(
         session,
@@ -255,6 +300,11 @@ async def login(
 
     enforce_trusted_browser_origin(
         request,
+    )
+
+    await limit_login(
+        request,
+        form_data.username,
     )
 
     authentication = AuthService(
@@ -312,6 +362,11 @@ async def refresh_access_token(
 
     raw_token = request.cookies.get(
         settings.refresh_cookie_name,
+    )
+
+    await limit_refresh(
+        request,
+        raw_token,
     )
 
     if not raw_token:

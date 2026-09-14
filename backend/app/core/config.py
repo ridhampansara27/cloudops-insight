@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     # Define the Redis connection.
     redis_url: str
 
+    # Enable distributed abuse protection for public authentication
+    # and workspace-invitation actions.
+    rate_limit_enabled: bool = True
+
+    # Trust Cloudflare's canonical connecting-IP header only when the
+    # application origin is protected behind Cloudflare/Tunnel.
+    #
+    # Keep disabled for local development and for any deployment where
+    # clients can reach the application origin directly.
+    rate_limit_trust_cloudflare_connecting_ip: bool = False
+
     # Define application logging verbosity.
     log_level: str = "INFO"
 

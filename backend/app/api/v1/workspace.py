@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     HTTPException,
+    Request,
     Response,
     status,
 )
@@ -36,6 +37,10 @@ from app.schemas.workspace import (
 )
 from app.services.auth_email_service import (
     AuthEmailService,
+)
+from app.services.rate_limit_service import (
+    limit_invitation_accept,
+    limit_invitation_issue,
 )
 from app.services.workspace_administration_service import (
     LastWorkspaceOwnerError,
@@ -297,11 +302,21 @@ def _invitation_response(
 )
 async def create_workspace_invitation(
     payload: WorkspaceInvitationCreate,
+    request: Request,
     current_user: CurrentUser,
     tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> WorkspaceInvitationRead:
     """Create and deliver one current-tenant workspace invitation."""
+
+    await limit_invitation_issue(
+        request,
+        user_id=current_user.id,
+        organization_id=tenant.org_id,
+        email=str(
+            payload.email,
+        ),
+    )
 
     email_sender = AuthEmailService()
 
@@ -431,9 +446,15 @@ async def revoke_workspace_invitation(
 )
 async def accept_workspace_invitation(
     payload: WorkspaceInvitationAcceptRequest,
+    request: Request,
     session: DatabaseSession,
 ) -> WorkspaceInvitationAcceptResponse:
     """Consume one workspace invitation without requiring prior login."""
+
+    await limit_invitation_accept(
+        request,
+        payload.token,
+    )
 
     try:
         accepted = await WorkspaceInvitationService(
