@@ -217,9 +217,12 @@ export function LoginPage() {
               Password
             </label>
 
-            <span className="text-xs text-muted-foreground">
-              Password reset coming next
-            </span>
+            <Link
+              className="text-xs font-medium text-cyan-300 transition-colors hover:text-cyan-200"
+              to="/forgot-password"
+            >
+              Forgot password?
+            </Link>
           </div>
 
           <Input

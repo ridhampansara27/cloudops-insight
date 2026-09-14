@@ -78,6 +78,38 @@ async function loadResendVerificationRoute() {
 }
 
 
+// Load password recovery only when requested.
+async function loadForgotPasswordRoute() {
+  const {
+    ForgotPasswordPage,
+  } =
+    await import(
+      "@/pages/forgot-password-page"
+    );
+
+  return {
+    Component:
+      ForgotPasswordPage,
+  };
+}
+
+
+// Load the reset form only from a recovery link.
+async function loadResetPasswordRoute() {
+  const {
+    ResetPasswordPage,
+  } =
+    await import(
+      "@/pages/reset-password-page"
+    );
+
+  return {
+    Component:
+      ResetPasswordPage,
+  };
+}
+
+
 // Load the operational dashboard only when visited.
 async function loadDashboardRoute() {
   const {
@@ -273,6 +305,22 @@ export const appRouter =
 
       lazy:
         loadResendVerificationRoute,
+    },
+    {
+      // Request password recovery without authentication.
+      path:
+        "/forgot-password",
+
+      lazy:
+        loadForgotPasswordRoute,
+    },
+    {
+      // Consume a one-time password reset bearer.
+      path:
+        "/reset-password",
+
+      lazy:
+        loadResetPasswordRoute,
     },
     {
       // Protect every application route.

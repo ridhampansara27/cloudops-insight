@@ -102,6 +102,43 @@ export async function resendVerification(
 }
 
 
+// Request password recovery without revealing account existence.
+export async function forgotPassword(
+  email: string,
+): Promise<AuthMessageResponse> {
+  return apiRequest<AuthMessageResponse>(
+    "/api/v1/auth/forgot-password",
+    {
+      method: "POST",
+      json: {
+        email,
+      },
+      requiresAuth: false,
+    },
+  );
+}
+
+
+// Consume one password-reset bearer and set a new password.
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<AuthMessageResponse> {
+  return apiRequest<AuthMessageResponse>(
+    "/api/v1/auth/reset-password",
+    {
+      method: "POST",
+      json: {
+        token,
+        new_password:
+          newPassword,
+      },
+      requiresAuth: false,
+    },
+  );
+}
+
+
 // Retrieve the authenticated user's profile.
 export async function getCurrentUser(): Promise<AuthenticatedUser> {
   return apiRequest<AuthenticatedUser>(
