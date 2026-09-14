@@ -28,8 +28,18 @@ class Settings(BaseSettings):
     # Define the visible FastAPI application name.
     app_name: str = "CloudOps Insight API"
 
-    # Define the current deployment environment.
+    # Define the lifecycle deployment environment.
+    #
+    # This is deliberately semantic rather than infrastructure-specific:
+    # Kubernetes is a platform, not an application environment.
     app_env: str = "development"
+
+    # Identify which application process is constructing shared settings.
+    #
+    # API requires the complete browser/authentication/email production
+    # contract. Background and migration processes receive only the secrets
+    # they genuinely need.
+    app_component: str = "api"
 
     # Enable development diagnostics.
     debug: bool = True
@@ -154,6 +164,72 @@ class Settings(BaseSettings):
     # Define Celery's task-result backend.
     celery_result_backend: str = "redis://localhost:6379/2"
 
+    @field_validator(
+        "app_env",
+        mode="before",
+    )
+    @classmethod
+    def validate_app_environment(
+        cls,
+        value: object,
+    ) -> object:
+        """Normalize and restrict lifecycle environment names."""
+
+        if not isinstance(
+            value,
+            str,
+        ):
+            return value
+
+        normalized = value.strip().lower()
+
+        allowed = {
+            "development",
+            "test",
+            "staging",
+            "production",
+        }
+
+        if normalized not in allowed:
+            raise ValueError(
+                "APP_ENV must be one of: development, test, staging, production."
+            )
+
+        return normalized
+
+    @field_validator(
+        "app_component",
+        mode="before",
+    )
+    @classmethod
+    def validate_app_component(
+        cls,
+        value: object,
+    ) -> object:
+        """Normalize and restrict application process identities."""
+
+        if not isinstance(
+            value,
+            str,
+        ):
+            return value
+
+        normalized = value.strip().lower()
+
+        allowed = {
+            "api",
+            "worker",
+            "beat",
+            "migration",
+        }
+
+        if normalized not in allowed:
+            raise ValueError(
+                "APP_COMPONENT must be one of: api, worker, beat, migration."
+            )
+
+        return normalized
+
     @model_validator(
         mode="after",
     )
@@ -202,6 +278,26 @@ class Settings(BaseSettings):
             not self.debug,
             "DEBUG must be false in production.",
         )
+
+        # ----------------------------------------------------
+        # Component boundary
+        # ----------------------------------------------------
+
+        # Celery and Alembic construct the same Settings object but they
+        # do not serve browser authentication or send authentication mail.
+        #
+        # Do not distribute SMTP credentials or opaque-token pepper to
+        # processes that do not use them.
+        if self.app_component != "api":
+            if problems:
+                raise ValueError(
+                    "Unsafe production configuration: "
+                    + " ".join(
+                        problems,
+                    ),
+                )
+
+            return self
 
         # ----------------------------------------------------
         # Authentication secrets

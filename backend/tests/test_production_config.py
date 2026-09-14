@@ -204,3 +204,138 @@ def test_development_remains_usable_with_local_services() -> None:
     )
 
     assert settings.is_production is False
+
+
+@pytest.mark.parametrize(
+    "component",
+    [
+        "worker",
+        "beat",
+        "migration",
+    ],
+)
+def test_non_api_production_components_use_least_privilege_configuration(
+    component: str,
+) -> None:
+    """Non-API processes must not require browser/email secrets."""
+
+    settings = Settings(
+        _env_file=None,
+        app_env="production",
+        app_component=component,
+        debug=False,
+        database_url=(
+            "postgresql+asyncpg://cloudops:local-test-password@database:5432/cloudops"
+        ),
+        redis_url="redis://redis:6379/0",
+        # JWT_SECRET remains a required shared Settings field today.
+        # The Helm chart preserves the existing delivery contract for it.
+        jwt_secret=("runtime-component-test-secret-0123456789abcdef0123456789abcdef"),
+        # Deliberately omit API-only production material:
+        #
+        # AUTH_TOKEN_PEPPER
+        # SMTP_HOST
+        # SMTP_USERNAME
+        # SMTP_PASSWORD
+        # production FRONTEND_BASE_URL
+        # production CORS
+        auth_token_pepper="",
+        smtp_host="",
+        smtp_username="",
+        smtp_password="",
+        frontend_base_url="http://localhost:5173",
+        cors_origins="http://localhost:5173",
+        refresh_cookie_secure=False,
+        rate_limit_enabled=False,
+    )
+
+    assert settings.is_production is True
+
+    assert settings.app_component == component
+
+
+def test_api_production_component_still_requires_full_security_contract() -> None:
+    """Component scoping must never weaken the FastAPI production gate."""
+
+    with pytest.raises(
+        ValidationError,
+    ):
+        Settings(
+            _env_file=None,
+            app_env="production",
+            app_component="api",
+            debug=False,
+            database_url=("postgresql+asyncpg://cloudops:test@database:5432/cloudops"),
+            redis_url="redis://redis:6379/0",
+            jwt_secret=("runtime-api-test-secret-0123456789abcdef0123456789abcdef"),
+            auth_token_pepper="",
+            smtp_host="",
+            smtp_username="",
+            smtp_password="",
+        )
+
+
+@pytest.mark.parametrize(
+    (
+        "field",
+        "value",
+    ),
+    [
+        (
+            "app_env",
+            "kubernetes",
+        ),
+        (
+            "app_env",
+            "prod",
+        ),
+        (
+            "app_component",
+            "celery",
+        ),
+        (
+            "app_component",
+            "unknown",
+        ),
+    ],
+)
+def test_invalid_runtime_identity_is_rejected(
+    field: str,
+    value: str,
+) -> None:
+    """Infrastructure names must not silently bypass security policy."""
+
+    values = {
+        "app_env": "development",
+        "app_component": "api",
+        "database_url": ("postgresql+asyncpg://cloudops:test@localhost:5432/cloudops"),
+        "redis_url": "redis://localhost:6379/0",
+        "jwt_secret": "development-test-secret",
+    }
+
+    values[field] = value
+
+    with pytest.raises(
+        ValidationError,
+    ):
+        Settings(
+            _env_file=None,
+            **values,
+        )
+
+
+def test_runtime_identity_is_normalized() -> None:
+    """Runtime identity keeps the previous case-insensitive behavior."""
+
+    settings = Settings(
+        _env_file=None,
+        app_env="  DEVELOPMENT  ",
+        app_component="  API  ",
+        database_url=("postgresql+asyncpg://cloudops:test@localhost:5432/cloudops"),
+        redis_url="redis://localhost:6379/0",
+        jwt_secret="development-test-secret",
+    )
+
+    assert settings.app_env == "development"
+
+    assert settings.app_component == "api"

@@ -1,4 +1,63 @@
 # ------------------------------------------------------------
+# Application runtime
+# ------------------------------------------------------------
+
+runtime:
+  # APP_ENV describes lifecycle state, not infrastructure.
+  #
+  # Production deployments MUST override this with:
+  #
+  #   appEnv: production
+  #
+  # The default chart remains suitable for local Kind development.
+  appEnv: development
+
+  debug: false
+
+  # Local browser origin used by the default Kind installation.
+  frontendBaseUrl: "http://cloudops.local"
+
+  corsOrigins: "http://localhost:5173,http://localhost:8080,http://cloudops.local"
+
+  # Keep self-service commercial registration fail-closed.
+  publicSignupEnabled: false
+
+  smtp:
+    # Local chart leaves delivery unconfigured.
+    #
+    # Production must provide host/from configuration here and credentials
+    # through the existing Kubernetes Secret.
+    host: ""
+
+    port: 587
+
+    fromEmail: "no-reply@example.com"
+
+    starttls: true
+
+    timeoutSeconds: 10
+
+  refreshCookie:
+    # Local Kind ingress is HTTP by default.
+    #
+    # Production MUST override this with true.
+    secure: false
+
+    sameSite: "lax"
+
+    path: "/api/v1/auth"
+
+    domain: ""
+
+  rateLimit:
+    enabled: true
+
+    # Keep disabled until the backend origin is verified to be reachable
+    # exclusively through the trusted Cloudflare path.
+    trustCloudflareConnectingIp: false
+
+
+# ------------------------------------------------------------
 # Backend
 # ------------------------------------------------------------
 
@@ -83,7 +142,7 @@ beat:
 
 
 # ------------------------------------------------------------
-# PostgreSQL — local Kind only
+# PostgreSQL -- local Kind only
 # ------------------------------------------------------------
 
 postgres:
@@ -98,7 +157,7 @@ postgres:
 
 
 # ------------------------------------------------------------
-# Redis — local Kind only
+# Redis -- local Kind only
 # ------------------------------------------------------------
 
 redis:
@@ -110,6 +169,9 @@ redis:
 # ------------------------------------------------------------
 
 secrets:
+  # The chart never creates commercial authentication secrets.
+  #
+  # Production secret material remains external to this repository.
   existingSecret: cloudops-secrets
 
 

@@ -37,12 +37,19 @@ spec:
                 name: cloudops-config
 
           env:
+            - name: APP_COMPONENT
+              value: "worker"
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecret }}
                   key: DATABASE_URL
 
+            # JWT_SECRET remains a required shared Settings field.
+            #
+            # Preserve the existing delivery contract until configuration
+            # ownership is further decomposed.
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -94,6 +101,9 @@ spec:
                 name: cloudops-config
 
           env:
+            - name: APP_COMPONENT
+              value: "beat"
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
