@@ -56,6 +56,14 @@ COPY nginx/nginx.conf \
 COPY nginx/default.conf \
     /etc/nginx/conf.d/default.conf
 
+# Create the reusable NGINX snippet directory.
+RUN mkdir -p \
+    /etc/nginx/snippets
+
+# Copy browser-facing response security headers.
+COPY nginx/security-headers.conf \
+    /etc/nginx/snippets/cloudops-security-headers.conf
+
 # Copy only the compiled Vite application.
 COPY --from=builder \
     /app/dist \
