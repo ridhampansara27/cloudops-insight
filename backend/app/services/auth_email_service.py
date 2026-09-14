@@ -141,6 +141,60 @@ If you did not request a password reset, you can ignore this email.
             message,
         )
 
+    async def send_workspace_invitation(
+        self,
+        *,
+        recipient_email: str,
+        token: str,
+        organization_name: str,
+        role: str,
+        inviter_name: str,
+    ) -> None:
+        """Deliver one expiring organization-invitation link."""
+
+        if not self.is_configured:
+            raise VerificationEmailConfigurationError(
+                "Authentication email delivery is not configured.",
+            )
+
+        query = urlencode(
+            {
+                "token": token,
+            },
+        )
+
+        invitation_url = (
+            f"{settings.frontend_base_url.rstrip('/')}/invitations/accept#{query}"
+        )
+
+        message = EmailMessage()
+
+        message["Subject"] = (
+            f"You are invited to {organization_name} on CloudOps Insight"
+        )
+
+        message["From"] = settings.smtp_from_email
+
+        message["To"] = recipient_email
+
+        message.set_content(
+            f"""{inviter_name} invited you to join {organization_name} on CloudOps Insight.
+
+Workspace role: {role}
+
+Accept the invitation using this secure link:
+{invitation_url}
+
+This invitation expires automatically and can only be used once.
+
+If you were not expecting this invitation, you can ignore this email.
+""",
+        )
+
+        await self._send_async(
+            message,
+        )
+
     async def _send_async(
         self,
         message: EmailMessage,

@@ -113,3 +113,85 @@ class MemberRoleUpdate(BaseModel):
     )
 
     role: TenantRole
+
+
+class WorkspaceInvitationCreate(BaseModel):
+    """Invite one email address into the current organization."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    email: EmailStr
+
+    role: TenantRole
+
+
+class WorkspaceInvitationRead(BaseModel):
+    """Safe invitation metadata without bearer material."""
+
+    id: UUID
+
+    organization_id: UUID
+
+    invited_email: EmailStr
+
+    role: TenantRole
+
+    status: Literal[
+        "pending",
+        "accepted",
+        "revoked",
+        "expired",
+    ]
+
+    invited_by_user_id: UUID
+
+    expires_at: datetime
+
+    accepted_at: datetime | None
+
+    revoked_at: datetime | None
+
+    created_at: datetime
+
+
+class WorkspaceInvitationAcceptRequest(BaseModel):
+    """Consume one opaque workspace-invitation bearer."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    token: str = Field(
+        min_length=32,
+        max_length=512,
+    )
+
+    # This remains required for both new and existing identities so
+    # the public endpoint does not reveal whether an account exists.
+    full_name: str = Field(
+        min_length=2,
+        max_length=160,
+    )
+
+    password: str = Field(
+        min_length=12,
+        max_length=128,
+    )
+
+
+class WorkspaceInvitationAcceptResponse(BaseModel):
+    """Safe result after successful invitation acceptance."""
+
+    organization_id: UUID
+
+    organization_name: str
+
+    user_id: UUID
+
+    email: EmailStr
+
+    role: TenantRole
+
+    account_created: bool
