@@ -1,12 +1,11 @@
 import {
   type FormEvent,
+  useEffect,
   useState,
 } from "react";
 
 import {
   Link,
-  useNavigate,
-  useSearchParams,
 } from "react-router-dom";
 
 import {
@@ -39,18 +38,23 @@ import {
 
 export function ResetPasswordPage() {
   const [
-    searchParams,
-  ] = useSearchParams();
+    token,
+  ] = useState(
+    () => {
+      const fragment =
+        new URLSearchParams(
+          window.location.hash.slice(
+            1,
+          ),
+        );
 
-  const navigate =
-    useNavigate();
+      return fragment.get(
+        "token",
+      );
+    },
+  );
 
-  const token =
-    searchParams.get(
-      "token",
-    );
-
-  const [
+const [
     password,
     setPassword,
   ] = useState(
@@ -85,6 +89,24 @@ export function ResetPasswordPage() {
     setIsSubmitting,
   ] = useState(
     false,
+  );
+
+
+  useEffect(
+    () => {
+      if (!token) {
+        return;
+      }
+
+      window.history.replaceState(
+        null,
+        "",
+        "/reset-password",
+      );
+    },
+    [
+      token,
+    ],
   );
 
 
@@ -141,16 +163,7 @@ export function ResetPasswordPage() {
       setResetComplete(
         true,
       );
-
-      // Remove the consumed bearer from the browser URL/history entry.
-      navigate(
-        "/reset-password",
-        {
-          replace: true,
-        },
-      );
-
-    } catch (error) {
+} catch (error) {
       if (
         error instanceof ApiError
       ) {

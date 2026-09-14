@@ -71,7 +71,7 @@ class AuthEmailService:
         )
 
         verification_url = (
-            f"{settings.frontend_base_url.rstrip('/')}/verify-email?{query}"
+            f"{settings.frontend_base_url.rstrip('/')}/verify-email#{query}"
         )
 
         message = EmailMessage()
@@ -115,7 +115,7 @@ If you did not request this account, you can ignore this email.
             },
         )
 
-        reset_url = f"{settings.frontend_base_url.rstrip('/')}/reset-password?{query}"
+        reset_url = f"{settings.frontend_base_url.rstrip('/')}/reset-password#{query}"
 
         message = EmailMessage()
 

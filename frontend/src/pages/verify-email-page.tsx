@@ -6,7 +6,6 @@ import {
 
 import {
   Link,
-  useSearchParams,
 } from "react-router-dom";
 
 import {
@@ -37,15 +36,23 @@ type VerificationState =
 
 export function VerifyEmailPage() {
   const [
-    searchParams,
-  ] = useSearchParams();
+    token,
+  ] = useState(
+    () => {
+      const fragment =
+        new URLSearchParams(
+          window.location.hash.slice(
+            1,
+          ),
+        );
 
-  const token =
-    searchParams.get(
-      "token",
-    );
+      return fragment.get(
+        "token",
+      );
+    },
+  );
 
-  const [
+const [
     state,
     setState,
   ] = useState<VerificationState>(
@@ -78,7 +85,15 @@ export function VerifyEmailPage() {
       started.current =
         true;
 
-      if (!token) {
+
+      if (token) {
+        window.history.replaceState(
+          null,
+          "",
+          "/verify-email",
+        );
+      }
+if (!token) {
         return;
       }
 
