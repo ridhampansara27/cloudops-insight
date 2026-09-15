@@ -34,8 +34,7 @@ def _production_settings(
         ),
         "frontend_base_url": "https://cloudinsight.ridhampansara.dev",
         "cors_origins": (
-            "https://cloudinsight.ridhampansara.dev,"
-            "https://app.cloudopsinsight.tech"
+            "https://cloudinsight.ridhampansara.dev,https://app.cloudopsinsight.tech"
         ),
         "smtp_host": "smtp.mail-provider.example",
         "smtp_port": 587,
@@ -84,9 +83,7 @@ def test_parallel_commercial_origins_are_accepted() -> None:
 
     settings = _production_settings()
 
-    assert settings.frontend_base_url == (
-        "https://cloudinsight.ridhampansara.dev"
-    )
+    assert settings.frontend_base_url == ("https://cloudinsight.ridhampansara.dev")
 
     assert settings.cors_origin_list == [
         "https://cloudinsight.ridhampansara.dev",
