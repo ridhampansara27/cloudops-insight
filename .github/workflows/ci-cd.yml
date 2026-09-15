@@ -313,6 +313,16 @@ jobs:
         with:
           context: ./backend
           platforms: ${{ matrix.platform }}
+
+          # Always resolve the freshest Python/Debian base image.
+          pull: true
+
+          # The runtime stage performs apt-get update/upgrade.
+          # Do not reuse that layer across CI runs, otherwise newly
+          # published Debian security fixes can remain hidden behind
+          # the BuildKit/GHA cache.
+          no-cache-filters: runtime
+
           load: true
           push: false
           tags: >-
