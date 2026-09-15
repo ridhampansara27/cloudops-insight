@@ -33,7 +33,10 @@ def _production_settings(
             "opaque-token-production-test-pepper-fedcba9876543210fedcba9876543210"
         ),
         "frontend_base_url": "https://cloudinsight.ridhampansara.dev",
-        "cors_origins": "https://cloudinsight.ridhampansara.dev",
+        "cors_origins": (
+            "https://cloudinsight.ridhampansara.dev,"
+            "https://app.cloudopsinsight.tech"
+        ),
         "smtp_host": "smtp.mail-provider.example",
         "smtp_port": 587,
         "smtp_username": "cloudops-production",
@@ -74,6 +77,21 @@ def test_safe_production_configuration_is_accepted() -> None:
     settings = _production_settings()
 
     assert settings.is_production is True
+
+
+def test_parallel_commercial_origins_are_accepted() -> None:
+    """Allow old and commercial hosts during the controlled migration."""
+
+    settings = _production_settings()
+
+    assert settings.frontend_base_url == (
+        "https://cloudinsight.ridhampansara.dev"
+    )
+
+    assert settings.cors_origin_list == [
+        "https://cloudinsight.ridhampansara.dev",
+        "https://app.cloudopsinsight.tech",
+    ]
 
 
 @pytest.mark.parametrize(
