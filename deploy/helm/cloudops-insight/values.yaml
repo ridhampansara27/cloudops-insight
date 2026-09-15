@@ -33,6 +33,8 @@ runtime:
 
     fromEmail: "no-reply@example.com"
 
+    fromName: "CloudOps Insight"
+
     starttls: true
 
     timeoutSeconds: 10

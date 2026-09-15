@@ -3,6 +3,7 @@
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import formataddr
 from functools import partial
 from typing import Protocol
 from urllib.parse import urlencode
@@ -78,7 +79,12 @@ class AuthEmailService:
 
         message["Subject"] = "Verify your CloudOps Insight email"
 
-        message["From"] = settings.smtp_from_email
+        message["From"] = formataddr(
+            (
+                settings.smtp_from_name.strip(),
+                settings.smtp_from_email.strip(),
+            ),
+        )
 
         message["To"] = recipient
 
@@ -121,7 +127,12 @@ If you did not request this account, you can ignore this email.
 
         message["Subject"] = "Reset your CloudOps Insight password"
 
-        message["From"] = settings.smtp_from_email
+        message["From"] = formataddr(
+            (
+                settings.smtp_from_name.strip(),
+                settings.smtp_from_email.strip(),
+            ),
+        )
 
         message["To"] = recipient
 
@@ -173,7 +184,12 @@ If you did not request a password reset, you can ignore this email.
             f"You are invited to {organization_name} on CloudOps Insight"
         )
 
-        message["From"] = settings.smtp_from_email
+        message["From"] = formataddr(
+            (
+                settings.smtp_from_name.strip(),
+                settings.smtp_from_email.strip(),
+            ),
+        )
 
         message["To"] = recipient_email
 

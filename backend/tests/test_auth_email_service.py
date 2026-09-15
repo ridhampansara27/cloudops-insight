@@ -366,7 +366,7 @@ async def test_real_smtp_delivers_all_commercial_auth_emails(
     # Verification email
     # --------------------------------------------------------
 
-    assert verification["From"] == "no-reply@cloudops.example"
+    assert verification["From"] == "CloudOps Insight <no-reply@cloudops.example>"
 
     assert verification["To"] == "owner@example.com"
 
@@ -388,7 +388,7 @@ async def test_real_smtp_delivers_all_commercial_auth_emails(
     # Password reset
     # --------------------------------------------------------
 
-    assert reset["From"] == "no-reply@cloudops.example"
+    assert reset["From"] == "CloudOps Insight <no-reply@cloudops.example>"
 
     assert reset["To"] == "owner@example.com"
 
@@ -410,7 +410,7 @@ async def test_real_smtp_delivers_all_commercial_auth_emails(
     # Workspace invitation
     # --------------------------------------------------------
 
-    assert invitation["From"] == "no-reply@cloudops.example"
+    assert invitation["From"] == "CloudOps Insight <no-reply@cloudops.example>"
 
     assert invitation["To"] == "member@example.com"
 

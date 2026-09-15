@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from_email: str = "no-reply@cloudops-insight.local"
+
+    # Human-readable sender name shown by email clients.
+    smtp_from_name: str = "CloudOps Insight"
     smtp_starttls: bool = True
     smtp_timeout_seconds: int = 10
 

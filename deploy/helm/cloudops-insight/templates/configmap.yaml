@@ -43,6 +43,8 @@ data:
 
   SMTP_FROM_EMAIL: {{ .Values.runtime.smtp.fromEmail | quote }}
 
+  SMTP_FROM_NAME: {{ .Values.runtime.smtp.fromName | quote }}
+
   SMTP_STARTTLS: {{ .Values.runtime.smtp.starttls | quote }}
 
   SMTP_TIMEOUT_SECONDS: {{ .Values.runtime.smtp.timeoutSeconds | quote }}
