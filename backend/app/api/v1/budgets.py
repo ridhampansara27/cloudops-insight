@@ -1,121 +1,165 @@
-# Import UUID typing.
 from uuid import UUID
 
-# Import FastAPI helpers.
-from fastapi import (
-    APIRouter,
-    HTTPException,
-    status,
-)
-
-# Import SQLAlchemy selection.
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-# Import API dependencies.
 from app.api.dependencies import (
-    CurrentUser,
+    CurrentTenant,
     DatabaseSession,
+    TenantOwnerOrAdmin,
 )
-
-# Import Budget ORM model.
 from app.models.budget import Budget
-
-# Import connected cloud accounts for account-scope validation.
 from app.models.cloud_account import CloudAccount
+from app.schemas.budget import BudgetCreate, BudgetRead, BudgetUpdate
+from app.services.budget_evaluation_service import BudgetEvaluationService
 
-# Import budget schemas.
-from app.schemas.budget import (
-    BudgetCreate,
-    BudgetRead,
-    BudgetUpdate,
-)
-
-# Import real budget evaluation.
-from app.services.budget_evaluation_service import (
-    BudgetEvaluationService,
-)
-
-# Create the budget router.
 router = APIRouter()
 
 
-# List all configured budgets.
+async def _get_tenant_budget(
+    *,
+    budget_id: UUID,
+    organization_id: UUID,
+    session: DatabaseSession,
+) -> Budget:
+    """Return a budget only when it belongs to the selected organization."""
+
+    result = await session.execute(
+        select(
+            Budget,
+        ).where(
+            Budget.id == budget_id,
+            Budget.organization_id == organization_id,
+        ),
+    )
+
+    budget = result.scalar_one_or_none()
+
+    if budget is None:
+        # 404 intentionally avoids revealing another tenant's budget.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Budget not found.",
+        )
+
+    return budget
+
+
+async def _validate_account_scope(
+    *,
+    scope_value: str,
+    organization_id: UUID,
+    session: DatabaseSession,
+) -> None:
+    """Require account-budget scopes to reference this organization."""
+
+    try:
+        cloud_account_id = UUID(
+            scope_value,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Account budget scope must reference a valid cloud account.",
+        ) from error
+
+    result = await session.execute(
+        select(
+            CloudAccount.id,
+        ).where(
+            CloudAccount.id == cloud_account_id,
+            CloudAccount.organization_id == organization_id,
+        ),
+    )
+
+    if result.scalar_one_or_none() is None:
+        # Keep the message generic for cross-tenant UUID probes.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Selected cloud account is unavailable.",
+        )
+
+
+def _with_evaluation(
+    *,
+    budget: Budget,
+    evaluation,
+) -> BudgetRead:
+    """Serialize one budget together with its calculated state."""
+
+    budget_read = BudgetRead.model_validate(
+        budget,
+    )
+
+    return budget_read.model_copy(
+        update={
+            "current_spend": evaluation.current_spend,
+            "utilization_percentage": evaluation.utilization_percentage,
+            "evaluation_status": evaluation.evaluation_status,
+            "last_evaluated_at": evaluation.last_evaluated_at,
+        },
+    )
+
+
 @router.get(
     "",
     response_model=list[BudgetRead],
 )
 async def list_budgets(
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive database session.
+    tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> list[BudgetRead]:
-    # Mark authentication as intentionally required.
-    del current_user
+    """List only budgets owned by the active organization."""
 
-    # Query budgets in creation order.
     result = await session.execute(
         select(
             Budget,
-        ).order_by(
+        )
+        .where(
+            Budget.organization_id == tenant.organization_id,
+        )
+        .order_by(
             Budget.created_at.desc(),
         ),
     )
 
-    # Retrieve ORM objects.
     budgets = result.scalars().all()
 
-    # Create the budget evaluation service.
     evaluation_service = BudgetEvaluationService(
         session,
     )
 
-    # Store evaluated budget responses.
     responses: list[BudgetRead] = []
 
-    # Evaluate every configured budget.
     for budget in budgets:
-        # Calculate real current spend and utilization.
         evaluation = await evaluation_service.evaluate(
-            budget,
+            budget=budget,
+            organization_id=tenant.organization_id,
         )
 
-        # Serialize persisted budget fields.
-        budget_read = BudgetRead.model_validate(
-            budget,
-        )
-
-        # Add calculated budget evaluation fields.
         responses.append(
-            budget_read.model_copy(
-                update={
-                    "current_spend": evaluation.current_spend,
-                    "utilization_percentage": (evaluation.utilization_percentage),
-                    "evaluation_status": (evaluation.evaluation_status),
-                    "last_evaluated_at": (evaluation.last_evaluated_at),
-                },
-            ),
+            _with_evaluation(
+                budget=budget,
+                evaluation=evaluation,
+            )
         )
 
-    # Return evaluated budgets.
     return responses
 
 
-# Create one budget.
 @router.post(
     "",
     response_model=BudgetRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_budget(
-    # Read request data.
     payload: BudgetCreate,
-    # Resolve authenticated user.
-    current_user: CurrentUser,
-    # Receive database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> BudgetRead:
-    # Reject inconsistent thresholds.
+    """Create a budget inside the active organization."""
+
     if payload.critical_threshold < payload.warning_threshold:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -124,114 +168,69 @@ async def create_budget(
             ),
         )
 
-    # Validate account-scoped budgets against a genuine
-    # connected CloudOps cloud account.
     if payload.scope_type == "account":
-        try:
-            cloud_account_id = UUID(
-                payload.scope_value,
-            )
-        except ValueError as error:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Account budget scope must reference a valid cloud account.",
-            ) from error
-
-        cloud_account = await session.get(
-            CloudAccount,
-            cloud_account_id,
+        await _validate_account_scope(
+            scope_value=payload.scope_value,
+            organization_id=tenant.organization_id,
+            session=session,
         )
 
-        if cloud_account is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Selected cloud account does not exist.",
-            )
-
-    # Build the ORM object.
     budget = Budget(
+        organization_id=tenant.organization_id,
         name=payload.name,
         scope_type=payload.scope_type,
         scope_value=payload.scope_value,
         monthly_limit=payload.monthly_limit,
         warning_threshold=payload.warning_threshold,
         critical_threshold=payload.critical_threshold,
-        created_by_id=current_user.id,
+        created_by_id=tenant.user_id,
     )
 
-    # Stage creation.
     session.add(
         budget,
     )
 
-    # Persist it.
     await session.commit()
 
-    # Reload generated fields.
     await session.refresh(
         budget,
     )
 
-    # Evaluate the newly created budget.
     evaluation = await BudgetEvaluationService(
         session,
     ).evaluate(
-        budget,
+        budget=budget,
+        organization_id=tenant.organization_id,
     )
 
-    # Serialize persisted budget fields.
-    budget_read = BudgetRead.model_validate(
-        budget,
-    )
-
-    # Return the budget with calculated evaluation fields.
-    return budget_read.model_copy(
-        update={
-            "current_spend": evaluation.current_spend,
-            "utilization_percentage": (evaluation.utilization_percentage),
-            "evaluation_status": (evaluation.evaluation_status),
-            "last_evaluated_at": (evaluation.last_evaluated_at),
-        },
+    return _with_evaluation(
+        budget=budget,
+        evaluation=evaluation,
     )
 
 
-# Update an existing budget.
 @router.patch(
     "/{budget_id}",
     response_model=BudgetRead,
 )
 async def update_budget(
-    # Read budget UUID.
     budget_id: UUID,
-    # Read requested changes.
     payload: BudgetUpdate,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> BudgetRead:
-    # Mark authentication as intentionally required.
-    del current_user
+    """Update only a budget belonging to this organization."""
 
-    # Retrieve the budget.
-    budget = await session.get(
-        Budget,
-        budget_id,
+    budget = await _get_tenant_budget(
+        budget_id=budget_id,
+        organization_id=tenant.organization_id,
+        session=session,
     )
 
-    # Reject missing records.
-    if budget is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Budget not found.",
-        )
-
-    # Extract supplied fields.
     changes = payload.model_dump(
         exclude_unset=True,
     )
 
-    # Apply requested values.
     for field_name, value in changes.items():
         setattr(
             budget,
@@ -239,7 +238,6 @@ async def update_budget(
             value,
         )
 
-    # Validate final threshold values.
     if budget.critical_threshold < budget.warning_threshold:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -248,70 +246,44 @@ async def update_budget(
             ),
         )
 
-    # Save changes.
     await session.commit()
 
-    # Reload generated values.
     await session.refresh(
         budget,
     )
 
-    # Evaluate the updated budget.
     evaluation = await BudgetEvaluationService(
         session,
     ).evaluate(
-        budget,
+        budget=budget,
+        organization_id=tenant.organization_id,
     )
 
-    # Serialize persisted budget fields.
-    budget_read = BudgetRead.model_validate(
-        budget,
-    )
-
-    # Return the updated budget with calculated evaluation fields.
-    return budget_read.model_copy(
-        update={
-            "current_spend": evaluation.current_spend,
-            "utilization_percentage": (evaluation.utilization_percentage),
-            "evaluation_status": (evaluation.evaluation_status),
-            "last_evaluated_at": (evaluation.last_evaluated_at),
-        },
+    return _with_evaluation(
+        budget=budget,
+        evaluation=evaluation,
     )
 
 
-# Delete a budget.
 @router.delete(
     "/{budget_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_budget(
-    # Read budget UUID.
     budget_id: UUID,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> None:
-    # Mark authentication as intentionally required.
-    del current_user
+    """Delete only a budget belonging to this organization."""
 
-    # Retrieve budget.
-    budget = await session.get(
-        Budget,
-        budget_id,
+    budget = await _get_tenant_budget(
+        budget_id=budget_id,
+        organization_id=tenant.organization_id,
+        session=session,
     )
 
-    # Reject unknown budgets.
-    if budget is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Budget not found.",
-        )
-
-    # Delete the ORM record.
     await session.delete(
         budget,
     )
 
-    # Persist deletion.
     await session.commit()

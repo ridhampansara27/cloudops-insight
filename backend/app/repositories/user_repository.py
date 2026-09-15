@@ -1,56 +1,48 @@
-# Import UUID typing.
+"""Persistence operations for application users."""
+
+from datetime import datetime
 from uuid import UUID
 
-# Import SQLAlchemy's SELECT construct.
 from sqlalchemy import select
-
-# Import the asynchronous SQLAlchemy session.
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import the User ORM model.
 from app.models.user import User
 
 
-# Encapsulate database operations involving users.
 class UserRepository:
-    # Create the repository with one request-scoped session.
+    """Persist identity records without forcing transaction boundaries."""
+
     def __init__(
         self,
         session: AsyncSession,
     ) -> None:
-        # Store the database session.
         self.session = session
 
-    # Find one user by email address.
     async def get_by_email(
         self,
         email: str,
     ) -> User | None:
-        # Build a case-normalized user lookup.
-        statement = select(User).where(
+        statement = select(
+            User,
+        ).where(
             User.email == email.lower(),
         )
 
-        # Execute the asynchronous query.
         result = await self.session.execute(
             statement,
         )
 
-        # Return the user or None.
         return result.scalar_one_or_none()
 
-    # Find one user by UUID.
     async def get_by_id(
         self,
         user_id: UUID,
     ) -> User | None:
-        # Use SQLAlchemy's primary-key lookup.
         return await self.session.get(
             User,
             user_id,
         )
 
-    # Create one user.
     async def create(
         self,
         *,
@@ -58,27 +50,37 @@ class UserRepository:
         full_name: str,
         password_hash: str,
         role: str = "viewer",
+        email_verified_at: datetime | None = None,
+        commit: bool = True,
     ) -> User:
-        # Construct the ORM object.
+        """Create a user with an optional caller-controlled transaction.
+
+        Legacy/administrative callers retain commit=True behavior.
+
+        Commercial signup will use commit=False so User + Organization +
+        OWNER membership + verification token can be committed atomically.
+        """
+
         user = User(
-            # Normalize the email before persistence.
             email=email.lower(),
-            # Store the display name.
             full_name=full_name,
-            # Store only the password hash.
             password_hash=password_hash,
-            # Store the application role.
             role=role,
+            email_verified_at=email_verified_at,
         )
 
-        # Add the user to the transaction.
-        self.session.add(user)
+        self.session.add(
+            user,
+        )
 
-        # Commit the transaction.
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
 
-        # Refresh database-generated fields.
-        await self.session.refresh(user)
+        else:
+            await self.session.flush()
 
-        # Return the persisted user.
+        await self.session.refresh(
+            user,
+        )
+
         return user

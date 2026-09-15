@@ -1,32 +1,51 @@
 // Define the bearer-token response returned by FastAPI.
 export interface LoginResponse {
-  // Store the signed JWT.
   access_token: string;
 
-  // FastAPI returns bearer for this application.
   token_type: string;
 }
 
-// Define the authenticated user returned by /auth/me.
-export interface AuthenticatedUser {
-  // Store the backend UUID.
-  id: string;
 
-  // Store the user's email address.
+// Define generic authentication workflow responses.
+export interface AuthMessageResponse {
+  message: string;
+}
+
+
+// Define commercial signup input.
+export interface SignupInput {
   email: string;
 
-  // Store the visible user name.
   full_name: string;
 
-  // Store application authorization role.
+  organization_name: string;
+
+  password: string;
+}
+
+
+// Define the authenticated user returned by /auth/me.
+export interface AuthenticatedUser {
+  id: string;
+
+  email: string;
+
+  full_name: string;
+
+  // Global application role remains separate from tenant membership role.
   role: string;
 
-  // Store whether the account is enabled.
   is_active: boolean;
 
-  // Store record creation timestamp.
+  // Null means email ownership has not yet been verified.
+  email_verified_at:
+    | string
+    | null;
+
+  // Security boundary for the latest password change.
+  password_changed_at: string;
+
   created_at: string;
 
-  // Store record update timestamp.
   updated_at: string;
 }

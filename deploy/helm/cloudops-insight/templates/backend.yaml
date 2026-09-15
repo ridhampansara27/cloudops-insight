@@ -33,6 +33,11 @@ spec:
                 name: cloudops-config
 
           env:
+            # FastAPI owns browser authentication, refresh sessions,
+            # verification/reset/invitation mail, and rate limiting.
+            - name: APP_COMPONENT
+              value: "api"
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -44,6 +49,34 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecret }}
                   key: JWT_SECRET
+
+            # Local development may omit this and use the existing
+            # JWT fallback. Production Settings validation requires it.
+            - name: AUTH_TOKEN_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: AUTH_TOKEN_PEPPER
+                  optional: true
+
+            # SMTP credentials are deliberately API-only.
+            #
+            # They remain optional at the Kubernetes-reference layer so
+            # local development can run without an SMTP provider.
+            # Production Settings validation fails closed when absent.
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: SMTP_USERNAME
+                  optional: true
+
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: SMTP_PASSWORD
+                  optional: true
 
             - name: SEED_ADMIN_PASSWORD
               valueFrom:

@@ -1,123 +1,75 @@
-# Import timezone-aware date helpers.
-from datetime import (
-    UTC,
-    datetime,
-    timedelta,
-)
-from functools import partial
+"""Synchronize AWS billing data for one current connection generation."""
 
-# Import UUID.
+from datetime import UTC, datetime, timedelta
+from functools import partial
 from uuid import UUID
 
-# Import AnyIO thread support.
 from anyio import to_thread
-
-# Import AWS API error handling.
 from botocore.exceptions import ClientError
-
-# Import SQLAlchemy querying and deletion.
 from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import asynchronous session.
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-)
-
-# Import account and cost models.
-from app.models.cloud_account import (
-    CloudAccount,
-)
-from app.models.cost import (
-    CostRecord,
-)
-
-# Import discovered resource model for provider-ID mapping.
-from app.models.resource import (
-    CloudResource,
-)
-
-# Import AWS Cost Explorer.
-from app.providers.aws.cost_explorer import (
-    CostExplorerProvider,
-)
-
-# Import AWS session factory.
-from app.providers.aws.session import (
-    AwsSessionFactory,
-)
-
-# Import AWS account configuration.
-from app.providers.aws.types import (
-    AwsAccountConfig,
+from app.models.cost import CostRecord
+from app.models.resource import CloudResource
+from app.providers.aws.cost_explorer import CostExplorerProvider
+from app.providers.aws.session import AwsSessionFactory
+from app.providers.aws.types import AwsAccountConfig
+from app.services.cloud_account_connection_guard import (
+    require_connection_revision,
 )
 
 
-# Synchronize real Cost Explorer data.
 class CostSyncService:
-    # Create service.
+    """Synchronize Cost Explorer without stale-job persistence."""
+
     def __init__(
         self,
         session: AsyncSession,
     ) -> None:
-        # Store database session.
         self.session = session
-
-        # Create AWS session helper.
         self.session_factory = AwsSessionFactory()
-
-        # Create Cost Explorer provider.
         self.provider = CostExplorerProvider()
 
-    # Synchronize one account's current-month service costs.
     async def sync_account(
         self,
         account_id: UUID,
+        expected_connection_revision: int,
     ) -> int:
-        # Retrieve cloud account.
-        account = await self.session.get(
-            CloudAccount,
-            account_id,
+        """Fetch billing data then lock the generation before writing."""
+
+        account = await require_connection_revision(
+            self.session,
+            account_id=account_id,
+            expected_revision=expected_connection_revision,
+            required_status="connected",
         )
 
-        # Reject unknown accounts.
-        if account is None:
-            raise RuntimeError(
-                "Cloud account not found.",
-            )
-
-        # Build AWS authentication configuration.
         aws_account = AwsAccountConfig(
-            account_id=(account.external_account_id),
-            role_arn=(account.role_arn),
-            external_id=(account.external_id),
+            account_id=account.external_account_id,
+            role_arn=account.role_arn,
+            external_id=account.external_id,
             enabled_regions=tuple(
                 account.enabled_regions,
             ),
         )
 
-        # Resolve AWS credentials.
         aws_session = await to_thread.run_sync(
             self.session_factory.create_account_session,
             aws_account,
         )
 
-        # Calculate current billing month start.
-        # Determine today's date using UTC.
         today = datetime.now(
             UTC,
         ).date()
 
-        # Use first day of current month.
         start_date = today.replace(
             day=1,
         )
 
-        # Cost Explorer end date is exclusive.
         end_date = today + timedelta(
             days=1,
         )
 
-        # Bind blocking provider call.
         operation = partial(
             self.provider.get_daily_service_costs,
             session=aws_session,
@@ -125,14 +77,10 @@ class CostSyncService:
             end_date=end_date,
         )
 
-        # Retrieve Cost Explorer data outside event loop.
         records = await to_thread.run_sync(
             operation,
         )
 
-        # AWS resource-level billing is an optional Cost Explorer
-        # feature. Query it when enabled, while preserving normal
-        # service-level cost synchronization when it is disabled.
         resource_start_date = max(
             start_date,
             today
@@ -169,9 +117,6 @@ class CostSyncService:
                 "",
             )
 
-            # Resource-level Cost Explorer granularity is opt-in.
-            # Do not fail the complete cost synchronization when
-            # this optional feature has not been enabled.
             if (
                 error_code == "AccessDeniedException"
                 and "Resource-level data granularity is an opt-in" in error_message
@@ -181,8 +126,16 @@ class CostSyncService:
             else:
                 raise
 
-        # Map AWS provider IDs such as EC2 instance IDs onto
-        # CloudOps resource UUIDs.
+        # No billing mutation is allowed until the generation is
+        # revalidated under a database lock.
+        await require_connection_revision(
+            self.session,
+            account_id=account_id,
+            expected_revision=expected_connection_revision,
+            required_status="connected",
+            for_update=True,
+        )
+
         resource_result = await self.session.execute(
             select(
                 CloudResource,
@@ -197,8 +150,6 @@ class CostSyncService:
             for resource in resource_result.scalars().all()
         }
 
-        # Replace any previously imported EC2 resource-level
-        # costs in the supported resource-level billing window.
         await self.session.execute(
             delete(
                 CostRecord,
@@ -210,7 +161,6 @@ class CostSyncService:
             ),
         )
 
-        # Remove earlier service aggregates for the same month.
         await self.session.execute(
             delete(
                 CostRecord,
@@ -222,23 +172,20 @@ class CostSyncService:
             ),
         )
 
-        # Insert normalized real AWS costs.
         for record in records:
             self.session.add(
                 CostRecord(
-                    cloud_account_id=(account_id),
+                    cloud_account_id=account_id,
                     resource_id=None,
-                    usage_date=(record.usage_date),
-                    service=(record.service),
-                    cost_type=("service_aggregate"),
-                    amount=(record.amount),
-                    currency=(record.currency),
-                    is_estimated=(record.estimated),
+                    usage_date=record.usage_date,
+                    service=record.service,
+                    cost_type="service_aggregate",
+                    amount=record.amount,
+                    currency=record.currency,
+                    is_estimated=record.estimated,
                 ),
             )
 
-        # Persist resource-level EC2 costs only when AWS supplied
-        # data and the provider resource maps to discovered inventory.
         resource_records_imported = 0
 
         for record in resource_records:
@@ -254,7 +201,7 @@ class CostSyncService:
                     cloud_account_id=account_id,
                     resource_id=resource.id,
                     usage_date=record.usage_date,
-                    service=("Amazon Elastic Compute Cloud - Compute"),
+                    service="Amazon Elastic Compute Cloud - Compute",
                     cost_type="resource_direct",
                     amount=record.amount,
                     currency=record.currency,
@@ -264,10 +211,8 @@ class CostSyncService:
 
             resource_records_imported += 1
 
-        # Persist complete replacement atomically.
         await self.session.commit()
 
-        # Return imported record count.
         return (
             len(
                 records,

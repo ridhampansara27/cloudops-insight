@@ -7,6 +7,35 @@ export const queryKeys = {
   ] as const,
 
 
+  // Store workspace-selection queries.
+  workspace: {
+    organizations: [
+      "workspace",
+      "organizations",
+    ] as const,
+
+    profile: [
+      "workspace",
+      "profile",
+    ] as const,
+
+    organization: [
+      "workspace",
+      "organization",
+    ] as const,
+
+    members: [
+      "workspace",
+      "members",
+    ] as const,
+
+    invitations: [
+      "workspace",
+      "invitations",
+    ] as const,
+  },
+
+
   // Store cloud-account queries.
   cloudAccounts: {
     // Store the complete cloud-account list.

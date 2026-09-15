@@ -42,12 +42,16 @@ spec:
                 name: cloudops-config
 
           env:
+            - name: APP_COMPONENT
+              value: "migration"
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecret }}
                   key: DATABASE_URL
 
+            # Preserve the existing shared Settings requirement.
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

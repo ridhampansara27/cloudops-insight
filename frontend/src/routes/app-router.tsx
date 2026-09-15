@@ -14,6 +14,11 @@ import {
 } from "@/features/auth/protected-route";
 
 
+import {
+  WorkspaceGate,
+} from "@/features/workspace/workspace-gate";
+
+
 // Load the login page only when needed.
 async function loadLoginRoute() {
   const {
@@ -26,6 +31,118 @@ async function loadLoginRoute() {
   return {
     Component:
       LoginPage,
+  };
+}
+
+
+// Load commercial signup only when visited.
+async function loadSignupRoute() {
+  const {
+    SignupPage,
+  } =
+    await import(
+      "@/pages/signup-page"
+    );
+
+  return {
+    Component:
+      SignupPage,
+  };
+}
+
+
+// Load email verification only when opened from an email link.
+async function loadVerifyEmailRoute() {
+  const {
+    VerifyEmailPage,
+  } =
+    await import(
+      "@/pages/verify-email-page"
+    );
+
+  return {
+    Component:
+      VerifyEmailPage,
+  };
+}
+
+
+// Load verification resend only when requested.
+async function loadResendVerificationRoute() {
+  const {
+    ResendVerificationPage,
+  } =
+    await import(
+      "@/pages/resend-verification-page"
+    );
+
+  return {
+    Component:
+      ResendVerificationPage,
+  };
+}
+
+
+// Load password recovery only when requested.
+async function loadForgotPasswordRoute() {
+  const {
+    ForgotPasswordPage,
+  } =
+    await import(
+      "@/pages/forgot-password-page"
+    );
+
+  return {
+    Component:
+      ForgotPasswordPage,
+  };
+}
+
+
+// Load the reset form only from a recovery link.
+async function loadResetPasswordRoute() {
+  const {
+    ResetPasswordPage,
+  } =
+    await import(
+      "@/pages/reset-password-page"
+    );
+
+  return {
+    Component:
+      ResetPasswordPage,
+  };
+}
+
+
+// Load public workspace invitation acceptance from an email link.
+async function loadInvitationAcceptRoute() {
+  const {
+    InvitationAcceptPage,
+  } =
+    await import(
+      "@/pages/invitation-accept-page"
+    );
+
+  return {
+    Component:
+      InvitationAcceptPage,
+  };
+}
+
+
+// Load commercial workspace settings only when visited.
+async function loadSettingsRoute() {
+  const {
+    SettingsPage,
+  } =
+    await import(
+      "@/pages/settings-page"
+    );
+
+  return {
+    Component:
+      SettingsPage,
   };
 }
 
@@ -203,6 +320,54 @@ export const appRouter =
         loadLoginRoute,
     },
     {
+      // Commercial tenant-owner registration.
+      path:
+        "/signup",
+
+      lazy:
+        loadSignupRoute,
+    },
+    {
+      // Consume one email verification link.
+      path:
+        "/verify-email",
+
+      lazy:
+        loadVerifyEmailRoute,
+    },
+    {
+      // Request another verification email.
+      path:
+        "/resend-verification",
+
+      lazy:
+        loadResendVerificationRoute,
+    },
+    {
+      // Request password recovery without authentication.
+      path:
+        "/forgot-password",
+
+      lazy:
+        loadForgotPasswordRoute,
+    },
+    {
+      // Consume a one-time password reset bearer.
+      path:
+        "/reset-password",
+
+      lazy:
+        loadResetPasswordRoute,
+    },
+    {
+      // Consume one opaque workspace invitation bearer from the URL fragment.
+      path:
+        "/invitations/accept",
+
+      lazy:
+        loadInvitationAcceptRoute,
+    },
+    {
       // Protect every application route.
       path:
         "/",
@@ -210,7 +375,9 @@ export const appRouter =
       // Keep the shared authenticated shell mounted.
       element: (
         <ProtectedRoute>
-          <AppLayout />
+          <WorkspaceGate>
+            <AppLayout />
+          </WorkspaceGate>
         </ProtectedRoute>
       ),
 
@@ -286,6 +453,14 @@ export const appRouter =
 
           lazy:
             loadRecommendationsRoute,
+        },
+        {
+          // Identity, workspace and team administration.
+          path:
+            "settings",
+
+          lazy:
+            loadSettingsRoute,
         },
         {
           // Unknown/removed routes.

@@ -1,134 +1,102 @@
-# Import UTC-aware datetime helpers.
 from datetime import UTC, datetime
 
-# Import FastAPI router.
 from fastapi import APIRouter
-
-# Import SQLAlchemy aggregation helpers.
 from sqlalchemy import func, select
 
-# Import request dependencies.
-from app.api.dependencies import (
-    CurrentUser,
-    DatabaseSession,
-)
-
-# Import cloud-account model.
-from app.models.cloud_account import (
-    CloudAccount,
-)
-
-# Import ORM models.
+from app.api.dependencies import CurrentTenant, DatabaseSession
+from app.models.cloud_account import CloudAccount
 from app.models.cost import CostRecord
 from app.models.incident import Incident
 from app.models.recommendation import Recommendation
 from app.models.resource import CloudResource
-
-# Import response schema.
 from app.schemas.dashboard import DashboardSummary
 
-# Create the dashboard API router.
 router = APIRouter()
 
 
-# Return dashboard KPIs.
 @router.get(
     "/summary",
     response_model=DashboardSummary,
 )
 async def get_dashboard_summary(
-    # Require an authenticated user.
-    current_user: CurrentUser,
-    # Receive the database session.
+    tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> DashboardSummary:
-    # Mark authentication as intentionally required.
-    del current_user
+    """Return KPIs from only the active organization."""
 
-    # Determine today's date using an explicit UTC timezone.
+    organization_id = tenant.organization_id
+
     today = datetime.now(
         UTC,
     ).date()
 
-    # Create the month boundary used by cost queries.
     month_start = today.replace(
         day=1,
     )
 
-    # Count all currently active resources.
-    total_resources = await session.scalar(
-        select(
-            func.count(
-                CloudResource.id,
-            ),
-        ).where(
-            # Ignore resources that disappeared from AWS.
-            CloudResource.is_active.is_(
-                True,
-            ),
-        ),
+    async def count_resources(
+        health_state: str | None = None,
+    ) -> int:
+        statement = (
+            select(
+                func.count(
+                    CloudResource.id,
+                ),
+            )
+            .join(
+                CloudAccount,
+                CloudAccount.id == CloudResource.cloud_account_id,
+            )
+            .where(
+                CloudAccount.organization_id == organization_id,
+                CloudResource.is_active.is_(True),
+            )
+        )
+
+        if health_state is not None:
+            statement = statement.where(
+                CloudResource.health_state == health_state,
+            )
+
+        result = await session.scalar(
+            statement,
+        )
+
+        return int(
+            result or 0,
+        )
+
+    total_resources = await count_resources()
+    healthy_resources = await count_resources(
+        "healthy",
+    )
+    warning_resources = await count_resources(
+        "warning",
+    )
+    critical_resources = await count_resources(
+        "critical",
     )
 
-    # Count currently active healthy resources.
-    healthy_resources = await session.scalar(
-        select(
-            func.count(
-                CloudResource.id,
-            ),
-        ).where(
-            # Ignore resources that disappeared from AWS.
-            CloudResource.is_active.is_(
-                True,
-            ),
-            # Count only healthy resources.
-            CloudResource.health_state == "healthy",
-        ),
-    )
-
-    # Count currently active warning resources.
-    warning_resources = await session.scalar(
-        select(
-            func.count(
-                CloudResource.id,
-            ),
-        ).where(
-            # Ignore resources that disappeared from AWS.
-            CloudResource.is_active.is_(
-                True,
-            ),
-            # Count only warning resources.
-            CloudResource.health_state == "warning",
-        ),
-    )
-
-    # Count currently active critical resources.
-    critical_resources = await session.scalar(
-        select(
-            func.count(
-                CloudResource.id,
-            ),
-        ).where(
-            # Ignore resources that disappeared from AWS.
-            CloudResource.is_active.is_(
-                True,
-            ),
-            # Count only critical resources.
-            CloudResource.health_state == "critical",
-        ),
-    )
-
-    # Count incidents that have not been resolved.
     active_incidents = await session.scalar(
         select(
             func.count(
                 Incident.id,
             ),
-        ).where(
+        )
+        .join(
+            CloudResource,
+            CloudResource.id == Incident.resource_id,
+        )
+        .join(
+            CloudAccount,
+            CloudAccount.id == CloudResource.cloud_account_id,
+        )
+        .where(
+            CloudAccount.organization_id == organization_id,
             Incident.status != "resolved",
         ),
     )
 
-    # Sum costs belonging to the current month.
     month_to_date_cost = await session.scalar(
         select(
             func.coalesce(
@@ -137,14 +105,18 @@ async def get_dashboard_summary(
                 ),
                 0,
             ),
-        ).where(
-            # Count only AWS service-level aggregate records.
+        )
+        .join(
+            CloudAccount,
+            CloudAccount.id == CostRecord.cloud_account_id,
+        )
+        .where(
+            CloudAccount.organization_id == organization_id,
             CostRecord.cost_type == "service_aggregate",
             CostRecord.usage_date >= month_start,
         ),
     )
 
-    # Sum savings from currently open recommendations.
     potential_savings = await session.scalar(
         select(
             func.coalesce(
@@ -153,34 +125,55 @@ async def get_dashboard_summary(
                 ),
                 0,
             ),
-        ).where(
+        )
+        .join(
+            CloudResource,
+            CloudResource.id == Recommendation.resource_id,
+        )
+        .join(
+            CloudAccount,
+            CloudAccount.id == CloudResource.cloud_account_id,
+        )
+        .where(
+            CloudAccount.organization_id == organization_id,
             Recommendation.status == "open",
         ),
     )
 
-    # Determine the most recent successful resource sync.
     last_resource_sync_at = await session.scalar(
         select(
             func.max(
                 CloudAccount.last_synced_at,
             ),
+        ).where(
+            CloudAccount.organization_id == organization_id,
         ),
     )
 
-    # Return the aggregated dashboard data.
+    currency = await session.scalar(
+        select(
+            CostRecord.currency,
+        )
+        .join(
+            CloudAccount,
+            CloudAccount.id == CostRecord.cloud_account_id,
+        )
+        .where(
+            CloudAccount.organization_id == organization_id,
+            CostRecord.cost_type == "service_aggregate",
+            CostRecord.usage_date >= month_start,
+        )
+        .order_by(
+            CostRecord.usage_date.desc(),
+        )
+        .limit(1),
+    )
+
     return DashboardSummary(
-        total_resources=int(
-            total_resources or 0,
-        ),
-        healthy_resources=int(
-            healthy_resources or 0,
-        ),
-        warning_resources=int(
-            warning_resources or 0,
-        ),
-        critical_resources=int(
-            critical_resources or 0,
-        ),
+        total_resources=total_resources,
+        healthy_resources=healthy_resources,
+        warning_resources=warning_resources,
+        critical_resources=critical_resources,
         active_incidents=int(
             active_incidents or 0,
         ),
@@ -190,7 +183,6 @@ async def get_dashboard_summary(
         potential_monthly_savings=float(
             potential_savings or 0,
         ),
-        currency="USD",
-        # Return the latest AWS inventory synchronization timestamp.
-        last_resource_sync_at=(last_resource_sync_at),
+        currency=currency or "USD",
+        last_resource_sync_at=last_resource_sync_at,
     )

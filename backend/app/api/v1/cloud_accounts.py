@@ -1,115 +1,117 @@
-# Import UUID typing.
-# Import UTC-aware timestamps.
-from datetime import (
-    UTC,
-    datetime,
-)
+from datetime import UTC, datetime
 from uuid import UUID
 
-# Import AnyIO thread execution for blocking Boto3 operations.
 from anyio import to_thread
-
-# Import FastAPI routing and HTTP error helpers.
 from fastapi import APIRouter, HTTPException, status
-
-# Import Pydantic base schema.
 from pydantic import BaseModel
 
-# Import authentication/database dependencies.
 from app.api.dependencies import (
-    CurrentUser,
+    CurrentTenant,
     DatabaseSession,
+    TenantOwnerOrAdmin,
 )
-
-# Import the SQLAlchemy CloudAccount model so this route can load an account directly by ID.
-from app.models.cloud_account import CloudAccount
-
-# Import AWS validation service.
+from app.core.config import settings
 from app.providers.aws.connection import (
     AwsConnectionError,
     AwsConnectionService,
 )
-
-# Import normalized AWS account configuration.
-from app.providers.aws.types import (
-    AwsAccountConfig,
-)
-
-# Import the repository.
-from app.repositories.cloud_account_repository import (
-    CloudAccountRepository,
-)
-
-# Import API schemas.
-# Import validation response schema.
+from app.providers.aws.types import AwsAccountConfig
 from app.schemas.cloud_account import (
     CloudAccountCreate,
+    CloudAccountDisconnectResponse,
+    CloudAccountOnboardingRead,
     CloudAccountRead,
     CloudAccountUpdate,
     CloudAccountValidationResponse,
 )
-
-# Import synchronization response schemas.
 from app.schemas.resource_sync import (
     MonitoringSyncResponse,
     ResourceSyncQueuedResponse,
     ResourceSyncStatusResponse,
 )
-
-# Import Cost Explorer synchronization service.
-from app.services.cost_sync_service import (
-    CostSyncService,
+from app.services.aws_account_validator import (
+    AWSAccountValidationError,
+    validate_aws_account_configuration,
 )
-
-# Import monitoring synchronization service.
-from app.services.monitoring_sync_service import (
-    MonitoringSyncService,
+from app.services.aws_onboarding_service import (
+    SUGGESTED_ROLE_NAME,
+    build_assume_role_trust_policy,
 )
-
-# Import Celery AWS synchronization task.
-from app.tasks.aws_sync import (
-    sync_aws_account_task,
+from app.services.cloud_account_connection_guard import (
+    StaleCloudAccountConnectionError,
+    require_connection_revision,
 )
+from app.services.cloud_account_service import CloudAccountService
+from app.services.cost_sync_service import CostSyncService
+from app.services.monitoring_sync_service import MonitoringSyncService
+from app.tasks.aws_sync import sync_aws_account_task
 
 
-# Describe a successful Cost Explorer synchronization.
-class CostSyncResponse(
-    BaseModel,
-):
-    # Return the synchronized cloud account UUID.
+class CostSyncResponse(BaseModel):
     account_id: UUID
-
-    # Return the number of imported cost records.
     records_imported: int
 
 
-# Create the cloud-account router.
 router = APIRouter()
 
 
-# List registered cloud accounts.
+def _build_onboarding_response(
+    account,
+) -> CloudAccountOnboardingRead:
+    if not account.external_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This legacy integration does not have a CloudOps "
+                "ExternalId and requires migration."
+            ),
+        )
+
+    platform_principal_arn = (
+        settings.aws_platform_principal_arn.strip()
+        if settings.aws_platform_principal_arn
+        else None
+    )
+
+    trust_policy = (
+        build_assume_role_trust_policy(
+            platform_principal_arn=platform_principal_arn,
+            external_id=account.external_id,
+        )
+        if platform_principal_arn
+        else None
+    )
+
+    public_account = CloudAccountRead.model_validate(
+        account,
+    )
+
+    return CloudAccountOnboardingRead(
+        **public_account.model_dump(),
+        external_id=account.external_id,
+        platform_principal_arn=platform_principal_arn,
+        suggested_role_name=SUGGESTED_ROLE_NAME,
+        trust_policy=trust_policy,
+        onboarding_ready=bool(
+            platform_principal_arn,
+        ),
+    )
+
+
 @router.get(
     "",
     response_model=list[CloudAccountRead],
 )
 async def list_cloud_accounts(
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive the request database session.
+    tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> list[CloudAccountRead]:
-    # Explicitly mark authentication as intentionally required.
-    del current_user
-
-    # Create the repository.
-    repository = CloudAccountRepository(
+    accounts = await CloudAccountService(
         session,
+    ).list_for_organization(
+        tenant.organization_id,
     )
 
-    # Retrieve all accounts.
-    accounts = await repository.list_all()
-
-    # Convert ORM objects into response schemas.
     return [
         CloudAccountRead.model_validate(
             account,
@@ -118,210 +120,226 @@ async def list_cloud_accounts(
     ]
 
 
-# Retrieve one cloud account.
+@router.post(
+    "",
+    response_model=CloudAccountOnboardingRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_cloud_account(
+    payload: CloudAccountCreate,
+    tenant: TenantOwnerOrAdmin,
+    session: DatabaseSession,
+) -> CloudAccountOnboardingRead:
+    account = await CloudAccountService(
+        session,
+    ).create(
+        payload=payload,
+        user_id=tenant.user_id,
+        organization_id=tenant.organization_id,
+    )
+
+    return _build_onboarding_response(
+        account,
+    )
+
+
+@router.get(
+    "/{account_id}/onboarding",
+    response_model=CloudAccountOnboardingRead,
+)
+async def get_cloud_account_onboarding(
+    account_id: UUID,
+    tenant: TenantOwnerOrAdmin,
+    session: DatabaseSession,
+) -> CloudAccountOnboardingRead:
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
+    )
+
+    return _build_onboarding_response(
+        account,
+    )
+
+
 @router.get(
     "/{account_id}",
     response_model=CloudAccountRead,
 )
 async def get_cloud_account(
-    # Read the account UUID from the route.
     account_id: UUID,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive the database session.
+    tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> CloudAccountRead:
-    # Mark authentication as intentionally required.
-    del current_user
-
-    # Create the repository.
-    repository = CloudAccountRepository(
+    account = await CloudAccountService(
         session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
     )
 
-    # Retrieve the requested account.
-    account = await repository.get_by_id(
-        account_id,
-    )
-
-    # Return 404 when it does not exist.
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
-        )
-
-    # Serialize the ORM model.
     return CloudAccountRead.model_validate(
         account,
     )
 
 
-# Return current resource-synchronization state.
 @router.get(
     "/{account_id}/sync-status",
     response_model=ResourceSyncStatusResponse,
 )
 async def get_cloud_account_sync_status(
-    # Receive cloud-account UUID.
     account_id: UUID,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive database session.
+    tenant: CurrentTenant,
     session: DatabaseSession,
 ) -> ResourceSyncStatusResponse:
-    # Require authentication.
-    del current_user
-
-    # Retrieve account.
-    account = await session.get(
-        CloudAccount,
-        account_id,
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
     )
 
-    # Reject unknown accounts.
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
-        )
-
-    # Return persisted synchronization status.
     return ResourceSyncStatusResponse(
         account_id=account.id,
-        sync_status=(account.sync_status),
-        sync_started_at=(account.sync_started_at),
-        last_synced_at=(account.last_synced_at),
-        last_sync_error=(account.last_sync_error),
+        sync_status=account.sync_status,
+        sync_started_at=account.sync_started_at,
+        last_synced_at=account.last_synced_at,
+        last_sync_error=account.last_sync_error,
     )
 
 
-# Register a new cloud account.
-@router.post(
-    "",
+@router.patch(
+    "/{account_id}",
     response_model=CloudAccountRead,
-    status_code=status.HTTP_201_CREATED,
 )
-async def create_cloud_account(
-    # Read and validate the request body.
-    payload: CloudAccountCreate,
-    # Resolve the current authenticated user.
-    current_user: CurrentUser,
-    # Receive the database session.
+async def update_cloud_account(
+    account_id: UUID,
+    payload: CloudAccountUpdate,
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountRead:
-    # Reject providers not supported by this project yet.
-    if payload.provider.lower() != "aws":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only AWS accounts are currently supported.",
-        )
-
-    # Create the repository.
-    repository = CloudAccountRepository(
+    account = await CloudAccountService(
         session,
-    )
-
-    # Look for an existing registration.
-    existing = await repository.get_by_external_id(
-        provider=payload.provider.lower(),
-        external_account_id=payload.external_account_id,
-    )
-
-    # Prevent duplicates.
-    if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cloud account is already registered.",
-        )
-
-    # Create the account.
-    account = await repository.create(
+    ).update(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
         payload=payload,
-        created_by_id=current_user.id,
     )
 
-    # Return the created account.
     return CloudAccountRead.model_validate(
         account,
     )
 
 
-# Validate access to one configured AWS account.
 @router.post(
     "/{account_id}/validate",
     response_model=CloudAccountValidationResponse,
 )
 async def validate_cloud_account(
-    # Read the CloudOps account UUID.
     account_id: UUID,
-    # Require an authenticated application user.
-    current_user: CurrentUser,
-    # Receive the asynchronous database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CloudAccountValidationResponse:
-    # Require authentication even though role authorization comes later.
-    del current_user
+    """Validate STS without allowing stale validation to reconnect access."""
 
-    # Create the database repository.
-    repository = CloudAccountRepository(
+    account = await CloudAccountService(
         session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
     )
 
-    # Retrieve account configuration.
-    account = await repository.get_by_id(
-        account_id,
-    )
-
-    # Reject unknown CloudOps records.
-    if account is None:
+    if account.status in {
+        "disconnecting",
+        "disconnected",
+    }:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Resume AWS onboarding before validating a disconnected integration."
+            ),
         )
 
-    # Create a thread-safe immutable AWS configuration snapshot.
+    if not account.role_arn or not account.external_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Complete the cross-account IAM role setup before "
+                "validating this AWS integration."
+            ),
+        )
+
+    try:
+        validate_aws_account_configuration(
+            account.external_account_id,
+            account.role_arn,
+        )
+
+    except AWSAccountValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(
+                error,
+            ),
+        ) from error
+
+    expected_revision = account.connection_revision
+
+    # Make validation mutually exclusive with connected synchronization.
+    account.status = "validating"
+    account.last_validation_error = None
+
+    await session.commit()
+
     aws_account = AwsAccountConfig(
-        # Store expected AWS account ID.
         account_id=account.external_account_id,
-        # Store optional AssumeRole ARN.
         role_arn=account.role_arn,
-        # Store optional ExternalId.
         external_id=account.external_id,
-        # Copy discovery regions.
         enabled_regions=tuple(
             account.enabled_regions,
         ),
     )
 
-    # Create AWS validation service.
     connection_service = AwsConnectionService()
 
     try:
-        # Run blocking Boto3 network operations outside the async event loop.
         identity = await to_thread.run_sync(
             connection_service.validate_account,
             aws_account,
         )
 
     except AwsConnectionError as error:
-        # Record the validation attempt time.
+        await session.rollback()
+
+        try:
+            account = await require_connection_revision(
+                session,
+                account_id=account_id,
+                expected_revision=expected_revision,
+                required_status="validating",
+                for_update=True,
+            )
+
+        except StaleCloudAccountConnectionError as stale_error:
+            await session.rollback()
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=("AWS integration changed while validation was running."),
+            ) from stale_error
+
         account.last_validated_at = datetime.now(
             UTC,
         )
-
-        # Mark the account as unhealthy.
         account.status = "error"
-
-        # Store only the safe application error message.
         account.last_validation_error = str(
             error,
         )
 
-        # Persist account state.
         await session.commit()
 
-        # Return a useful API validation failure.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(
@@ -329,71 +347,63 @@ async def validate_cloud_account(
             ),
         ) from error
 
-    # Record successful validation.
+    try:
+        account = await require_connection_revision(
+            session,
+            account_id=account_id,
+            expected_revision=expected_revision,
+            required_status="validating",
+            for_update=True,
+        )
+
+    except StaleCloudAccountConnectionError as error:
+        await session.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=("AWS integration changed while validation was running."),
+        ) from error
+
     account.last_validated_at = datetime.now(
         UTC,
     )
-
-    # Mark AWS connectivity successful.
     account.status = "connected"
-
-    # Clear any historical validation error.
     account.last_validation_error = None
+    account.disconnected_at = None
 
-    # Persist connection status.
     await session.commit()
 
-    # Return verified AWS identity.
     return CloudAccountValidationResponse(
-        # Confirm successful connection.
         connected=True,
-        # Return verified account ID.
         account_id=identity.account_id,
-        # Return verified caller ARN.
         caller_arn=identity.arn,
-        # Explain the result.
         message="AWS account connection validated successfully.",
     )
 
 
-# Queue AWS inventory synchronization.
 @router.post(
     "/{account_id}/sync",
     response_model=ResourceSyncQueuedResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def sync_cloud_account(
-    # Receive CloudOps cloud-account UUID.
     account_id: UUID,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> ResourceSyncQueuedResponse:
-    # Require authentication.
-    del current_user
-
-    # Retrieve account.
-    account = await session.get(
-        CloudAccount,
-        account_id,
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
     )
 
-    # Reject unknown accounts.
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
-        )
-
-    # Require verified AWS connection.
     if account.status != "connected":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Validate the AWS account before synchronization.",
         )
 
-    # Prevent obvious duplicate synchronization requests.
     if account.sync_status in {
         "queued",
         "running",
@@ -403,40 +413,32 @@ async def sync_cloud_account(
             detail="AWS synchronization is already in progress.",
         )
 
-    # Mark account queued before sending the Celery task.
-    account.sync_status = "queued"
+    queued_revision = account.connection_revision
 
-    # Clear previous queue errors.
+    account.sync_status = "queued"
     account.last_sync_error = None
 
-    # Persist queue state.
     await session.commit()
 
     try:
-        # Publish the synchronization task to Redis.
         task = sync_aws_account_task.delay(
             str(
                 account_id,
             ),
+            queued_revision,
         )
 
     except Exception as error:
-        # Mark queue submission failure.
         account.sync_status = "failed"
-
-        # Store a safe queue error.
         account.last_sync_error = "Unable to queue resource synchronization."
 
-        # Persist failure.
         await session.commit()
 
-        # Report service unavailability.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Background synchronization service is unavailable.",
         ) from error
 
-    # Return queued task information.
     return ResourceSyncQueuedResponse(
         account_id=account_id,
         task_id=task.id,
@@ -444,147 +446,107 @@ async def sync_cloud_account(
     )
 
 
-# Synchronize real CloudWatch metrics for one AWS account.
 @router.post(
     "/{account_id}/metrics/sync",
     response_model=MonitoringSyncResponse,
 )
 async def sync_cloud_account_metrics(
-    # Receive cloud account UUID.
     account_id: UUID,
-    # Require authenticated application user.
-    current_user: CurrentUser,
-    # Receive asynchronous database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> MonitoringSyncResponse:
-    # Require authentication.
-    del current_user
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
+    )
 
-    # Run CloudWatch synchronization.
+    if account.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS account is not connected.",
+        )
+
     samples = await MonitoringSyncService(
         session,
     ).sync_account(
         account_id,
+        account.connection_revision,
     )
 
-    # Return synchronization result.
     return MonitoringSyncResponse(
         account_id=account_id,
-        samples_upserted=(samples),
+        samples_upserted=samples,
     )
 
 
-# Synchronize real Cost Explorer records.
 @router.post(
     "/{account_id}/costs/sync",
     response_model=CostSyncResponse,
 )
 async def sync_cloud_account_costs(
-    # Receive cloud account UUID.
     account_id: UUID,
-    # Require authenticated application user.
-    current_user: CurrentUser,
-    # Receive asynchronous database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
 ) -> CostSyncResponse:
-    # Require authentication.
-    del current_user
+    account = await CloudAccountService(
+        session,
+    ).get_for_organization(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
+    )
 
-    # Synchronize Cost Explorer.
+    if account.status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS account is not connected.",
+        )
+
     imported = await CostSyncService(
         session,
     ).sync_account(
         account_id,
+        account.connection_revision,
     )
 
-    # Return synchronization statistics.
     return CostSyncResponse(
         account_id=account_id,
         records_imported=imported,
     )
 
 
-# Modify a cloud account.
-@router.patch(
-    "/{account_id}",
-    response_model=CloudAccountRead,
+@router.post(
+    "/{account_id}/disconnect",
+    response_model=CloudAccountDisconnectResponse,
 )
-async def update_cloud_account(
-    # Read the account identifier.
+async def disconnect_cloud_account(
     account_id: UUID,
-    # Read fields to update.
-    payload: CloudAccountUpdate,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive the database session.
+    tenant: TenantOwnerOrAdmin,
     session: DatabaseSession,
-) -> CloudAccountRead:
-    # Mark authentication as intentionally required.
-    del current_user
+) -> CloudAccountDisconnectResponse:
+    """Safely revoke CloudOps integration activity without deleting history."""
 
-    # Create the repository.
-    repository = CloudAccountRepository(
+    account, budgets_deactivated = await CloudAccountService(
         session,
+    ).disconnect(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
     )
 
-    # Retrieve the account.
-    account = await repository.get_by_id(
-        account_id,
-    )
-
-    # Reject missing accounts.
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
+    if account.disconnected_at is None:
+        raise RuntimeError(
+            "Disconnected account is missing disconnect timestamp.",
         )
 
-    # Apply the changes.
-    updated_account = await repository.update(
-        account=account,
-        payload=payload,
-    )
-
-    # Return the updated account.
-    return CloudAccountRead.model_validate(
-        updated_account,
-    )
-
-
-# Delete one cloud account.
-@router.delete(
-    "/{account_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_cloud_account(
-    # Read the account UUID.
-    account_id: UUID,
-    # Require authentication.
-    current_user: CurrentUser,
-    # Receive the database session.
-    session: DatabaseSession,
-) -> None:
-    # Mark authentication as intentionally required.
-    del current_user
-
-    # Create the repository.
-    repository = CloudAccountRepository(
-        session,
-    )
-
-    # Retrieve the account.
-    account = await repository.get_by_id(
-        account_id,
-    )
-
-    # Reject missing accounts.
-    if account is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cloud account not found.",
-        )
-
-    # Delete the account and dependent inventory.
-    await repository.delete(
-        account,
+    return CloudAccountDisconnectResponse(
+        account_id=account.id,
+        status=account.status,
+        disconnected_at=account.disconnected_at,
+        connection_revision=account.connection_revision,
+        account_budgets_deactivated=budgets_deactivated,
+        message=(
+            "AWS integration disconnected. Historical CloudOps data "
+            "was retained and no AWS resources were modified."
+        ),
     )

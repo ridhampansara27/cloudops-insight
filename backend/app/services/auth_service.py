@@ -1,65 +1,58 @@
-# Import the asynchronous SQLAlchemy session.
+"""Authentication credential verification."""
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import password verification helpers.
 from app.core.security import (
     DUMMY_PASSWORD_HASH,
     verify_password,
 )
-
-# Import the User model.
 from app.models.user import User
-
-# Import the user repository.
 from app.repositories.user_repository import UserRepository
 
 
-# Encapsulate authentication business logic.
 class AuthService:
-    # Create the service with one database session.
+    """Authenticate local CloudOps identities."""
+
     def __init__(
         self,
         session: AsyncSession,
     ) -> None:
-        # Create the repository used by the service.
         self.users = UserRepository(
             session,
         )
 
-    # Authenticate one email and password combination.
     async def authenticate(
         self,
         email: str,
         password: str,
     ) -> User | None:
-        # Find the user by normalized email.
+        """Authenticate without revealing which credential check failed."""
+
         user = await self.users.get_by_email(
             email,
         )
 
-        # Handle unknown email addresses.
         if user is None:
-            # Perform a normal password verification to reduce timing differences.
+            # Preserve comparable password-work for unknown identities.
             verify_password(
                 password,
                 DUMMY_PASSWORD_HASH,
             )
 
-            # Reject authentication.
             return None
 
-        # Reject an incorrect password.
         if not verify_password(
             password,
             user.password_hash,
         ):
-            # Authentication failed.
             return None
 
-        # Reject disabled users.
         if not user.is_active:
-            # Do not authenticate inactive accounts.
             return None
 
-        # Authentication succeeded.
+        # Commercial users must prove ownership of the login address
+        # before an access token can ever be issued.
+        if user.email_verified_at is None:
+            return None
+
         return user

@@ -5,12 +5,15 @@ metadata:
   name: cloudops-config
 
 data:
-  # Configure FastAPI runtime environment.
+  # ----------------------------------------------------------
+  # Runtime identity
+  # ----------------------------------------------------------
+
   APP_NAME: "CloudOps Insight API"
 
-  APP_ENV: "kubernetes"
+  APP_ENV: {{ .Values.runtime.appEnv | quote }}
 
-  DEBUG: "false"
+  DEBUG: {{ .Values.runtime.debug | quote }}
 
   API_V1_PREFIX: "/api/v1"
 
@@ -18,24 +21,81 @@ data:
 
   SQL_ECHO: "false"
 
-  # Configure Redis.
+
+  # ----------------------------------------------------------
+  # Browser / commercial authentication configuration
+  # ----------------------------------------------------------
+
+  FRONTEND_BASE_URL: {{ .Values.runtime.frontendBaseUrl | quote }}
+
+  CORS_ORIGINS: {{ .Values.runtime.corsOrigins | quote }}
+
+  PUBLIC_SIGNUP_ENABLED: {{ .Values.runtime.publicSignupEnabled | quote }}
+
+
+  # ----------------------------------------------------------
+  # SMTP non-secret configuration
+  # ----------------------------------------------------------
+
+  SMTP_HOST: {{ .Values.runtime.smtp.host | quote }}
+
+  SMTP_PORT: {{ .Values.runtime.smtp.port | quote }}
+
+  SMTP_FROM_EMAIL: {{ .Values.runtime.smtp.fromEmail | quote }}
+
+  SMTP_FROM_NAME: {{ .Values.runtime.smtp.fromName | quote }}
+
+  SMTP_STARTTLS: {{ .Values.runtime.smtp.starttls | quote }}
+
+  SMTP_TIMEOUT_SECONDS: {{ .Values.runtime.smtp.timeoutSeconds | quote }}
+
+
+  # ----------------------------------------------------------
+  # Refresh-session cookie
+  # ----------------------------------------------------------
+
+  REFRESH_COOKIE_SECURE: {{ .Values.runtime.refreshCookie.secure | quote }}
+
+  REFRESH_COOKIE_SAMESITE: {{ .Values.runtime.refreshCookie.sameSite | quote }}
+
+  REFRESH_COOKIE_PATH: {{ .Values.runtime.refreshCookie.path | quote }}
+
+  REFRESH_COOKIE_DOMAIN: {{ .Values.runtime.refreshCookie.domain | quote }}
+
+
+  # ----------------------------------------------------------
+  # Distributed authentication abuse protection
+  # ----------------------------------------------------------
+
+  RATE_LIMIT_ENABLED: {{ .Values.runtime.rateLimit.enabled | quote }}
+
+  RATE_LIMIT_TRUST_CLOUDFLARE_CONNECTING_IP: {{ .Values.runtime.rateLimit.trustCloudflareConnectingIp | quote }}
+
+
+  # ----------------------------------------------------------
+  # Redis
+  # ----------------------------------------------------------
+
   REDIS_URL: "redis://cloudops-redis:6379/0"
 
-  # Configure Celery.
+
+  # ----------------------------------------------------------
+  # Celery
+  # ----------------------------------------------------------
+
   CELERY_BROKER_URL: "redis://cloudops-redis:6379/1"
 
   CELERY_RESULT_BACKEND: "redis://cloudops-redis:6379/2"
 
-  # Use default AWS region.
+
+  # ----------------------------------------------------------
+  # AWS
+  # ----------------------------------------------------------
+
   AWS_DEFAULT_REGION: "eu-central-1"
 
-  # Do not expect a workstation AWS profile inside Kubernetes.
   AWS_PROFILE_NAME: ""
 
-  # Configure STS role sessions.
   AWS_ROLE_SESSION_NAME: "cloudops-insight"
 
   AWS_ROLE_DURATION_SECONDS: "3600"
-
-  # Allow local web development if required.
-  CORS_ORIGINS: "http://localhost:5173,http://localhost:8080,http://cloudops.local"

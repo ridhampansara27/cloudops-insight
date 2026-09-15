@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ServerCog,
   ShieldCheck,
+  Unplug,
   Wifi,
 } from "lucide-react";
 
@@ -60,13 +61,31 @@ import type {
   AwsAccountFormValues,
 } from "@/features/cloud-accounts/aws-account-dialog";
 
+// Import guided phase-two IAM setup.
+import {
+  AwsOnboardingDialog,
+} from "@/features/cloud-accounts/aws-onboarding-dialog";
+
+// Import safe disconnect confirmation.
+import {
+  AwsDisconnectDialog,
+} from "@/features/cloud-accounts/aws-disconnect-dialog";
+
 // Import genuine backend operations.
 import {
+  useCloudAccountOnboarding,
   useCloudAccounts,
   useCreateCloudAccount,
+  useDisconnectCloudAccount,
   useSyncCloudAccount,
+  useUpdateCloudAccountRole,
   useValidateCloudAccount,
 } from "@/features/cloud-accounts/api/cloud-accounts-api";
+
+import type {
+  CloudAccountApiResponse,
+  CloudAccountOnboardingApiResponse,
+} from "@/types/api";
 
 // Import timestamp formatting.
 import {
@@ -123,10 +142,42 @@ function getConnectionStyle(
         "border-amber-400/20 bg-amber-400/8 text-amber-300",
 
       label:
-        "Validation required",
+        "IAM setup required",
 
       Icon:
         ShieldCheck,
+    };
+  }
+
+  if (
+    status ===
+    "disconnected"
+  ) {
+    return {
+      badge:
+        "border-slate-400/20 bg-slate-400/8 text-slate-300",
+
+      label:
+        "Disconnected",
+
+      Icon:
+        Unplug,
+    };
+  }
+
+  if (
+    status ===
+    "disconnecting"
+  ) {
+    return {
+      badge:
+        "border-amber-400/20 bg-amber-400/8 text-amber-300",
+
+      label:
+        "Disconnecting",
+
+      Icon:
+        Unplug,
     };
   }
 
@@ -239,6 +290,31 @@ export function CloudAccountsPage() {
   ] =
     useState(false);
 
+  // Store secure phase-two onboarding dialog visibility.
+  const [
+    onboardingOpen,
+    setOnboardingOpen,
+  ] =
+    useState(false);
+
+  // Store owner/admin-only onboarding material only while needed.
+  const [
+    onboardingAccount,
+    setOnboardingAccount,
+  ] =
+    useState<
+      CloudAccountOnboardingApiResponse | null
+    >(null);
+
+  // Store the account selected for safe disconnect confirmation.
+  const [
+    disconnectAccount,
+    setDisconnectAccount,
+  ] =
+    useState<
+      CloudAccountApiResponse | null
+    >(null);
+
   // Load registered AWS account configurations.
   // The API hook already polls every five seconds so Celery
   // synchronization state updates automatically.
@@ -249,52 +325,158 @@ export function CloudAccountsPage() {
   const createAccount =
     useCreateCloudAccount();
 
+  const onboardingQuery =
+    useCloudAccountOnboarding();
+
+  const updateAccountRole =
+    useUpdateCloudAccountRole();
+
+  const disconnectCloudAccount =
+    useDisconnectCloudAccount();
+
   const validateAccount =
     useValidateCloudAccount();
 
   const syncAccount =
     useSyncCloudAccount();
 
-  // Register one genuine AWS account.
+  // Start secure phase-one AWS onboarding.
   async function handleCreate(
     values:
       AwsAccountFormValues,
   ) {
     try {
-      await createAccount.mutateAsync({
-        name:
-          values.name,
+      const onboarding =
+        await createAccount.mutateAsync({
+          name:
+            values.name,
 
-        provider:
-          "aws",
+          provider:
+            "aws",
 
-        external_account_id:
-          values.accountId,
+          external_account_id:
+            values.accountId,
 
-        role_arn:
-          values.roleArn,
+          enabled_regions:
+            values.enabledRegions,
+        });
 
-        external_id:
-          values.externalId,
+      // Immediately continue into generated IAM setup.
+      setOnboardingAccount(
+        onboarding,
+      );
 
-        enabled_regions:
-          values.enabledRegions,
-      });
+      setOnboardingOpen(
+        true,
+      );
 
       toast.success(
-        "AWS account added.",
+        "AWS account registered. Configure the IAM role next.",
       );
     } catch {
       toast.error(
-        "Unable to add AWS account.",
+        "Unable to start AWS onboarding.",
       );
 
-      // Keep the registration dialog open.
       throw new Error(
         "AWS account creation failed.",
       );
     }
   }
+
+
+  // Resume phase-two IAM setup for a pending/error integration.
+  async function handleContinueSetup(
+    accountId:
+      string,
+  ) {
+    try {
+      const onboarding =
+        await onboardingQuery.mutateAsync(
+          accountId,
+        );
+
+      setOnboardingAccount(
+        onboarding,
+      );
+
+      setOnboardingOpen(
+        true,
+      );
+    } catch {
+      toast.error(
+        "Unable to load AWS onboarding configuration.",
+      );
+    }
+  }
+
+
+  // Store the customer role then verify real AssumeRole connectivity.
+  async function handleSaveRoleAndValidate(
+    roleArn:
+      string,
+  ) {
+    if (!onboardingAccount) {
+      throw new Error(
+        "AWS onboarding state is unavailable.",
+      );
+    }
+
+    try {
+      const updated =
+        await updateAccountRole.mutateAsync({
+          accountId:
+            onboardingAccount.id,
+
+          roleArn,
+        });
+
+      // Keep the security material in memory while updating
+      // the public account fields returned from PATCH.
+      setOnboardingAccount(
+        (
+          current,
+        ) =>
+          current
+            ? {
+                ...current,
+                ...updated,
+                external_id:
+                  current.external_id,
+                platform_principal_arn:
+                  current.platform_principal_arn,
+                suggested_role_name:
+                  current.suggested_role_name,
+                trust_policy:
+                  current.trust_policy,
+                onboarding_ready:
+                  current.onboarding_ready,
+              }
+            : null,
+      );
+
+      await validateAccount.mutateAsync(
+        onboardingAccount.id,
+      );
+
+      toast.success(
+        "AWS connection validated successfully.",
+      );
+
+      setOnboardingAccount(
+        null,
+      );
+    } catch {
+      toast.error(
+        "AWS connection validation failed.",
+      );
+
+      throw new Error(
+        "AWS onboarding validation failed.",
+      );
+    }
+  }
+
 
   // Validate one account through the existing AWS STS endpoint.
   async function handleValidate(
@@ -315,6 +497,42 @@ export function CloudAccountsPage() {
       );
     }
   }
+
+  // Stop CloudOps provider access without deleting AWS resources.
+  async function handleDisconnect() {
+    if (!disconnectAccount) {
+      return;
+    }
+
+    try {
+      const result =
+        await disconnectCloudAccount.mutateAsync(
+          disconnectAccount.id,
+        );
+
+      setDisconnectAccount(
+        null,
+      );
+
+      const budgetMessage =
+        result.account_budgets_deactivated > 0
+          ? ` ${result.account_budgets_deactivated} account budget${
+              result.account_budgets_deactivated === 1
+                ? ""
+                : "s"
+            } deactivated.`
+          : "";
+
+      toast.success(
+        `AWS integration disconnected.${budgetMessage}`,
+      );
+    } catch {
+      toast.error(
+        "Unable to disconnect AWS integration.",
+      );
+    }
+  }
+
 
   // Queue genuine resource discovery through Celery.
   async function handleSync(
@@ -374,14 +592,16 @@ export function CloudAccountsPage() {
         "connected",
     );
 
-  // Count accounts that still require first validation.
+  // Count integrations requiring setup, validation or reconnection.
   const pendingAccounts =
     accounts.filter(
       (
         account,
       ) =>
         account.status ===
-        "pending",
+          "pending" ||
+        account.status ===
+          "disconnected",
     );
 
   // Count Celery resource synchronizations currently in flight.
@@ -473,12 +693,12 @@ export function CloudAccountsPage() {
                 "Validation required",
 
               description:
-                `${pendingAccounts.length} registered AWS account${
+                `${pendingAccounts.length} AWS account${
                   pendingAccounts.length ===
                   1
                     ? ""
                     : "s"
-                } must be validated before inventory synchronization.`,
+                } require IAM setup, validation or reconnection before synchronization.`,
 
               classes:
                 "border-amber-400/20 bg-amber-400/8 text-amber-300",
@@ -888,6 +1108,11 @@ export function CloudAccountsPage() {
                   account.id
               );
 
+            const loadingOnboardingThisAccount =
+              onboardingQuery.isPending &&
+              onboardingQuery.variables ===
+                account.id;
+
             // Resolve genuine connection semantics.
             const connectionStyle =
               getConnectionStyle(
@@ -1138,30 +1363,76 @@ export function CloudAccountsPage() {
                     </div>
                   )}
 
+                  {account.disconnected_at && (
+                    <div className="rounded-xl border border-slate-400/15 bg-slate-400/[0.045] p-3">
+                      <div className="flex items-start gap-2">
+                        <Unplug className="mt-0.5 size-4 shrink-0 text-slate-300" />
+
+                        <div>
+                          <p className="text-xs font-semibold text-slate-200">
+                            Integration disconnected
+                          </p>
+
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            CloudOps AWS access stopped{" "}
+                            {formatTimestamp(
+                              account.disconnected_at,
+                            )}. Historical data remains available.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Existing backend actions. */}
                   <div className="flex flex-wrap gap-2 border-t border-border/45 pt-4">
-                    <Button
-                      className="rounded-xl"
-                      disabled={
-                        validateAccount.isPending
-                      }
-                      onClick={() =>
-                        void handleValidate(
-                          account.id,
-                        )
-                      }
-                      size="sm"
-                      variant="outline"
-                    >
-                      <ShieldCheck className="mr-2 size-3.5" />
+                    {account.status ===
+                    "connected" ? (
+                      <Button
+                        className="rounded-xl"
+                        disabled={
+                          validateAccount.isPending
+                        }
+                        onClick={() =>
+                          void handleValidate(
+                            account.id,
+                          )
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        <ShieldCheck className="mr-2 size-3.5" />
 
-                      {validatingThisAccount
-                        ? "Validating..."
-                        : account.status ===
-                            "connected"
-                          ? "Revalidate"
-                          : "Validate"}
-                    </Button>
+                        {validatingThisAccount
+                          ? "Validating..."
+                          : "Revalidate"}
+                      </Button>
+                    ) : (
+                      <Button
+                        className="rounded-xl border-violet-400/20 bg-violet-400/8 text-violet-200 hover:bg-violet-400/12"
+                        disabled={
+                          onboardingQuery.isPending
+                        }
+                        onClick={() =>
+                          void handleContinueSetup(
+                            account.id,
+                          )
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        <KeyRound className="mr-2 size-3.5" />
+
+                        {loadingOnboardingThisAccount
+                          ? "Loading setup..."
+                          : account.status ===
+                              "disconnected"
+                            ? "Reconnect"
+                            : account.role_arn
+                              ? "Review IAM setup"
+                              : "Continue setup"}
+                      </Button>
+                    )}
 
                     <Button
                       className="rounded-xl"
@@ -1192,9 +1463,35 @@ export function CloudAccountsPage() {
                     </Button>
 
                     {account.status !==
+                      "disconnected" &&
+                      account.status !==
+                        "disconnecting" && (
+                      <Button
+                        className="rounded-xl"
+                        disabled={
+                          disconnectCloudAccount.isPending
+                        }
+                        onClick={() =>
+                          setDisconnectAccount(
+                            account,
+                          )
+                        }
+                        size="sm"
+                        variant="destructive"
+                      >
+                        <Unplug className="mr-2 size-3.5" />
+
+                        Disconnect
+                      </Button>
+                    )}
+
+                    {account.status !==
                       "connected" && (
                       <p className="self-center text-xs text-muted-foreground">
-                        Validate AWS access before synchronization.
+                        {account.status ===
+                        "disconnected"
+                          ? "Historical CloudOps data is retained. Reconnect to resume AWS synchronization."
+                          : "Complete IAM setup and validate AWS access before synchronization."}
                       </p>
                     )}
                   </div>
@@ -1218,6 +1515,60 @@ export function CloudAccountsPage() {
         }
         open={
           dialogOpen
+        }
+      />
+
+      <AwsOnboardingDialog
+        isSaving={
+          updateAccountRole.isPending ||
+          validateAccount.isPending
+        }
+        onboarding={
+          onboardingAccount
+        }
+        onOpenChange={(
+          nextOpen,
+        ) => {
+          setOnboardingOpen(
+            nextOpen,
+          );
+
+          if (!nextOpen) {
+            setOnboardingAccount(
+              null,
+            );
+          }
+        }}
+        onSaveAndValidate={
+          handleSaveRoleAndValidate
+        }
+        open={
+          onboardingOpen
+        }
+      />
+
+      <AwsDisconnectDialog
+        account={
+          disconnectAccount
+        }
+        isDisconnecting={
+          disconnectCloudAccount.isPending
+        }
+        onConfirm={
+          handleDisconnect
+        }
+        onOpenChange={(
+          nextOpen,
+        ) => {
+          if (!nextOpen) {
+            setDisconnectAccount(
+              null,
+            );
+          }
+        }}
+        open={
+          disconnectAccount !==
+          null
         }
       />
     </section>
