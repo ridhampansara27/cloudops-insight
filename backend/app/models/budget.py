@@ -27,15 +27,14 @@ class Budget(
 
     # Store the organization that owns this budget.
     #
-    # This remains nullable temporarily while legacy data and all
-    # write paths are migrated to explicit tenant ownership.
-    organization_id: Mapped[UUID | None] = mapped_column(
+    # Every budget belongs to exactly one organization.
+    organization_id: Mapped[UUID] = mapped_column(
         ForeignKey(
             "organizations.id",
             ondelete="RESTRICT",
         ),
         index=True,
-        nullable=True,
+        nullable=False,
     )
 
     # Store the budget display name.
