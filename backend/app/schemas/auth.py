@@ -1,5 +1,7 @@
 """Authentication request and response contracts."""
 
+from typing import Literal
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -94,5 +96,30 @@ class ResetPasswordRequest(BaseModel):
 
 class AuthMessageResponse(BaseModel):
     """Return intentionally generic authentication workflow messages."""
+
+    message: str
+
+
+class DeleteAccountRequest(BaseModel):
+    """Require explicit confirmation and password re-authentication."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    confirmation: Literal["DELETE"]
+
+    current_password: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+
+
+class DeleteAccountResponse(BaseModel):
+    """Summarize successful permanent identity deletion."""
+
+    personal_workspaces_deleted: int
+
+    shared_workspaces_left: int
 
     message: str

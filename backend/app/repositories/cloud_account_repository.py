@@ -47,6 +47,7 @@ class CloudAccountRepository:
         *,
         account_id: UUID,
         organization_id: UUID,
+        for_update: bool = False,
     ) -> CloudAccount | None:
         statement = select(
             CloudAccount,
@@ -54,6 +55,9 @@ class CloudAccountRepository:
             CloudAccount.id == account_id,
             CloudAccount.organization_id == organization_id,
         )
+
+        if for_update:
+            statement = statement.with_for_update()
 
         result = await self.session.execute(
             statement,

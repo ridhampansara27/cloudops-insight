@@ -85,12 +85,14 @@ class OrganizationInvitation(
         nullable=False,
     )
 
-    invited_by_user_id: Mapped[UUID] = mapped_column(
+    invited_by_user_id: Mapped[UUID | None] = mapped_column(
+        # Keep invitation audit history if the inviting user later
+        # deletes their CloudOps identity.
         ForeignKey(
             "users.id",
-            ondelete="RESTRICT",
+            ondelete="SET NULL",
         ),
-        nullable=False,
+        nullable=True,
     )
 
     accepted_by_user_id: Mapped[UUID | None] = mapped_column(

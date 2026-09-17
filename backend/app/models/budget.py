@@ -103,14 +103,14 @@ class Budget(
     )
 
     # Store the user who created the budget.
-    created_by_id: Mapped[UUID] = mapped_column(
-        # Reference the users table.
+    created_by_id: Mapped[UUID | None] = mapped_column(
+        # Preserve organization-owned budget history if its creator
+        # later deletes their CloudOps identity.
         ForeignKey(
             "users.id",
-            ondelete="RESTRICT",
+            ondelete="SET NULL",
         ),
-        # Require ownership.
-        nullable=False,
+        nullable=True,
     )
 
     # Store current evaluated spending.

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ServerCog,
   ShieldCheck,
+  Trash2,
   Unplug,
   Wifi,
 } from "lucide-react";
@@ -71,12 +72,17 @@ import {
   AwsDisconnectDialog,
 } from "@/features/cloud-accounts/aws-disconnect-dialog";
 
+import {
+  AwsRemoveDialog,
+} from "@/features/cloud-accounts/aws-remove-dialog";
+
 // Import genuine backend operations.
 import {
   useCloudAccountOnboarding,
   useCloudAccounts,
   useCreateCloudAccount,
   useDisconnectCloudAccount,
+  useRemoveCloudAccount,
   useSyncCloudAccount,
   useUpdateCloudAccountRole,
   useValidateCloudAccount,
@@ -178,6 +184,22 @@ function getConnectionStyle(
 
       Icon:
         Unplug,
+    };
+  }
+
+  if (
+    status ===
+    "removing"
+  ) {
+    return {
+      badge:
+        "border-rose-400/20 bg-rose-400/8 text-rose-300",
+
+      label:
+        "Removing",
+
+      Icon:
+        Trash2,
     };
   }
 
@@ -315,6 +337,15 @@ export function CloudAccountsPage() {
       CloudAccountApiResponse | null
     >(null);
 
+  // Store the account selected for permanent CloudOps-data removal.
+  const [
+    removeAccount,
+    setRemoveAccount,
+  ] =
+    useState<
+      CloudAccountApiResponse | null
+    >(null);
+
   // Load registered AWS account configurations.
   // The API hook already polls every five seconds so Celery
   // synchronization state updates automatically.
@@ -333,6 +364,9 @@ export function CloudAccountsPage() {
 
   const disconnectCloudAccount =
     useDisconnectCloudAccount();
+
+  const removeCloudAccount =
+    useRemoveCloudAccount();
 
   const validateAccount =
     useValidateCloudAccount();
@@ -529,6 +563,33 @@ export function CloudAccountsPage() {
     } catch {
       toast.error(
         "Unable to disconnect AWS integration.",
+      );
+    }
+  }
+
+
+  // Permanently remove the integration and CloudOps-imported data.
+  async function handleRemoveIntegration() {
+    if (!removeAccount) {
+      return;
+    }
+
+    try {
+      const result =
+        await removeCloudAccount.mutateAsync(
+          removeAccount.id,
+        );
+
+      setRemoveAccount(
+        null,
+      );
+
+      toast.success(
+        result.message,
+      );
+    } catch {
+      toast.error(
+        "Unable to permanently remove AWS integration data.",
       );
     }
   }
@@ -1407,7 +1468,8 @@ export function CloudAccountsPage() {
                           ? "Validating..."
                           : "Revalidate"}
                       </Button>
-                    ) : (
+                    ) : account.status ===
+                      "removing" ? null : (
                       <Button
                         className="rounded-xl border-violet-400/20 bg-violet-400/8 text-violet-200 hover:bg-violet-400/12"
                         disabled={
@@ -1465,7 +1527,9 @@ export function CloudAccountsPage() {
                     {account.status !==
                       "disconnected" &&
                       account.status !==
-                        "disconnecting" && (
+                        "disconnecting" &&
+                      account.status !==
+                        "removing" && (
                       <Button
                         className="rounded-xl"
                         disabled={
@@ -1485,13 +1549,38 @@ export function CloudAccountsPage() {
                       </Button>
                     )}
 
+                    <Button
+                      className="rounded-xl border-rose-400/25 text-rose-300 hover:bg-rose-400/10 hover:text-rose-200"
+                      disabled={
+                        removeCloudAccount.isPending
+                      }
+                      onClick={() =>
+                        setRemoveAccount(
+                          account,
+                        )
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Trash2 className="mr-2 size-3.5" />
+
+                      {account.status ===
+                      "removing"
+                        ? "Retry removal"
+                        : "Remove data"}
+                    </Button>
+
                     {account.status !==
                       "connected" && (
                       <p className="self-center text-xs text-muted-foreground">
                         {account.status ===
-                        "disconnected"
-                          ? "Historical CloudOps data is retained. Reconnect to resume AWS synchronization."
-                          : "Complete IAM setup and validate AWS access before synchronization."}
+                        "removing"
+                          ? "Permanent CloudOps data removal is in progress. Retry removal if cleanup was interrupted."
+                          : account.status ===
+                              "disconnected"
+                            ? "Historical CloudOps data is retained. Reconnect to resume AWS synchronization."
+                            : "Complete IAM setup and validate AWS access before synchronization."}
                       </p>
                     )}
                   </div>
@@ -1571,6 +1660,35 @@ export function CloudAccountsPage() {
           null
         }
       />
+      <AwsRemoveDialog
+        account={
+          removeAccount
+        }
+        key={
+          removeAccount?.id ??
+          "closed"
+        }
+        isRemoving={
+          removeCloudAccount.isPending
+        }
+        onConfirm={
+          handleRemoveIntegration
+        }
+        onOpenChange={(
+          nextOpen,
+        ) => {
+          if (!nextOpen) {
+            setRemoveAccount(
+              null,
+            );
+          }
+        }}
+        open={
+          removeAccount !==
+          null
+        }
+      />
+
     </section>
   );
 }

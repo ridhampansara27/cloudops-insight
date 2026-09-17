@@ -22,6 +22,8 @@ from app.schemas.cloud_account import (
     CloudAccountDisconnectResponse,
     CloudAccountOnboardingRead,
     CloudAccountRead,
+    CloudAccountRemovalRequest,
+    CloudAccountRemovalResponse,
     CloudAccountUpdate,
     CloudAccountValidationResponse,
 )
@@ -250,7 +252,14 @@ async def validate_cloud_account(
     ).get_for_organization(
         account_id=account_id,
         organization_id=tenant.organization_id,
+        for_update=True,
     )
+
+    if account.status == "removing":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS integration removal is already in progress.",
+        )
 
     if account.status in {
         "disconnecting",
@@ -562,6 +571,35 @@ async def sync_cloud_account_costs(
     return CostSyncResponse(
         account_id=account_id,
         records_imported=imported,
+    )
+
+
+@router.post(
+    "/{account_id}/remove",
+    response_model=CloudAccountRemovalResponse,
+)
+async def remove_cloud_account(
+    account_id: UUID,
+    payload: CloudAccountRemovalRequest,
+    tenant: TenantOwnerOrAdmin,
+    session: DatabaseSession,
+) -> CloudAccountRemovalResponse:
+    """Permanently remove CloudOps integration data, never AWS resources."""
+
+    budgets_deleted = await CloudAccountService(
+        session,
+    ).remove(
+        account_id=account_id,
+        organization_id=tenant.organization_id,
+    )
+
+    return CloudAccountRemovalResponse(
+        account_id=account_id,
+        account_budgets_deleted=budgets_deleted,
+        message=(
+            "AWS integration and imported CloudOps data were permanently "
+            "removed. No AWS resources were modified."
+        ),
     )
 
 

@@ -23,6 +23,8 @@ from app.core.security import (
 )
 from app.schemas.auth import (
     AuthMessageResponse,
+    DeleteAccountRequest,
+    DeleteAccountResponse,
     ForgotPasswordRequest,
     ResendVerificationRequest,
     ResetPasswordRequest,
@@ -31,6 +33,12 @@ from app.schemas.auth import (
     VerifyEmailRequest,
 )
 from app.schemas.user import UserRead
+from app.services.account_deletion_service import (
+    AccountDeletionCloudIntegrationsRemainError,
+    AccountDeletionLastOwnerError,
+    AccountDeletionService,
+    InvalidAccountDeletionPasswordError,
+)
 from app.services.auth_cookie_service import (
     clear_refresh_cookie,
     set_refresh_cookie,
@@ -441,6 +449,65 @@ async def logout(
 
     clear_refresh_cookie(
         response,
+    )
+
+
+@router.post(
+    "/delete-account",
+    response_model=DeleteAccountResponse,
+)
+async def delete_account(
+    payload: DeleteAccountRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+    session: DatabaseSession,
+) -> DeleteAccountResponse:
+    """Permanently delete the authenticated CloudOps identity."""
+
+    enforce_trusted_browser_origin(
+        request,
+    )
+
+    try:
+        result = await AccountDeletionService(
+            session,
+        ).delete_account(
+            user_id=current_user.id,
+            current_password=payload.current_password,
+        )
+
+    except InvalidAccountDeletionPasswordError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        ) from error
+
+    except AccountDeletionLastOwnerError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=("Transfer workspace ownership before deleting your account."),
+        ) from error
+
+    except AccountDeletionCloudIntegrationsRemainError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Remove all cloud integrations from personal workspaces "
+                "before deleting your account."
+            ),
+        ) from error
+
+    # The database deletion cascades all refresh-session rows. Clearing the
+    # browser cookie completes the client-side session lifecycle as well.
+    clear_refresh_cookie(
+        response,
+    )
+
+    return DeleteAccountResponse(
+        personal_workspaces_deleted=result.personal_workspaces_deleted,
+        shared_workspaces_left=result.shared_workspaces_left,
+        message="CloudOps account deleted successfully.",
     )
 
 
