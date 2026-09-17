@@ -4,6 +4,7 @@ from uuid import UUID
 from anyio import to_thread
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import (
     CurrentTenant,
@@ -371,7 +372,55 @@ async def validate_cloud_account(
     account.last_validation_error = None
     account.disconnected_at = None
 
-    await session.commit()
+    try:
+        await session.commit()
+
+    except IntegrityError as error:
+        # PostgreSQL/asyncpg keeps the provider exception as the cause of
+        # SQLAlchemy's adapted DBAPI error.
+        original_error = getattr(
+            error.orig,
+            "__cause__",
+            None,
+        )
+
+        constraint_name = getattr(
+            original_error,
+            "constraint_name",
+            None,
+        )
+
+        # Never disguise unrelated integrity failures as ownership conflicts.
+        if constraint_name != (
+            "uq_cloud_accounts_connected_provider_external_account_id"
+        ):
+            raise
+
+        # Another organization completed validation for the same
+        # provider-native account while this AWS validation was running.
+        await session.rollback()
+
+        account = await CloudAccountService(
+            session,
+        ).get_for_organization(
+            account_id=account_id,
+            organization_id=tenant.organization_id,
+        )
+
+        account.last_validated_at = datetime.now(
+            UTC,
+        )
+        account.status = "error"
+        account.last_validation_error = (
+            "AWS account is already connected or unavailable."
+        )
+
+        await session.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AWS account is already connected or unavailable.",
+        ) from error
 
     return CloudAccountValidationResponse(
         connected=True,

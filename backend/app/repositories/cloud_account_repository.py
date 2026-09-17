@@ -61,15 +61,17 @@ class CloudAccountRepository:
 
         return result.scalar_one_or_none()
 
-    async def get_by_external_id(
+    async def get_by_external_id_for_organization(
         self,
         *,
+        organization_id: UUID,
         provider: str,
         external_account_id: str,
     ) -> CloudAccount | None:
         statement = select(
             CloudAccount,
         ).where(
+            CloudAccount.organization_id == organization_id,
             CloudAccount.provider == provider,
             CloudAccount.external_account_id == external_account_id,
         )

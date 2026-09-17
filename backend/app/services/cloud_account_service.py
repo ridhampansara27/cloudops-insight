@@ -58,7 +58,8 @@ class CloudAccountService:
                 ),
             ) from error
 
-        existing = await self.repository.get_by_external_id(
+        existing = await self.repository.get_by_external_id_for_organization(
+            organization_id=organization_id,
             provider=payload.provider.lower(),
             external_account_id=payload.external_account_id,
         )
