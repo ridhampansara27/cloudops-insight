@@ -112,7 +112,7 @@ async def read_organization(
         organization = await WorkspaceAdministrationService(
             session,
         ).get_organization(
-            organization_id=tenant.org_id,
+            organization_id=tenant.organization_id,
         )
 
     except WorkspaceOrganizationNotFoundError as error:
@@ -146,7 +146,7 @@ async def update_organization(
         organization = await WorkspaceAdministrationService(
             session,
         ).update_organization(
-            organization_id=tenant.org_id,
+            organization_id=tenant.organization_id,
             name=payload.name,
         )
 
@@ -179,7 +179,7 @@ async def list_members(
     members = await WorkspaceAdministrationService(
         session,
     ).list_members(
-        organization_id=tenant.org_id,
+        organization_id=tenant.organization_id,
     )
 
     return [
@@ -212,7 +212,7 @@ async def update_member_role(
         member = await WorkspaceAdministrationService(
             session,
         ).update_member_role(
-            organization_id=tenant.org_id,
+            organization_id=tenant.organization_id,
             membership_id=membership_id,
             role=payload.role,
         )
@@ -255,7 +255,7 @@ async def remove_member(
         await WorkspaceAdministrationService(
             session,
         ).remove_member(
-            organization_id=tenant.org_id,
+            organization_id=tenant.organization_id,
             membership_id=membership_id,
         )
 
@@ -312,7 +312,7 @@ async def create_workspace_invitation(
     await limit_invitation_issue(
         request,
         user_id=current_user.id,
-        organization_id=tenant.org_id,
+        organization_id=tenant.organization_id,
         email=str(
             payload.email,
         ),
@@ -334,7 +334,7 @@ async def create_workspace_invitation(
             session,
             email_sender=email_sender,
         ).issue_invitation(
-            organization_id=tenant.org_id,
+            organization_id=tenant.organization_id,
             invited_email=str(
                 payload.email,
             ),
@@ -392,7 +392,7 @@ async def list_workspace_invitations(
     invitations = await WorkspaceInvitationService(
         session,
     ).list_invitations(
-        organization_id=tenant.org_id,
+        organization_id=tenant.organization_id,
     )
 
     return [
@@ -418,7 +418,7 @@ async def revoke_workspace_invitation(
         await WorkspaceInvitationService(
             session,
         ).revoke_invitation(
-            organization_id=tenant.org_id,
+            organization_id=tenant.organization_id,
             invitation_id=invitation_id,
         )
 

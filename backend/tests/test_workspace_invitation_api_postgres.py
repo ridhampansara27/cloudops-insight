@@ -204,7 +204,7 @@ async def test_invitation_api_issue_list_accept_and_replay(
             )
 
             tenant = SimpleNamespace(
-                org_id=organization.id,
+                organization_id=organization.id,
                 role="owner",
             )
 
@@ -363,7 +363,7 @@ async def test_invitation_api_revoke_is_tenant_scoped(
             )
 
             tenant_b = SimpleNamespace(
-                org_id=organization_b.id,
+                organization_id=organization_b.id,
                 role="owner",
             )
 
@@ -379,7 +379,7 @@ async def test_invitation_api_revoke_is_tenant_scoped(
             )
 
             tenant_a = SimpleNamespace(
-                org_id=organization_a.id,
+                organization_id=organization_a.id,
                 role="owner",
             )
 
