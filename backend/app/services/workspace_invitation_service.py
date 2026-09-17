@@ -113,7 +113,7 @@ class WorkspaceInvitationRecord:
 
     status: str
 
-    invited_by_user_id: UUID
+    invited_by_user_id: UUID | None
 
     expires_at: datetime
 

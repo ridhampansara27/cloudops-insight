@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.budget import Budget
@@ -90,10 +90,12 @@ class CloudAccountService:
         *,
         account_id: UUID,
         organization_id: UUID,
+        for_update: bool = False,
     ) -> CloudAccount:
         account = await self.repository.get_by_id_for_organization(
             account_id=account_id,
             organization_id=organization_id,
+            for_update=for_update,
         )
 
         if account is None:
@@ -116,7 +118,19 @@ class CloudAccountService:
         account = await self.get_for_organization(
             account_id=account_id,
             organization_id=organization_id,
+            for_update=True,
         )
+
+        if account.status in {
+            "disconnecting",
+            "removing",
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Cloud integration lifecycle operation is already in progress."
+                ),
+            )
 
         changes = payload.model_dump(
             exclude_unset=True,
@@ -174,6 +188,67 @@ class CloudAccountService:
             payload=payload,
         )
 
+    async def remove(
+        self,
+        *,
+        account_id: UUID,
+        organization_id: UUID,
+    ) -> int:
+        """Permanently remove one integration and all imported account data."""
+
+        account = await self.get_for_organization(
+            account_id=account_id,
+            organization_id=organization_id,
+            for_update=True,
+        )
+
+        # First establish the AWS-access security boundary.
+        #
+        # A queued worker holding an older revision must become stale before
+        # destructive cleanup starts. If a previous removal attempt stopped
+        # after this commit, retry safely continues without incrementing again.
+        if account.status != "removing":
+            account.status = "removing"
+            account.connection_revision += 1
+
+            account.sync_status = "idle"
+            account.sync_started_at = None
+            account.last_sync_error = None
+
+            await self.session.commit()
+
+            await self.session.refresh(
+                account,
+            )
+
+        # Account budgets use a textual scope rather than a foreign key,
+        # therefore PostgreSQL cannot cascade them from cloud_accounts.
+        budget_result = await self.session.execute(
+            delete(
+                Budget,
+            ).where(
+                Budget.organization_id == organization_id,
+                Budget.scope_type == "account",
+                Budget.scope_value
+                == str(
+                    account.id,
+                ),
+            )
+        )
+
+        budgets_deleted = budget_result.rowcount or 0
+
+        # resources and cost_records cascade from cloud_accounts.
+        # Resource-owned metrics, incidents, recommendations and tags then
+        # cascade from resources.
+        await self.session.delete(
+            account,
+        )
+
+        await self.session.commit()
+
+        return budgets_deleted
+
     async def disconnect(
         self,
         *,
@@ -188,7 +263,14 @@ class CloudAccountService:
         account = await self.get_for_organization(
             account_id=account_id,
             organization_id=organization_id,
+            for_update=True,
         )
+
+        if account.status == "removing":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="AWS integration removal is already in progress.",
+            )
 
         # Idempotent disconnect.
         if account.status == "disconnected":

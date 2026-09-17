@@ -7,6 +7,7 @@ import {
 import type {
   AuthenticatedUser,
   AuthMessageResponse,
+  DeleteAccountResponse,
   LoginResponse,
   SignupInput,
 } from "@/types/auth";
@@ -149,6 +150,29 @@ export async function logoutSession(): Promise<void> {
       // Logout authenticates with the HttpOnly refresh cookie rather
       // than requiring a still-valid access JWT.
       requiresAuth: false,
+    },
+  );
+}
+
+
+// Permanently delete the authenticated CloudOps identity.
+//
+// The backend independently verifies both the destructive confirmation
+// and the current password before deleting any identity state.
+export async function deleteAccount(
+  currentPassword: string,
+): Promise<DeleteAccountResponse> {
+  return apiRequest<DeleteAccountResponse>(
+    "/api/v1/auth/delete-account",
+    {
+      method: "POST",
+      json: {
+        confirmation:
+          "DELETE",
+
+        current_password:
+          currentPassword,
+      },
     },
   );
 }

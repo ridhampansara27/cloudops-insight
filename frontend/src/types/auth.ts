@@ -12,6 +12,16 @@ export interface AuthMessageResponse {
 }
 
 
+// Define successful permanent-account deletion response.
+export interface DeleteAccountResponse {
+  personal_workspaces_deleted: number;
+
+  shared_workspaces_left: number;
+
+  message: string;
+}
+
+
 // Define commercial signup input.
 export interface SignupInput {
   email: string;

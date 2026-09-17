@@ -139,14 +139,14 @@ class CloudAccount(
     )
 
     # Record which CloudOps user created the account.
-    created_by_id: Mapped[UUID] = mapped_column(
-        # Reference the users table.
+    created_by_id: Mapped[UUID | None] = mapped_column(
+        # Preserve the organization-owned integration if its creator
+        # later deletes their CloudOps identity.
         ForeignKey(
             "users.id",
-            ondelete="RESTRICT",
+            ondelete="SET NULL",
         ),
-        # Require ownership information.
-        nullable=False,
+        nullable=True,
     )
 
     # Store when AWS credentials were most recently validated.

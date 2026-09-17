@@ -21,6 +21,14 @@ import {
 } from "sonner";
 
 import {
+  DeleteAccountDialog,
+} from "@/features/auth/delete-account-dialog";
+
+import {
+  deleteAccount,
+} from "@/features/auth/api/auth-api";
+
+import {
   InviteMemberDialog,
 } from "@/features/workspace/invite-member-dialog";
 
@@ -41,6 +49,10 @@ import type {
   WorkspaceInvitationStatus,
   WorkspaceRole,
 } from "@/features/workspace/workspace-types";
+
+import {
+  useWorkspaceStore,
+} from "@/features/workspace/workspace-store";
 
 import {
   useAuthStore,
@@ -177,6 +189,22 @@ export function SettingsPage() {
       false,
     );
 
+  const [
+    deleteAccountOpen,
+    setDeleteAccountOpen,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    isDeletingAccount,
+    setIsDeletingAccount,
+  ] =
+    useState(
+      false,
+    );
+
 
   const profileQuery =
     useWorkspaceProfile();
@@ -231,6 +259,22 @@ export function SettingsPage() {
         state,
       ) =>
         state.setUser,
+    );
+
+  const logout =
+    useAuthStore(
+      (
+        state,
+      ) =>
+        state.logout,
+    );
+
+  const setActiveOrganizationId =
+    useWorkspaceStore(
+      (
+        state,
+      ) =>
+        state.setActiveOrganizationId,
     );
 
 
@@ -504,6 +548,50 @@ export function SettingsPage() {
         readableError(
           error,
           "Unable to revoke this invitation.",
+        ),
+      );
+    }
+  }
+
+
+  async function handleDeleteAccount(
+    currentPassword: string,
+  ) {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeletingAccount(
+      true,
+    );
+
+    try {
+      await deleteAccount(
+        currentPassword,
+      );
+
+      // The backend has now deleted the identity and refresh sessions.
+      // Clear browser-memory auth and persisted workspace selection before
+      // hard navigation removes the remaining in-memory application cache.
+      logout();
+
+      setActiveOrganizationId(
+        null,
+      );
+
+      window.location.replace(
+        "/login",
+      );
+
+    } catch (error) {
+      setIsDeletingAccount(
+        false,
+      );
+
+      toast.error(
+        readableError(
+          error,
+          "Unable to delete your CloudOps account.",
         ),
       );
     }
@@ -1222,6 +1310,82 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+
+      {/* =====================================================
+          Account danger zone
+          ===================================================== */}
+      <Card className="overflow-hidden border-rose-400/20 bg-card/72 py-0">
+        <CardHeader className="border-b border-rose-400/15 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl border border-rose-400/25 bg-rose-400/10 text-rose-300">
+              <Trash2 className="size-[18px]" />
+            </div>
+
+            <div>
+              <CardTitle>
+                Danger zone
+              </CardTitle>
+
+              <CardDescription className="mt-1">
+                Permanent identity and account lifecycle operations.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-5">
+          <div className="flex flex-col gap-4 rounded-xl border border-rose-400/15 bg-rose-400/[0.035] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold">
+                Delete CloudOps account
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Permanently delete your CloudOps identity. Shared workspace
+                data is preserved, last-owner safety is enforced, and personal
+                cloud integrations must be removed before deletion.
+              </p>
+            </div>
+
+            <Button
+              className="shrink-0 rounded-xl"
+              onClick={() =>
+                setDeleteAccountOpen(
+                  true,
+                )
+              }
+              type="button"
+              variant="destructive"
+            >
+              <Trash2 className="mr-2 size-4" />
+
+              Delete account
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+
+      <DeleteAccountDialog
+        isDeleting={
+          isDeletingAccount
+        }
+        key={
+          deleteAccountOpen
+            ? "delete-open"
+            : "delete-closed"
+        }
+        onConfirm={
+          handleDeleteAccount
+        }
+        onOpenChange={
+          setDeleteAccountOpen
+        }
+        open={
+          deleteAccountOpen
+        }
+      />
 
 
       {canAdministerWorkspace && (

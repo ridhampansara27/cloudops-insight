@@ -20,6 +20,7 @@ import type {
   CloudAccountApiResponse,
   CloudAccountDisconnectApiResponse,
   CloudAccountOnboardingApiResponse,
+  CloudAccountRemovalApiResponse,
   CloudAccountSyncQueuedResponse,
   CloudAccountValidationApiResponse,
 } from "@/types/api";
@@ -144,6 +145,28 @@ async function disconnectCloudAccount(
 }
 
 
+// Permanently remove one CloudOps provider integration.
+//
+// This deletes CloudOps-owned imported data only.
+// It never deletes resources inside the customer's AWS account.
+async function removeCloudAccount(
+  accountId: string,
+): Promise<CloudAccountRemovalApiResponse> {
+  return apiRequest<
+    CloudAccountRemovalApiResponse
+  >(
+    `/api/v1/cloud-accounts/${accountId}/remove`,
+    {
+      method: "POST",
+      json: {
+        confirmation:
+          "REMOVE",
+      },
+    },
+  );
+}
+
+
 // Queue genuine AWS inventory discovery.
 async function syncCloudAccount(
   accountId: string,
@@ -260,6 +283,64 @@ export function useDisconnectCloudAccount() {
           queryKeys.cloudAccounts
             .all,
       });
+    },
+  });
+}
+
+
+// Permanently remove one CloudOps AWS integration.
+export function useRemoveCloudAccount() {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn:
+      removeCloudAccount,
+
+    onSuccess: async () => {
+      // Permanent integration removal affects several cached domains.
+      // Mark all of them stale so deleted provider data cannot remain
+      // presented as current after the destructive operation succeeds.
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.cloudAccounts
+              .all,
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.dashboard
+              .summary,
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.resources
+              .all,
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.costs
+              .summary,
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.budgets,
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.incidents,
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey:
+            queryKeys.recommendations,
+        }),
+      ]);
     },
   });
 }

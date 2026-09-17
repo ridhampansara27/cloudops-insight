@@ -90,7 +90,7 @@ export interface WorkspaceInvitation {
   status:
     WorkspaceInvitationStatus;
 
-  invited_by_user_id: string;
+  invited_by_user_id: string | null;
 
   expires_at: string;
 

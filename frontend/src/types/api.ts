@@ -117,6 +117,16 @@ export interface CloudAccountDisconnectApiResponse {
 }
 
 
+// Define permanent CloudOps integration-removal response.
+export interface CloudAccountRemovalApiResponse {
+  account_id: string;
+
+  account_budgets_deleted: number;
+
+  message: string;
+}
+
+
 // Define queued synchronization response.
 export interface CloudAccountSyncQueuedResponse {
   // Store account UUID.

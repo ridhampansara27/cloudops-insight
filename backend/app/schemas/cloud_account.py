@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -113,5 +113,25 @@ class CloudAccountDisconnectResponse(BaseModel):
     connection_revision: int
 
     account_budgets_deactivated: int
+
+    message: str
+
+
+class CloudAccountRemovalRequest(BaseModel):
+    """Require an explicit destructive confirmation."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    confirmation: Literal["REMOVE"]
+
+
+class CloudAccountRemovalResponse(BaseModel):
+    """Describe permanent removal of one cloud integration."""
+
+    account_id: UUID
+
+    account_budgets_deleted: int
 
     message: str
