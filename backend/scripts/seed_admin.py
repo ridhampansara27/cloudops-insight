@@ -3,14 +3,17 @@
 import asyncio
 from datetime import UTC, datetime
 
+from sqlalchemy import select
+
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import async_session_factory
+from app.models.organization import Organization, OrganizationMembership
 from app.repositories.user_repository import UserRepository
 
 
 async def seed_admin() -> None:
-    """Create a verified local administrator when explicitly configured."""
+    """Create a verified administrator together with an owner workspace."""
 
     if not settings.seed_admin_password:
         raise RuntimeError(
@@ -22,36 +25,91 @@ async def seed_admin() -> None:
             session,
         )
 
-        existing_user = await repository.get_by_email(
+        user = await repository.get_by_email(
             settings.seed_admin_email,
         )
 
-        if existing_user is not None:
-            print(
-                "Administrator already exists:",
-                existing_user.email,
+        created_user = False
+
+        if user is None:
+            user = await repository.create(
+                email=settings.seed_admin_email,
+                full_name=settings.seed_admin_name,
+                password_hash=hash_password(
+                    settings.seed_admin_password,
+                ),
+                role="admin",
+                email_verified_at=datetime.now(
+                    UTC,
+                ),
+                # Keep user + workspace creation inside one transaction.
+                commit=False,
             )
 
-            return
+            created_user = True
 
-        hashed_password = hash_password(
-            settings.seed_admin_password,
-        )
-
-        user = await repository.create(
-            email=settings.seed_admin_email,
-            full_name=settings.seed_admin_name,
-            password_hash=hashed_password,
-            role="admin",
-            email_verified_at=datetime.now(
-                UTC,
+        # Reuse an existing active owner workspace when one already exists.
+        membership_result = await session.execute(
+            select(
+                OrganizationMembership,
+            )
+            .where(
+                OrganizationMembership.user_id == user.id,
+                OrganizationMembership.role == "owner",
+                OrganizationMembership.is_active.is_(True),
+            )
+            .order_by(
+                OrganizationMembership.created_at,
+                OrganizationMembership.id,
+            )
+            .limit(
+                1,
             ),
         )
 
-        print(
-            "Created administrator:",
-            user.email,
-        )
+        membership = membership_result.scalar_one_or_none()
+
+        if membership is None:
+            workspace_name = (f"{user.full_name or user.email} Workspace")[:160]
+
+            organization = Organization(
+                name=workspace_name,
+                is_active=True,
+            )
+
+            session.add(
+                organization,
+            )
+
+            await session.flush()
+
+            session.add(
+                OrganizationMembership(
+                    organization_id=organization.id,
+                    user_id=user.id,
+                    role="owner",
+                    is_active=True,
+                ),
+            )
+
+            await session.commit()
+
+        elif created_user:
+            # Defensive transaction boundary. A newly created user should
+            # normally enter the branch above, but never leave it uncommitted.
+            await session.commit()
+
+        if created_user:
+            print(
+                "Created administrator:",
+                user.email,
+            )
+
+        else:
+            print(
+                "Administrator already exists:",
+                user.email,
+            )
 
 
 if __name__ == "__main__":

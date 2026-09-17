@@ -38,16 +38,14 @@ class CloudAccount(
 
     # Store the organization that owns this cloud integration.
     #
-    # This remains nullable during the commercial migration rollout.
-    # A later migration will enforce NOT NULL after every creation
-    # and synchronization path is tenant-aware.
-    organization_id: Mapped[UUID | None] = mapped_column(
+    # Every cloud account belongs to exactly one organization.
+    organization_id: Mapped[UUID] = mapped_column(
         ForeignKey(
             "organizations.id",
             ondelete="RESTRICT",
         ),
         index=True,
-        nullable=True,
+        nullable=False,
     )
 
     # Store the cloud provider.

@@ -18,6 +18,7 @@ from app.models.budget import Budget
 from app.models.cloud_account import CloudAccount
 from app.models.cost import CostRecord
 from app.models.incident import Incident
+from app.models.organization import OrganizationMembership
 from app.models.recommendation import Recommendation
 from app.models.resource import CloudResource, ResourceTag
 from app.models.user import User
@@ -45,11 +46,41 @@ async def seed_demo_data() -> None:
                 "No administrator exists. Run scripts.seed_admin first.",
             )
 
+        # Resolve the administrator's owner workspace.
+        membership_result = await session.execute(
+            select(
+                OrganizationMembership,
+            )
+            .where(
+                OrganizationMembership.user_id == admin.id,
+                OrganizationMembership.role == "owner",
+                OrganizationMembership.is_active.is_(True),
+            )
+            .order_by(
+                OrganizationMembership.created_at,
+                OrganizationMembership.id,
+            )
+            .limit(
+                1,
+            ),
+        )
+
+        membership = membership_result.scalar_one_or_none()
+
+        if membership is None:
+            raise RuntimeError(
+                "Administrator has no active owner workspace. "
+                "Run scripts.seed_admin again.",
+            )
+
+        organization_id = membership.organization_id
+
         # Check whether demo data was already created.
         existing_result = await session.execute(
             select(
                 CloudAccount,
             ).where(
+                CloudAccount.organization_id == organization_id,
                 CloudAccount.external_account_id == "123456789012",
             ),
         )
@@ -71,6 +102,7 @@ async def seed_demo_data() -> None:
 
         # Create the demonstration AWS account.
         account = CloudAccount(
+            organization_id=organization_id,
             provider="aws",
             name="CloudOps Demo AWS",
             external_account_id="123456789012",
@@ -357,6 +389,7 @@ async def seed_demo_data() -> None:
         # Create an account-level budget.
         session.add(
             Budget(
+                organization_id=organization_id,
                 name="AWS Monthly Budget",
                 scope_type="account",
                 scope_value=(account.external_account_id),

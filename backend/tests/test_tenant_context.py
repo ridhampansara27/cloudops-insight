@@ -51,19 +51,19 @@ def make_context(
     )
 
 
-def test_cloud_account_has_transitional_organization_fk() -> None:
+def test_cloud_account_requires_organization_fk() -> None:
     column = CloudAccount.__table__.c.organization_id
 
-    assert column.nullable is True
+    assert column.nullable is False
     assert {foreign_key.target_fullname for foreign_key in column.foreign_keys} == {
         "organizations.id",
     }
 
 
-def test_budget_has_transitional_organization_fk() -> None:
+def test_budget_requires_organization_fk() -> None:
     column = Budget.__table__.c.organization_id
 
-    assert column.nullable is True
+    assert column.nullable is False
     assert {foreign_key.target_fullname for foreign_key in column.foreign_keys} == {
         "organizations.id",
     }
