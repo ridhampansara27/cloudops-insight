@@ -3,7 +3,15 @@ from datetime import datetime
 from uuid import UUID
 
 # Import SQLAlchemy database constructs.
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 
 # Import PostgreSQL JSON storage.
 from sqlalchemy.dialects.postgresql import JSONB
@@ -27,12 +35,24 @@ class CloudAccount(
     # Define the database table.
     __tablename__ = "cloud_accounts"
 
-    # Ensure the same provider account cannot be registered twice.
+    # Prevent duplicate onboarding records inside one organization while
+    # allowing separate tenants to independently prove AWS ownership.
+    #
+    # Once validation succeeds, only one organization may hold the global
+    # connected claim for a provider-native account.
     __table_args__ = (
         UniqueConstraint(
+            "organization_id",
             "provider",
             "external_account_id",
-            name="uq_cloud_accounts_provider_external_account_id",
+            name="uq_cloud_accounts_org_provider_external_account_id",
+        ),
+        Index(
+            "uq_cloud_accounts_connected_provider_external_account_id",
+            "provider",
+            "external_account_id",
+            unique=True,
+            postgresql_where=text("status = 'connected'"),
         ),
     )
 
