@@ -7,6 +7,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import {
+  LegalFooter,
+} from "@/components/legal/legal-footer";
+
 
 interface AuthShellProps {
   eyebrow: string;
@@ -102,6 +106,11 @@ export function AuthShell({
             <div className="mt-8">
               {children}
             </div>
+
+            <LegalFooter
+              className="mt-8 border-t border-border/50 pt-5"
+              compact
+            />
           </div>
         </section>
       </div>

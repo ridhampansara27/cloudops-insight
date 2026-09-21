@@ -131,6 +131,70 @@ async function loadInvitationAcceptRoute() {
 }
 
 
+// Load the public privacy notice only when requested.
+async function loadPrivacyRoute() {
+  const {
+    PrivacyPage,
+  } =
+    await import(
+      "@/pages/legal-pages"
+    );
+
+  return {
+    Component:
+      PrivacyPage,
+  };
+}
+
+
+// Load the public terms only when requested.
+async function loadTermsRoute() {
+  const {
+    TermsPage,
+  } =
+    await import(
+      "@/pages/legal-pages"
+    );
+
+  return {
+    Component:
+      TermsPage,
+  };
+}
+
+
+// Load provider information without requiring authentication.
+async function loadImpressumRoute() {
+  const {
+    ImpressumPage,
+  } =
+    await import(
+      "@/pages/legal-pages"
+    );
+
+  return {
+    Component:
+      ImpressumPage,
+  };
+}
+
+
+// Load the public contact page.
+async function loadContactRoute() {
+  const {
+    ContactPage,
+  } =
+    await import(
+      "@/pages/legal-pages"
+    );
+
+  return {
+    Component:
+      ContactPage,
+  };
+}
+
+
 // Load commercial workspace settings only when visited.
 async function loadSettingsRoute() {
   const {
@@ -366,6 +430,38 @@ export const appRouter =
 
       lazy:
         loadInvitationAcceptRoute,
+    },
+    {
+      // Public privacy information must remain accessible without login.
+      path:
+        "/privacy",
+
+      lazy:
+        loadPrivacyRoute,
+    },
+    {
+      // Public service terms.
+      path:
+        "/terms",
+
+      lazy:
+        loadTermsRoute,
+    },
+    {
+      // Public provider information.
+      path:
+        "/impressum",
+
+      lazy:
+        loadImpressumRoute,
+    },
+    {
+      // Public support and security contact information.
+      path:
+        "/contact",
+
+      lazy:
+        loadContactRoute,
     },
     {
       // Protect every application route.
