@@ -387,6 +387,24 @@ export function SignupPage() {
           password hash.
         </p>
 
+        <p className="text-xs leading-5 text-muted-foreground">
+          By creating a workspace, you agree to the{" "}
+          <Link
+            className="font-medium text-cyan-300 transition-colors hover:text-cyan-200"
+            to="/terms"
+          >
+            Terms of Use
+          </Link>
+          {" "}and acknowledge the{" "}
+          <Link
+            className="font-medium text-cyan-300 transition-colors hover:text-cyan-200"
+            to="/privacy"
+          >
+            Privacy Policy
+          </Link>
+          .
+        </p>
+
         {errorMessage && (
           <div
             aria-live="polite"
