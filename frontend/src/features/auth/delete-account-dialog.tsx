@@ -60,6 +60,32 @@ export function DeleteAccountDialog({
   ] =
     useState("");
 
+  function handleDialogOpenChange(
+    nextOpen: boolean,
+  ) {
+    // Never retain sensitive destructive-confirmation state after close.
+    if (
+      isDeleting &&
+      !nextOpen
+    ) {
+      return;
+    }
+
+    if (!nextOpen) {
+      setConfirmation(
+        "",
+      );
+
+      setCurrentPassword(
+        "",
+      );
+    }
+
+    onOpenChange(
+      nextOpen,
+    );
+  }
+
   const confirmed =
     confirmation ===
       "DELETE" &&
@@ -68,21 +94,9 @@ export function DeleteAccountDialog({
 
   return (
     <Dialog
-      onOpenChange={(
-        nextOpen,
-      ) => {
-        // Prevent dismissal while the destructive request is running.
-        if (
-          isDeleting &&
-          !nextOpen
-        ) {
-          return;
-        }
-
-        onOpenChange(
-          nextOpen,
-        );
-      }}
+      onOpenChange={
+        handleDialogOpenChange
+      }
       open={
         open
       }
@@ -216,7 +230,7 @@ export function DeleteAccountDialog({
               isDeleting
             }
             onClick={() =>
-              onOpenChange(
+              handleDialogOpenChange(
                 false,
               )
             }
