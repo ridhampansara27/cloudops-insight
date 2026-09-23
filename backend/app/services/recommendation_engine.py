@@ -198,7 +198,7 @@ class RecommendationEngine:
             ):
                 existing_recommendation.status = "resolved"
 
-                await self.session.commit()
+                # MonitoringSyncService owns the transaction commit.
 
             return None
 
@@ -389,10 +389,10 @@ class RecommendationEngine:
             recommendation.confidence = "medium"
 
         # -----------------------------------------------------
-        # 14. Persist the recommendation.
+        # 14. Flush inside the caller-owned transaction.
         # -----------------------------------------------------
 
-        await self.session.commit()
+        await self.session.flush()
 
         await self.session.refresh(
             recommendation,
