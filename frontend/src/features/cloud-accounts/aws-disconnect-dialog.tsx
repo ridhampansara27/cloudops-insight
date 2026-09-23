@@ -54,9 +54,21 @@ export function AwsDisconnectDialog({
 
   return (
     <Dialog
-      onOpenChange={
-        onOpenChange
-      }
+      onOpenChange={(
+        nextOpen,
+      ) => {
+        // Keep lifecycle state visible while disconnect is running.
+        if (
+          isDisconnecting &&
+          !nextOpen
+        ) {
+          return;
+        }
+
+        onOpenChange(
+          nextOpen,
+        );
+      }}
       open={
         open
       }
