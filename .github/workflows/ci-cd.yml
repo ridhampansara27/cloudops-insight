@@ -352,6 +352,16 @@ jobs:
         with:
           context: ./frontend
           platforms: ${{ matrix.platform }}
+
+          # Always resolve the freshest Node/NGINX Alpine base images.
+          pull: true
+
+          # The final runtime stage performs `apk upgrade --no-cache`.
+          # Do not reuse that stage from the GHA/BuildKit cache, otherwise
+          # newly published Alpine security fixes can remain hidden behind
+          # an older cached package-upgrade layer.
+          no-cache-filters: runtime
+
           load: true
           push: false
           tags: >-
