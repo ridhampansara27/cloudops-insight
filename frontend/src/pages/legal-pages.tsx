@@ -7,7 +7,6 @@ import {
   CloudCog,
   Mail,
   ShieldCheck,
-  TriangleAlert,
 } from "lucide-react";
 
 import {
@@ -23,7 +22,7 @@ const CONTACT_EMAIL =
   "support@cloudopsinsight.tech";
 
 const LAST_UPDATED =
-  "21 September 2026";
+  "24 September 2026";
 
 
 interface LegalPageShellProps {
@@ -156,7 +155,7 @@ function ContactEmail() {
 export function PrivacyPage() {
   return (
     <LegalPageShell
-      description="This notice explains how the CloudOps Insight student MVP handles personal data and cloud integration data."
+      description="This notice explains how CloudOps Insight handles personal data and cloud integration data."
       eyebrow="Data protection"
       title="Privacy Policy"
     >
@@ -172,15 +171,19 @@ export function PrivacyPage() {
         </p>
 
         <p>
-          Contact:
-          {" "}
-          <ContactEmail />
+          Postal address:
+          <br />
+          Luisenstr. 2
+          <br />
+          76137 Karlsruhe
+          <br />
+          Germany
         </p>
 
         <p>
-          A private residential address is not published on this
-          pre-launch website. A serviceable provider address will be
-          added before a commercial launch where legally required.
+          Email:
+          {" "}
+          <ContactEmail />
         </p>
       </LegalSection>
 
@@ -307,10 +310,10 @@ export function PrivacyPage() {
 
       <LegalSection title="9. Changes to this notice">
         <p>
-          This privacy notice may be updated as CloudOps Insight moves
-          from a student MVP toward a commercial service. Material
-          changes should be reflected on this page before the affected
-          functionality is launched.
+          This privacy notice may be updated as CloudOps Insight and
+          its processing activities change. Material changes should be
+          reflected on this page before the affected functionality is
+          introduced or materially changed.
         </p>
       </LegalSection>
     </LegalPageShell>
@@ -321,16 +324,16 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <LegalPageShell
-      description="These pre-launch terms describe the basic rules for using the CloudOps Insight student MVP."
+      description="These terms describe the basic rules for using CloudOps Insight."
       eyebrow="Service terms"
       title="Terms of Use"
     >
-      <LegalSection title="1. Pre-launch student project">
+      <LegalSection title="1. Service status">
         <p>
-          CloudOps Insight is currently provided as a student-built,
-          pre-commercial MVP. No paid subscription or production
-          service-level agreement is currently offered under these
-          terms.
+          CloudOps Insight is currently operated as a student-built
+          service by Ridham Pansara. The service is currently offered
+          without a paid subscription and without a service-level
+          agreement unless expressly agreed otherwise.
         </p>
       </LegalSection>
 
@@ -374,10 +377,11 @@ export function TermsPage() {
 
       <LegalSection title="5. Availability">
         <p>
-          Because this is a pre-launch student MVP, features may
-          change, become temporarily unavailable, contain defects or
-          be discontinued. No uptime or support-response guarantee is
-          currently provided.
+          CloudOps Insight is an evolving student-built service.
+          Features may change, become temporarily unavailable, contain
+          defects or be discontinued. No uptime or support-response
+          guarantee is currently provided unless expressly agreed
+          otherwise.
         </p>
       </LegalSection>
 
@@ -402,7 +406,7 @@ export function TermsPage() {
 
       <LegalSection title="8. Liability">
         <p>
-          CloudOps Insight is provided as a pre-commercial MVP. To the
+          CloudOps Insight is an evolving software service. To the
           extent permitted by applicable law, no guarantee is made
           that recommendations, cost information, monitoring results
           or imported cloud information will always be complete,
@@ -419,7 +423,7 @@ export function TermsPage() {
         <p>
           These terms may be updated as the service changes. Material
           contractual changes should be communicated appropriately
-          before they apply to a commercial service.
+          before they take effect.
         </p>
       </LegalSection>
 
@@ -443,29 +447,10 @@ export function TermsPage() {
 export function ImpressumPage() {
   return (
     <LegalPageShell
-      description="Provider information for the current pre-launch CloudOps Insight student project."
+      description="Provider information for CloudOps Insight."
       eyebrow="Provider information"
       title="Impressum"
     >
-      <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5">
-        <div className="flex gap-3">
-          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-300" />
-
-          <div>
-            <h2 className="font-semibold text-amber-100">
-              Pre-launch blocker
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              This page is intentionally not represented as a complete
-              commercial Impressum. A private residential address is
-              not published. Before commercial launch, a legally
-              suitable serviceable provider address and any other
-              required provider information must be added.
-            </p>
-          </div>
-        </div>
-      </div>
 
       <LegalSection title="Provider">
         <p>
@@ -479,6 +464,14 @@ export function ImpressumPage() {
           <br />
           CloudOps Insight student project
         </p>
+
+        <p>
+          Luisenstr. 2
+          <br />
+          76137 Karlsruhe
+          <br />
+          Germany
+        </p>
       </LegalSection>
 
       <LegalSection title="Contact">
@@ -491,14 +484,14 @@ export function ImpressumPage() {
 
       <LegalSection title="Registration information">
         <p>
-          CloudOps Insight is not currently operated through a
-          registered company.
+          CloudOps Insight is operated by Ridham Pansara as an
+          individual operator and is not operated through a registered
+          company.
         </p>
 
         <p>
           No commercial-register entry and no VAT identification
-          number are currently stated for this pre-launch student
-          project.
+          number are currently held for CloudOps Insight.
         </p>
       </LegalSection>
     </LegalPageShell>
@@ -571,6 +564,14 @@ export function ContactPage() {
           </strong>
           {" "}
           as an individual student project.
+        </p>
+
+        <p>
+          Luisenstr. 2
+          <br />
+          76137 Karlsruhe
+          <br />
+          Germany
         </p>
       </LegalSection>
     </LegalPageShell>
