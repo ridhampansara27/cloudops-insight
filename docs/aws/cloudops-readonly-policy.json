@@ -19,7 +19,6 @@
       ],
       "Resource": "*"
     },
-
     {
       "Sid": "CloudOpsMonitoringRead",
       "Effect": "Allow",
@@ -27,8 +26,7 @@
         "cloudwatch:GetMetricData"
       ],
       "Resource": "*"
-    }
-
+    },
     {
       "Sid": "CloudOpsFinOpsRead",
       "Effect": "Allow",
@@ -38,6 +36,5 @@
       ],
       "Resource": "*"
     }
-    
   ]
 }
