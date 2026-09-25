@@ -60,7 +60,7 @@ async def _validate_account_scope(
 
     except ValueError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Account budget scope must reference a valid cloud account.",
         ) from error
 
@@ -76,7 +76,7 @@ async def _validate_account_scope(
     if result.scalar_one_or_none() is None:
         # Keep the message generic for cross-tenant UUID probes.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Selected cloud account is unavailable.",
         )
 
@@ -162,7 +162,7 @@ async def create_budget(
 
     if payload.critical_threshold < payload.warning_threshold:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 "Critical threshold must be greater than or equal to warning threshold."
             ),
@@ -240,7 +240,7 @@ async def update_budget(
 
     if budget.critical_threshold < budget.warning_threshold:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 "Critical threshold must be greater than or equal to warning threshold."
             ),

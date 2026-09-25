@@ -1,4 +1,4 @@
-﻿"""Shared pytest fixtures for backend integration tests."""
+"""Shared pytest fixtures for backend integration tests."""
 
 from collections.abc import AsyncIterator
 

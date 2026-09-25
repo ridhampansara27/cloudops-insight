@@ -98,7 +98,7 @@ async def update_incident_status(
 
     if payload.status not in allowed_statuses:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid incident status.",
         )
 
