@@ -7,6 +7,8 @@ import {
   ArrowRight,
   CheckCircle2,
   CloudCog,
+  LifeBuoy,
+  Mail,
   Menu,
   ShieldCheck,
   Sparkles,
@@ -166,7 +168,27 @@ export function LandingPage() {
     setUser,
   ]);
 
-  async function handleSignOut() {
+    function handleBrandClick() {
+    // Close the responsive navigation if it is open.
+    setMobileMenuOpen(false);
+
+    // Respect the operating system's reduced-motion preference.
+    const prefersReducedMotion =
+      window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+    // Return to the very top of the public landing page.
+    window.scrollTo({
+      top: 0,
+      behavior:
+        prefersReducedMotion
+          ? "auto"
+          : "smooth",
+    });
+  }
+
+async function handleSignOut() {
     if (signingOut) {
       return;
     }
@@ -186,7 +208,7 @@ export function LandingPage() {
     sessionStatus === "authenticated";
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="landing-page dark min-h-screen bg-background text-foreground">
       <div className="cloudops-backdrop relative min-h-screen overflow-hidden">
         <div
           aria-hidden="true"
@@ -198,10 +220,12 @@ export function LandingPage() {
           className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_48%),radial-gradient(circle_at_top_right,rgba(139,92,246,0.10),transparent_28%)]"
         />
 
-        <header className="landing-header sticky top-0 z-50 border-b border-cyan-400/[0.08] backdrop-blur-2xl">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
+        <header className="landing-header fixed inset-x-0 top-0 z-50 border-b border-cyan-400/[0.08] backdrop-blur-2xl">
+          <div className="mx-auto flex h-16 max-w-[1480px] items-center justify-between px-4 sm:px-6 lg:px-8">
             <Link
+              aria-label="CloudOps Insight home"
               className="flex items-center gap-3"
+              onClick={handleBrandClick}
               to="/"
             >
               <span className="flex size-9 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300">
@@ -215,29 +239,29 @@ export function LandingPage() {
 
             <nav
               aria-label="Primary"
-              className="hidden items-center gap-7 text-sm text-muted-foreground lg:flex"
+              className="hidden items-center gap-2 text-sm text-muted-foreground lg:flex"
             >
-              <a className="transition-colors hover:text-foreground" href="#why-cloudops">
+              <a className="landing-nav-pop" href="#why-cloudops">
                 Why CloudOps
               </a>
 
-              <a className="transition-colors hover:text-foreground" href="#features">
+              <a className="landing-nav-pop" href="#features">
                 Features
               </a>
 
-              <a className="transition-colors hover:text-foreground" href="#how-it-works">
+              <a className="landing-nav-pop" href="#how-it-works">
                 How it works
               </a>
 
-              <a className="transition-colors hover:text-foreground" href="#security">
+              <a className="landing-nav-pop" href="#security">
                 Security
               </a>
 
-              <Link className="transition-colors hover:text-foreground" to="/about">
+              <Link className="landing-nav-pop" to="/about">
                 About
               </Link>
 
-              <Link className="transition-colors hover:text-foreground" to="/contact">
+              <Link className="landing-nav-pop" to="/contact">
                 Contact
               </Link>
             </nav>
@@ -276,9 +300,9 @@ export function LandingPage() {
 
                   <Link
                     className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:bg-cyan-300"
-                    to="/signup"
+                    to="/contact"
                   >
-                    Get started free
+                    Request access
                   </Link>
                 </>
               )}
@@ -355,9 +379,9 @@ export function LandingPage() {
 
                       <Link
                         className="rounded-xl bg-cyan-400 px-4 py-2 font-semibold text-slate-950"
-                        to="/signup"
+                        to="/contact"
                       >
-                        Get started free
+                        Request access
                       </Link>
                     </>
                   )}
@@ -367,7 +391,7 @@ export function LandingPage() {
           )}
         </header>
 
-        <main className="relative">
+        <main className="relative pt-16">
           <section className="mx-auto max-w-[1480px] px-4 pb-14 pt-14 sm:px-6 lg:px-8 lg:pb-16 lg:pt-16">
             <div className="grid items-center gap-12 xl:grid-cols-[0.94fr_1.06fr]">
               <div>
@@ -396,9 +420,9 @@ export function LandingPage() {
                 <div className="mt-8 flex flex-wrap gap-3">
                   <Link
                     className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 shadow-xl shadow-cyan-500/10 transition hover:bg-cyan-300"
-                    to={isAuthenticated ? "/dashboard" : "/signup"}
+                    to={isAuthenticated ? "/dashboard" : "/contact"}
                   >
-                    {isAuthenticated ? "Open dashboard" : "Get started free"}
+                    {isAuthenticated ? "Open dashboard" : "Request access"}
                     <ArrowRight className="size-4" />
                   </Link>
 
@@ -431,7 +455,7 @@ export function LandingPage() {
             <div className="mx-auto mt-8 grid w-full max-w-[340px] gap-3 rounded-3xl border border-border/50 bg-card/[0.22] p-3 sm:max-w-none sm:grid-cols-2 sm:p-4 lg:grid-cols-5">
               {capabilityStrip.map((item) => (
                 <div
-                  className="rounded-2xl border border-border/40 bg-background/20 px-4 py-3 text-sm text-muted-foreground"
+                  className="landing-pop-card rounded-2xl border border-border/40 bg-background/20 px-4 py-3 text-sm text-muted-foreground"
                   key={item}
                 >
                   {item}
@@ -618,8 +642,58 @@ export function LandingPage() {
             </div>
           </section>
 
+          <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
+            <div className="landing-pop-card relative overflow-hidden rounded-[30px] border border-cyan-400/15 bg-card/45 p-6 shadow-xl shadow-black/10 sm:p-8">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-cyan-400/[0.08] blur-3xl"
+              />
+
+              <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex size-11 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.07] text-cyan-300">
+                    <LifeBuoy className="size-5" />
+                  </div>
+
+                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+                    CloudOps support
+                  </p>
+
+                  <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                    Need help or want access to CloudOps Insight?
+                  </h2>
+
+                  <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                    Contact support for product questions, access requests,
+                    onboarding help or issues with your CloudOps workspace.
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 flex-wrap gap-3">
+                  <Link
+                    className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
+                    to="/contact"
+                  >
+                    <LifeBuoy className="size-4" />
+
+                    Contact support
+                  </Link>
+
+                  <a
+                    className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-background/25 px-5 py-3 text-sm font-medium transition-colors hover:border-cyan-400/25 hover:bg-card/60"
+                    href="mailto:support@cloudopsinsight.tech"
+                  >
+                    <Mail className="size-4" />
+
+                    Email support
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 lg:px-8 lg:py-20">
-            <div className="cloudops-glass rounded-[32px] border border-cyan-400/15 px-6 py-14 shadow-2xl shadow-cyan-950/20 sm:px-10">
+            <div className="landing-pop-card cloudops-glass rounded-[32px] border border-cyan-400/15 px-6 py-14 shadow-2xl shadow-cyan-950/20 sm:px-10">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
                 Start exploring
               </p>
@@ -629,17 +703,17 @@ export function LandingPage() {
               </h2>
 
               <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-muted-foreground">
-                Create a workspace, connect AWS securely and bring inventory,
-                monitoring and FinOps information into one operational command
-                center.
+                Request access to CloudOps Insight, then connect AWS securely
+                and bring inventory, monitoring and FinOps information into one
+                operational command center.
               </p>
 
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link
                   className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950"
-                  to={isAuthenticated ? "/dashboard" : "/signup"}
+                  to={isAuthenticated ? "/dashboard" : "/contact"}
                 >
-                  {isAuthenticated ? "Open dashboard" : "Create account"}
+                  {isAuthenticated ? "Open dashboard" : "Request access"}
                   <ArrowRight className="size-4" />
                 </Link>
 
@@ -656,7 +730,7 @@ export function LandingPage() {
               <div className="mt-10 flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/25 px-3 py-2">
                   <CheckCircle2 className="size-3.5 text-emerald-300" />
-                  Public signup supported
+                  Public signup currently closed
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/25 px-3 py-2">

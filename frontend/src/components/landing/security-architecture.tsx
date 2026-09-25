@@ -93,7 +93,7 @@ export function SecurityArchitecture() {
       </div>
 
       <div className="grid gap-4">
-        <div className="rounded-3xl border border-border/60 bg-card/50 p-6">
+        <div className="landing-pop-card rounded-3xl border border-border/60 bg-card/50 p-6">
           <div className="flex items-center gap-3">
             <KeyRound className="size-5 text-cyan-300" />
             <p className="font-semibold">
@@ -144,7 +144,7 @@ export function SecurityArchitecture() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-cyan-400/20 bg-cyan-400/[0.05] p-6">
+        <div className="landing-pop-card rounded-3xl border border-cyan-400/20 bg-cyan-400/[0.05] p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
             Transparency
           </p>
