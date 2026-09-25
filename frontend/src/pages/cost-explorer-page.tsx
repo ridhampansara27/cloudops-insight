@@ -12,6 +12,7 @@ import {
   Layers3,
   Search,
   SearchX,
+  RefreshCw,
   Sparkles,
   TrendingUp,
   X,
@@ -150,6 +151,19 @@ export function CostExplorerPage() {
       />
     );
   }
+
+  const isRefreshing =
+    costQuery.isFetching;
+
+
+  async function refreshCostExplorer() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await costQuery.refetch();
+  }
+
 
   // Store successful genuine billing response.
   const costs =
@@ -477,6 +491,36 @@ export function CostExplorerPage() {
               service-level allocation, daily billing movement and
               available resource attribution.
             </p>
+
+            <div className="mt-5">
+              <Button
+                aria-label="Refresh Cost Explorer"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isRefreshing
+                }
+                onClick={() => {
+                  void refreshCostExplorer();
+                }}
+                title="Refresh Cost Explorer data"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isRefreshing
+                    ? "Refreshing..."
+                    : "Refresh data"
+                }
+              </Button>
+            </div>
           </div>
 
           {/* Genuine dataset posture. */}

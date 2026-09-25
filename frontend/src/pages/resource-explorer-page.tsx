@@ -182,6 +182,24 @@ export function ResourceExplorerPage() {
     );
   }
 
+  // Treat either resource query as one inventory refresh operation.
+  const isRefreshing =
+    summaryQuery.isFetching ||
+    resourcesQuery.isFetching;
+
+
+  async function refreshResources() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await Promise.all([
+      summaryQuery.refetch(),
+      resourcesQuery.refetch(),
+    ]);
+  }
+
+
   // Store genuine global inventory summary.
   const summary =
     summaryQuery.data;
@@ -377,24 +395,54 @@ export function ResourceExplorerPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-background/30 px-4 py-3 backdrop-blur-xl">
-            <div className="flex size-9 items-center justify-center rounded-lg border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
-              <Boxes className="size-4" />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-background/30 px-4 py-3 backdrop-blur-xl">
+              <div className="flex size-9 items-center justify-center rounded-lg border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
+                <Boxes className="size-4" />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Inventory
+                </p>
+
+                <p className="mt-0.5 text-sm font-semibold">
+                  {
+                    summary.total_resources
+                  }
+                  {" "}
+                  tracked resources
+                </p>
+              </div>
             </div>
 
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Inventory
-              </p>
-
-              <p className="mt-0.5 text-sm font-semibold">
-                {
-                  summary.total_resources
+            <Button
+              aria-label="Refresh resource inventory"
+              className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+              disabled={
+                isRefreshing
+              }
+              onClick={() => {
+                void refreshResources();
+              }}
+              title="Refresh resource inventory"
+              type="button"
+              variant="outline"
+            >
+              <RefreshCw
+                className={
+                  isRefreshing
+                    ? "size-4 animate-spin"
+                    : "size-4"
                 }
-                {" "}
-                tracked resources
-              </p>
-            </div>
+              />
+
+              {
+                isRefreshing
+                  ? "Refreshing..."
+                  : "Refresh"
+              }
+            </Button>
           </div>
         </CardContent>
       </Card>
