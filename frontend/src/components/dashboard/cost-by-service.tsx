@@ -100,16 +100,16 @@ export function CostByService({
       <CardContent className="pt-2">
         {services.length ===
         0 ? (
-          <div className="flex min-h-[230px] flex-col items-center justify-center text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
-              <CircleDollarSign className="size-5" />
+          <div className="flex min-h-[170px] flex-col items-center justify-center px-5 text-center">
+            <div className="flex size-10 items-center justify-center rounded-xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
+              <CircleDollarSign className="size-[18px]" />
             </div>
 
-            <p className="mt-4 font-semibold">
+            <p className="mt-3 text-sm font-semibold">
               No synchronized billing data
             </p>
 
-            <p className="mt-1 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
               AWS service costs will appear here after Cost Explorer
               synchronization completes.
             </p>

@@ -161,7 +161,7 @@ export function MetricCard({
 
   // Render a dimensional KPI tile.
   return (
-    <Card className="group relative min-h-[166px] overflow-hidden border-border/70 bg-card/72 py-0">
+    <Card className="group relative min-h-[148px] overflow-hidden border-border/70 bg-card/72 py-0">
       {/* Add a subtle domain-specific glow. */}
       <div
         aria-hidden="true"
@@ -180,7 +180,7 @@ export function MetricCard({
         )}
       />
 
-      <CardContent className="relative flex h-full flex-col justify-between p-4">
+      <CardContent className="relative flex h-full flex-col justify-between p-3.5">
         <div className="flex items-start justify-between gap-4">
           <p className="max-w-[70%] text-sm font-medium leading-snug text-muted-foreground">
             {
@@ -190,16 +190,16 @@ export function MetricCard({
 
           <div
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl border shadow-inner transition-transform duration-300 group-hover:scale-110",
+              "flex size-9 shrink-0 items-center justify-center rounded-xl border shadow-inner transition-transform duration-300 group-hover:scale-105",
               style.icon,
             )}
           >
-            <Icon className="size-[18px]" />
+            <Icon className="size-4" />
           </div>
         </div>
 
-        <div className="mt-7">
-          <p className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+        <div className="mt-5">
+          <p className="text-[28px] font-semibold tracking-[-0.04em] text-foreground">
             {
               metric.value
             }
