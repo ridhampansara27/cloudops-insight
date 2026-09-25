@@ -3,7 +3,6 @@
 import {
   CloudCog,
   ExternalLink,
-  LifeBuoy,
   Sparkles,
 } from "lucide-react";
 
@@ -41,6 +40,7 @@ export function AppSidebar() {
         className="cloudops-nav-pop relative flex h-[72px] items-center gap-3 border-b border-sidebar-border px-5"
         title="Dashboard"
         to="/dashboard"
+        viewTransition
       >
         <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl border border-primary/25 bg-gradient-to-br from-primary/25 via-primary/10 to-violet-500/15 text-primary shadow-lg shadow-primary/5">
           <CloudCog className="relative z-10 size-5" />
@@ -115,6 +115,7 @@ export function AppSidebar() {
                         to={
                           item.href
                         }
+                        viewTransition
                       >
                         {/* Give active/hovered routes dimensional icon treatment. */}
                         <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent bg-transparent transition-colors group-hover:border-sidebar-border group-hover:bg-sidebar-accent">
@@ -142,47 +143,20 @@ export function AppSidebar() {
         )}
       </nav>
 
-      {/* Keep customer-facing help/navigation useful and deployment-neutral. */}
-      <div className="relative border-t border-sidebar-border p-4">
-        <div className="space-y-2 rounded-2xl border border-sidebar-border bg-sidebar-accent/25 p-2.5 shadow-inner">
-          <Link
-            className="cloudops-nav-pop flex items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
-            to="/"
-          >
-            <div className="flex size-8 items-center justify-center rounded-lg border border-primary/15 bg-primary/8 text-primary">
-              <ExternalLink className="size-4" />
-            </div>
+      {/* Keep one compact shortcut back to the public CloudOps website. */}
+      <div className="relative border-t border-sidebar-border p-2">
+        <Link
+          aria-label="Open CloudOps Insight public website"
+          className="cloudops-nav-pop group flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/25 px-3 text-xs font-semibold text-muted-foreground shadow-inner transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-sidebar-accent/55 hover:text-sidebar-foreground hover:shadow-lg hover:shadow-primary/5"
+          title="CloudOps Insight public website"
+          to="/"
+        >
+          <ExternalLink className="size-3.5 shrink-0 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
 
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-sidebar-foreground">
-                Public website
-              </p>
-
-              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                cloudopsinsight.tech
-              </p>
-            </div>
-          </Link>
-
-          <a
-            className="cloudops-nav-pop flex items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
-            href="mailto:support@cloudopsinsight.tech"
-          >
-            <div className="flex size-8 items-center justify-center rounded-lg border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
-              <LifeBuoy className="size-4" />
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-sidebar-foreground">
-                Support
-              </p>
-
-              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                Get CloudOps help
-              </p>
-            </div>
-          </a>
-        </div>
+          <span>
+            Public website
+          </span>
+        </Link>
       </div>
     </aside>
   );

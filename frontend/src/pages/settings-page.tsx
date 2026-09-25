@@ -99,16 +99,6 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-
 function roleClasses(
   role: WorkspaceRole,
 ) {
@@ -911,86 +901,99 @@ export function SettingsPage() {
 
 
       {/* =====================================================
-          Members
+          Workspace access
           ===================================================== */}
-      <Card className="overflow-hidden bg-card/72 py-0">
-        <CardHeader className="border-b border-border/50 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/8 text-emerald-300">
-              <Users className="size-[18px]" />
+      <div
+        className={
+          canAdministerWorkspace
+            ? "grid items-start gap-5 xl:grid-cols-2"
+            : "grid gap-5"
+        }
+      >
+        {/* -----------------------------------------------------
+            Team members
+            ----------------------------------------------------- */}
+        <Card className="overflow-hidden bg-card/72 py-0">
+          <CardHeader className="border-b border-border/50 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/8 text-emerald-300">
+                  <Users className="size-[18px]" />
+                </div>
+
+                <div className="min-w-0">
+                  <CardTitle>
+                    Team members
+                  </CardTitle>
+
+                  <CardDescription className="mt-1">
+                    People with active access to this workspace.
+                  </CardDescription>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge
+                  className="rounded-full border-border/70 bg-background/35 px-2.5 py-1 text-muted-foreground"
+                  variant="outline"
+                >
+                  {
+                    members.length
+                  }{" "}
+                  {
+                    members.length ===
+                    1
+                      ? "member"
+                      : "members"
+                  }
+                </Badge>
+
+                {canAdministerWorkspace && (
+                  <Button
+                    className="rounded-xl"
+                    onClick={() =>
+                      setInviteOpen(
+                        true,
+                      )
+                    }
+                    size="sm"
+                    type="button"
+                  >
+                    <MailPlus className="mr-2 size-4" />
+
+                    Invite
+                  </Button>
+                )}
+              </div>
             </div>
+          </CardHeader>
 
-            <div>
-              <CardTitle>
-                Team members
-              </CardTitle>
+          <CardContent className="p-3">
+            <div className="cloudops-settings-list max-h-[430px] space-y-2 overflow-y-auto pr-1">
+              {members.map(
+                (
+                  member,
+                ) => {
+                  const isCurrentUser =
+                    member.user_id ===
+                    profile.id;
 
-              <CardDescription className="mt-1">
-                Active identities with access to this workspace.
-              </CardDescription>
-            </div>
-          </div>
+                  return (
+                    <div
+                      className="rounded-2xl border border-border/55 bg-background/22 p-4 transition-colors hover:border-primary/20 hover:bg-accent/18"
+                      key={
+                        member.membership_id
+                      }
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/7 text-primary">
+                            <UserRound className="size-[18px]" />
+                          </div>
 
-          {canAdministerWorkspace && (
-            <Button
-              className="mt-4 rounded-xl sm:mt-0"
-              onClick={() =>
-                setInviteOpen(
-                  true,
-                )
-              }
-              type="button"
-            >
-              <MailPlus className="mr-2 size-4" />
-
-              Invite member
-            </Button>
-          )}
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/20">
-                <TableRow className="border-border/60 hover:bg-transparent">
-                  <TableHead>
-                    Member
-                  </TableHead>
-
-                  <TableHead>
-                    Role
-                  </TableHead>
-
-                  <TableHead>
-                    Joined
-                  </TableHead>
-
-                  <TableHead className="text-right">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {members.map(
-                  (
-                    member,
-                  ) => {
-                    const isCurrentUser =
-                      member.user_id ===
-                      profile.id;
-
-                    return (
-                      <TableRow
-                        className="border-border/45"
-                        key={
-                          member.membership_id
-                        }
-                      >
-                        <TableCell>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-semibold">
                                 {
                                   member.full_name
                                 }
@@ -1006,218 +1009,242 @@ export function SettingsPage() {
                               )}
                             </div>
 
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
                               {
                                 member.email
                               }
                             </p>
                           </div>
-                        </TableCell>
+                        </div>
 
-                        <TableCell>
-                          {organization.current_role ===
-                            "owner" &&
-                          !isCurrentUser ? (
-                            <NativeSelect
-                              className="min-w-28 rounded-xl"
-                              disabled={
-                                updateMemberRole.isPending
-                              }
-                              onChange={(
-                                event,
-                              ) =>
-                                void handleRoleChange(
-                                  member.membership_id,
-                                  event.target
-                                    .value as WorkspaceRole,
-                                )
-                              }
-                              value={
-                                member.role
-                              }
-                            >
-                              <NativeSelectOption value="owner">
-                                Owner
-                              </NativeSelectOption>
+                        {organization.current_role ===
+                          "owner" &&
+                        !isCurrentUser && (
+                          <Button
+                            aria-label={`Remove ${member.full_name}`}
+                            className="shrink-0 rounded-xl"
+                            disabled={
+                              removeMember.isPending
+                            }
+                            onClick={() =>
+                              void handleRemoveMember(
+                                member.membership_id,
+                                member.full_name,
+                              )
+                            }
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 className="size-4 text-rose-300" />
+                          </Button>
+                        )}
+                      </div>
 
-                              <NativeSelectOption value="admin">
-                                Admin
-                              </NativeSelectOption>
+                      <div className="mt-4 grid gap-3 border-t border-border/40 pt-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            Workspace role
+                          </p>
 
-                              <NativeSelectOption value="member">
-                                Member
-                              </NativeSelectOption>
+                          <div className="mt-1.5">
+                            {organization.current_role ===
+                              "owner" &&
+                            !isCurrentUser ? (
+                              <NativeSelect
+                                className="h-8 min-w-28 rounded-lg text-xs"
+                                disabled={
+                                  updateMemberRole.isPending
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  void handleRoleChange(
+                                    member.membership_id,
+                                    event.target
+                                      .value as WorkspaceRole,
+                                  )
+                                }
+                                value={
+                                  member.role
+                                }
+                              >
+                                <NativeSelectOption value="owner">
+                                  Owner
+                                </NativeSelectOption>
 
-                              <NativeSelectOption value="viewer">
-                                Viewer
-                              </NativeSelectOption>
-                            </NativeSelect>
-                          ) : (
-                            <Badge
-                              className={
-                                roleClasses(
-                                  member.role,
-                                )
-                              }
-                              variant="outline"
-                            >
-                              {
-                                member.role
-                              }
-                            </Badge>
-                          )}
-                        </TableCell>
+                                <NativeSelectOption value="admin">
+                                  Admin
+                                </NativeSelectOption>
 
-                        <TableCell className="text-sm text-muted-foreground">
-                          {
-                            formatTimestamp(
-                              member.joined_at,
-                            )
-                          }
-                        </TableCell>
+                                <NativeSelectOption value="member">
+                                  Member
+                                </NativeSelectOption>
 
-                        <TableCell className="text-right">
-                          {organization.current_role ===
-                            "owner" &&
-                          !isCurrentUser ? (
-                            <Button
-                              aria-label={`Remove ${member.full_name}`}
-                              className="rounded-xl"
-                              disabled={
-                                removeMember.isPending
-                              }
-                              onClick={() =>
-                                void handleRemoveMember(
-                                  member.membership_id,
-                                  member.full_name,
-                                )
-                              }
-                              size="sm"
-                              type="button"
-                              variant="destructive"
-                            >
-                              <Trash2 className="mr-2 size-3.5" />
+                                <NativeSelectOption value="viewer">
+                                  Viewer
+                                </NativeSelectOption>
+                              </NativeSelect>
+                            ) : (
+                              <Badge
+                                className={
+                                  roleClasses(
+                                    member.role,
+                                  )
+                                }
+                                variant="outline"
+                              >
+                                {
+                                  member.role
+                                }
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
 
-                              Remove
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  },
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                        <div className="sm:text-right">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            Joined
+                          </p>
 
-
-      {/* =====================================================
-          Invitations
-          ===================================================== */}
-      {canAdministerWorkspace && (
-        <Card className="overflow-hidden bg-card/72 py-0">
-          <CardHeader className="border-b border-border/50 p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/8 text-amber-300">
-                <MailPlus className="size-[18px]" />
-              </div>
-
-              <div>
-                <CardTitle>
-                  Invitations
-                </CardTitle>
-
-                <CardDescription className="mt-1">
-                  One-time workspace invitations and their current lifecycle.
-                </CardDescription>
-              </div>
+                          <p className="mt-2 text-xs text-foreground/80">
+                            {
+                              formatTimestamp(
+                                member.joined_at,
+                              )
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              )}
             </div>
-          </CardHeader>
+          </CardContent>
+        </Card>
 
-          <CardContent className="p-0">
-            {invitationsQuery.isPending ? (
-              <div className="p-6 text-sm text-muted-foreground">
-                Loading invitations...
-              </div>
-            ) : invitationsQuery.isError ? (
-              <div className="p-6">
-                <p className="text-sm font-medium text-destructive">
-                  Unable to load invitations.
-                </p>
 
-                <Button
-                  className="mt-3 rounded-xl"
-                  onClick={() => {
-                    void invitationsQuery.refetch();
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : invitations.length ===
-              0 ? (
-              <div className="flex min-h-48 flex-col items-center justify-center p-6 text-center">
-                <div className="flex size-11 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
-                  <MailPlus className="size-4" />
+        {/* -----------------------------------------------------
+            Invitations
+            ----------------------------------------------------- */}
+        {canAdministerWorkspace && (
+          <Card className="overflow-hidden bg-card/72 py-0">
+            <CardHeader className="border-b border-border/50 p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/8 text-amber-300">
+                    <MailPlus className="size-[18px]" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <CardTitle>
+                      Invitations
+                    </CardTitle>
+
+                    <CardDescription className="mt-1">
+                      Pending and historical workspace invitations.
+                    </CardDescription>
+                  </div>
                 </div>
 
-                <p className="mt-4 text-sm font-semibold">
-                  No invitations yet
-                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge
+                    className="rounded-full border-amber-400/20 bg-amber-400/7 px-2.5 py-1 text-amber-300"
+                    variant="outline"
+                  >
+                    {
+                      pendingInvitations.length
+                    }{" "}
+                    pending
+                  </Badge>
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Invite a teammate when you are ready to share this workspace.
-                </p>
+                  <Badge
+                    className="rounded-full border-border/70 bg-background/35 px-2.5 py-1 text-muted-foreground"
+                    variant="outline"
+                  >
+                    {
+                      invitations.length
+                    }{" "}
+                    total
+                  </Badge>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/20">
-                    <TableRow className="border-border/60 hover:bg-transparent">
-                      <TableHead>
-                        Invitee
-                      </TableHead>
+            </CardHeader>
 
-                      <TableHead>
-                        Role
-                      </TableHead>
+            <CardContent className="p-3">
+              {invitationsQuery.isPending ? (
+                <div className="rounded-2xl border border-border/50 bg-background/20 p-5 text-sm text-muted-foreground">
+                  Loading invitations...
+                </div>
+              ) : invitationsQuery.isError ? (
+                <div className="rounded-2xl border border-rose-400/15 bg-rose-400/[0.035] p-5">
+                  <p className="text-sm font-medium text-destructive">
+                    Unable to load invitations.
+                  </p>
 
-                      <TableHead>
-                        Status
-                      </TableHead>
+                  <Button
+                    className="mt-3 rounded-xl"
+                    onClick={() => {
+                      void invitationsQuery.refetch();
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : invitations.length ===
+                0 ? (
+                <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-border/65 bg-background/18 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
+                      <MailPlus className="size-4" />
+                    </div>
 
-                      <TableHead>
-                        Expires
-                      </TableHead>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        No invitations yet
+                      </p>
 
-                      <TableHead className="text-right">
-                        Action
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Invite a teammate when you are ready to share this workspace.
+                      </p>
+                    </div>
+                  </div>
 
-                  <TableBody>
-                    {invitations.map(
-                      (
-                        invitation,
-                      ) => (
-                        <TableRow
-                          className="border-border/45"
-                          key={
-                            invitation.id
-                          }
-                        >
-                          <TableCell>
-                            <p className="font-medium">
+                  <Button
+                    className="shrink-0 rounded-xl"
+                    onClick={() =>
+                      setInviteOpen(
+                        true,
+                      )
+                    }
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <MailPlus className="mr-2 size-3.5" />
+
+                    Invite teammate
+                  </Button>
+                </div>
+              ) : (
+                <div className="cloudops-settings-list max-h-[430px] space-y-2 overflow-y-auto pr-1">
+                  {invitations.map(
+                    (
+                      invitation,
+                    ) => (
+                      <div
+                        className="rounded-2xl border border-border/55 bg-background/22 p-4 transition-colors hover:border-primary/20 hover:bg-accent/18"
+                        key={
+                          invitation.id
+                        }
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
                               {
                                 invitation.invited_email
                               }
@@ -1231,85 +1258,76 @@ export function SettingsPage() {
                                 )
                               }
                             </p>
-                          </TableCell>
+                          </div>
 
-                          <TableCell>
-                            <Badge
-                              className={
-                                roleClasses(
-                                  invitation.role,
+                          <Badge
+                            className={
+                              invitationClasses(
+                                invitation.status,
+                              )
+                            }
+                            variant="outline"
+                          >
+                            {
+                              invitation.status
+                            }
+                          </Badge>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/40 pt-3">
+                          <Badge
+                            className={
+                              roleClasses(
+                                invitation.role,
+                              )
+                            }
+                            variant="outline"
+                          >
+                            {
+                              invitation.role
+                            }
+                          </Badge>
+
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Clock3 className="size-3.5" />
+
+                            Expires{" "}
+                            {
+                              formatTimestamp(
+                                invitation.expires_at,
+                              )
+                            }
+                          </span>
+
+                          {invitation.status ===
+                            "pending" && (
+                            <Button
+                              className="ml-auto rounded-xl"
+                              disabled={
+                                revokeInvitation.isPending
+                              }
+                              onClick={() =>
+                                void handleRevokeInvitation(
+                                  invitation.id,
                                 )
                               }
-                              variant="outline"
+                              size="sm"
+                              type="button"
+                              variant="ghost"
                             >
-                              {
-                                invitation.role
-                              }
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell>
-                            <Badge
-                              className={
-                                invitationClasses(
-                                  invitation.status,
-                                )
-                              }
-                              variant="outline"
-                            >
-                              {
-                                invitation.status
-                              }
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell className="text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Clock3 className="size-3.5" />
-
-                              {
-                                formatTimestamp(
-                                  invitation.expires_at,
-                                )
-                              }
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            {invitation.status ===
-                              "pending" ? (
-                              <Button
-                                className="rounded-xl"
-                                disabled={
-                                  revokeInvitation.isPending
-                                }
-                                onClick={() =>
-                                  void handleRevokeInvitation(
-                                    invitation.id,
-                                  )
-                                }
-                                size="sm"
-                                type="button"
-                                variant="destructive"
-                              >
-                                Revoke
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                —
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ),
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                              Revoke
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
 
       {/* =====================================================
