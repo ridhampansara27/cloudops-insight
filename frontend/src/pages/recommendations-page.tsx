@@ -12,6 +12,7 @@ import {
   Filter,
   Gauge,
   Lightbulb,
+  RefreshCw,
   Search,
   SearchX,
   ShieldAlert,
@@ -591,6 +592,23 @@ export function RecommendationsPage() {
     );
   }
 
+  const isRefreshing =
+    recommendationsQuery.isFetching ||
+    resourcesQuery.isFetching;
+
+
+  async function refreshRecommendations() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await Promise.all([
+      recommendationsQuery.refetch(),
+      resourcesQuery.refetch(),
+    ]);
+  }
+
+
   // Derive overall optimization posture from genuine workflow state.
   const optimizationPosture =
     openRecommendations.length >
@@ -778,6 +796,36 @@ export function RecommendationsPage() {
               savings, implementation risk and confidence before accepting
               or dismissing a recommendation.
             </p>
+
+            <div className="mt-5">
+              <Button
+                aria-label="Refresh recommendations"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isRefreshing
+                }
+                onClick={() => {
+                  void refreshRecommendations();
+                }}
+                title="Refresh recommendations"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isRefreshing
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
+              </Button>
+            </div>
           </div>
 
           {/* Genuine optimization posture. */}

@@ -11,6 +11,7 @@ import {
   Gauge,
   Pencil,
   Plus,
+  RefreshCw,
   ShieldAlert,
   Target,
   Trash2,
@@ -162,6 +163,26 @@ export function BudgetsPage() {
       />
     );
   }
+
+  // Treat all supporting budget context as one manual refresh.
+  const isRefreshing =
+    budgetsQuery.isFetching ||
+    accountsQuery.isFetching ||
+    costQuery.isFetching;
+
+
+  async function refreshBudgets() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await Promise.all([
+      budgetsQuery.refetch(),
+      accountsQuery.refetch(),
+      costQuery.refetch(),
+    ]);
+  }
+
 
   // Store successful backend data.
   const budgets =
@@ -707,6 +728,34 @@ export function BudgetsPage() {
                 <Plus className="mr-2 size-4" />
 
                 Create budget
+              </Button>
+
+              <Button
+                aria-label="Refresh budgets"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isRefreshing
+                }
+                onClick={() => {
+                  void refreshBudgets();
+                }}
+                title="Refresh budget data"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isRefreshing
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
               </Button>
 
               {!canCreateBudget && (
