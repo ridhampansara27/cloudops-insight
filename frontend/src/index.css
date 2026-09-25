@@ -539,3 +539,141 @@
     transform: none;
   }
 }
+
+/* ==========================================================
+   Public website polish
+   ========================================================== */
+
+@layer utilities {
+  /* Lightweight entrance treatment for landing-page surfaces. */
+  .landing-fade-up {
+    animation:
+      landing-fade-up 520ms
+      cubic-bezier(0.2, 0.8, 0.2, 1)
+      both;
+  }
+
+  /* Slight visual halo for primary product surfaces. */
+  .landing-product-glow {
+    box-shadow:
+      0 24px 80px rgb(6 182 212 / 8%),
+      0 4px 24px rgb(0 0 0 / 26%);
+  }
+}
+
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect users who request reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .landing-fade-up,
+  .cloudops-interactive {
+    animation: none;
+    transition: none;
+  }
+
+  .cloudops-interactive:hover {
+    transform: none;
+  }
+}
+/* Public landing navigation should visually continue the page backdrop. */
+.landing-header {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(6 15 27 / 92%),
+      rgb(8 18 35 / 90%) 48%,
+      rgb(20 17 46 / 90%)
+    );
+
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 2%),
+    0 8px 30px rgb(0 0 0 / 12%);
+}
+/* Expanded mobile navigation continues the same CloudOps visual surface
+   used by the sticky header and hero instead of becoming a black drawer. */
+.landing-mobile-menu {
+  background:
+    radial-gradient(
+      circle at 85% 0%,
+      rgb(99 102 241 / 12%),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 10% 100%,
+      rgb(34 211 238 / 7%),
+      transparent 45%
+    ),
+    linear-gradient(
+      145deg,
+      rgb(7 17 31 / 98%),
+      rgb(10 20 39 / 98%) 52%,
+      rgb(19 17 46 / 98%)
+    );
+
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 28%),
+    inset 0 -1px 0 rgb(56 189 248 / 5%);
+}
+
+.landing-mobile-link {
+  display: block;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.8rem;
+
+  color: rgb(203 213 225);
+
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.landing-mobile-link:hover,
+.landing-mobile-link:focus-visible {
+  border-color: rgb(34 211 238 / 12%);
+  background: rgb(34 211 238 / 5%);
+  color: rgb(240 249 255);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-mobile-link {
+    transition: none;
+  }
+}
+/* Keep every mobile navigation row visually consistent,
+   including React Router <Link> elements. */
+.landing-mobile-menu nav > a {
+  display: block;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  color: rgb(203 213 225);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.landing-mobile-menu nav > a:hover,
+.landing-mobile-menu nav > a:focus-visible {
+  border-color: rgb(34 211 238 / 12%);
+  background: rgb(34 211 238 / 5%);
+  color: rgb(240 249 255);
+  outline: none;
+}

@@ -58,7 +58,7 @@ function LegalPageShell({
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <Link
             className="inline-flex items-center gap-3"
-            to="/login"
+            to="/"
           >
             <span className="flex size-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/[0.07] text-cyan-300">
               <CloudCog className="size-5" />
@@ -77,10 +77,10 @@ function LegalPageShell({
 
           <Link
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            to="/login"
+            to="/"
           >
             <ArrowLeft className="size-4" />
-            Back to sign in
+            Back to CloudOps Insight
           </Link>
         </header>
 
