@@ -174,6 +174,17 @@ INVITATION_ACCEPT_TOKEN = RateLimitPolicy(
 )
 
 
+# ============================================================
+# Authenticated support policies
+# ============================================================
+
+SUPPORT_TICKET_ACTOR = RateLimitPolicy(
+    "support-ticket-actor",
+    10,
+    3600,
+)
+
+
 def _normalized_ip(
     value: str | None,
 ) -> str | None:
@@ -501,6 +512,27 @@ async def limit_invitation_issue(
             organization_id,
         ),
         normalized_email,
+        include_client_ip=False,
+    )
+
+
+async def limit_support_ticket(
+    request: Request,
+    *,
+    user_id: UUID,
+    organization_id: UUID,
+) -> None:
+    """Protect authenticated support-ticket submission."""
+
+    await enforce_rate_limit(
+        request,
+        SUPPORT_TICKET_ACTOR,
+        str(
+            user_id,
+        ),
+        str(
+            organization_id,
+        ),
         include_client_ip=False,
     )
 

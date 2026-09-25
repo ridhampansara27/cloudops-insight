@@ -10,6 +10,7 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.incidents import router as incidents_router
 from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.resources import router as resources_router
+from app.api.v1.support import router as support_router
 from app.api.v1.workspace import router as workspace_router
 
 # Import application settings.
@@ -80,6 +81,14 @@ router.include_router(
     recommendations_router,
     prefix="/recommendations",
     tags=["Recommendations"],
+)
+
+
+# Register authenticated customer-support routes.
+router.include_router(
+    support_router,
+    prefix="/support",
+    tags=["Support"],
 )
 
 

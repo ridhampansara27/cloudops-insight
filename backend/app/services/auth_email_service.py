@@ -2,6 +2,7 @@
 
 import smtplib
 import ssl
+from datetime import datetime
 from email.message import EmailMessage
 from email.utils import formataddr
 from functools import partial
@@ -39,6 +40,10 @@ class PasswordResetEmailSender(Protocol):
 
 class VerificationEmailConfigurationError(RuntimeError):
     """Raised when authentication SMTP delivery is unavailable."""
+
+
+class SupportEmailDeliveryError(RuntimeError):
+    """Raised when a support ticket cannot be delivered."""
 
 
 class AuthEmailService:
@@ -210,6 +215,93 @@ If you were not expecting this invitation, you can ignore this email.
         await self._send_async(
             message,
         )
+
+    async def send_support_ticket(
+        self,
+        *,
+        ticket_id: str,
+        category: str,
+        subject: str,
+        support_message: str,
+        user_name: str,
+        user_email: str,
+        user_id: str,
+        organization_name: str,
+        organization_id: str,
+        organization_role: str,
+        submitted_at: datetime,
+    ) -> None:
+        """Deliver one authenticated customer support request."""
+
+        if (
+            not self.is_configured
+            or not settings.support_recipient_email.strip()
+        ):
+            raise VerificationEmailConfigurationError(
+                "Support email delivery is not configured.",
+            )
+
+        message = EmailMessage()
+
+        message["Subject"] = (
+            f"[CloudOps Support] {ticket_id} - {subject}"
+        )
+
+        message["From"] = formataddr(
+            (
+                settings.smtp_from_name.strip(),
+                settings.smtp_from_email.strip(),
+            ),
+        )
+
+        message["To"] = (
+            settings.support_recipient_email.strip()
+        )
+
+        # Make normal email-client Reply actions reach the customer.
+        message["Reply-To"] = user_email
+
+        message.set_content(
+            f"""CloudOps Insight support ticket
+
+Ticket ID: {ticket_id}
+Category: {category}
+Subject: {subject}
+Submitted: {submitted_at.isoformat()}
+
+Message:
+{support_message}
+
+Authenticated customer
+----------------------
+Name: {user_name}
+Email: {user_email}
+User ID: {user_id}
+
+Workspace
+---------
+Name: {organization_name}
+Workspace ID: {organization_id}
+Role: {organization_role}
+
+Security note:
+CloudOps Insight support requests must not contain passwords,
+AWS secret keys, session tokens, or other credentials.
+""",
+        )
+
+        try:
+            await self._send_async(
+                message,
+            )
+
+        except (
+            OSError,
+            smtplib.SMTPException,
+        ) as error:
+            raise SupportEmailDeliveryError(
+                "Support email delivery failed.",
+            ) from error
 
     async def _send_async(
         self,
