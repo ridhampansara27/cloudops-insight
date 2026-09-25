@@ -2,12 +2,14 @@
 // Import visual identity icons.
 import {
   CloudCog,
-  GitBranch,
+  ExternalLink,
+  LifeBuoy,
   Sparkles,
 } from "lucide-react";
 
 // Import React Router navigation helpers.
 import {
+  Link,
   NavLink,
 } from "react-router-dom";
 
@@ -33,8 +35,13 @@ export function AppSidebar() {
         className="pointer-events-none absolute left-0 top-0 h-40 w-full bg-gradient-to-br from-primary/10 via-transparent to-transparent"
       />
 
-      {/* Render the product identity. */}
-      <div className="relative flex h-[72px] items-center gap-3 border-b border-sidebar-border px-5">
+      {/* Product identity is also the dashboard-home control. */}
+      <Link
+        aria-label="Go to dashboard"
+        className="cloudops-nav-pop relative flex h-[72px] items-center gap-3 border-b border-sidebar-border px-5"
+        title="Dashboard"
+        to="/dashboard"
+      >
         <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl border border-primary/25 bg-gradient-to-br from-primary/25 via-primary/10 to-violet-500/15 text-primary shadow-lg shadow-primary/5">
           <CloudCog className="relative z-10 size-5" />
 
@@ -57,7 +64,7 @@ export function AppSidebar() {
             Command Center
           </p>
         </div>
-      </div>
+      </Link>
 
       {/* Render production navigation groups. */}
       <nav className="relative flex-1 space-y-6 overflow-y-auto px-3 py-5">
@@ -135,24 +142,46 @@ export function AppSidebar() {
         )}
       </nav>
 
-      {/* Show architecture context without inventing runtime status. */}
+      {/* Keep customer-facing help/navigation useful and deployment-neutral. */}
       <div className="relative border-t border-sidebar-border p-4">
-        <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/30 p-3.5 shadow-inner">
-          <div className="flex items-center gap-2">
+        <div className="space-y-2 rounded-2xl border border-sidebar-border bg-sidebar-accent/25 p-2.5 shadow-inner">
+          <Link
+            className="cloudops-nav-pop flex items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
+            to="/"
+          >
             <div className="flex size-8 items-center justify-center rounded-lg border border-primary/15 bg-primary/8 text-primary">
-              <GitBranch className="size-4" />
+              <ExternalLink className="size-4" />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold text-sidebar-foreground">
-                GitOps delivery
+                Public website
               </p>
 
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                AWS ? EKS ? Argo CD
+              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                cloudopsinsight.tech
               </p>
             </div>
-          </div>
+          </Link>
+
+          <a
+            className="cloudops-nav-pop flex items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
+            href="mailto:support@cloudopsinsight.tech"
+          >
+            <div className="flex size-8 items-center justify-center rounded-lg border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
+              <LifeBuoy className="size-4" />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-sidebar-foreground">
+                Support
+              </p>
+
+              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                Get CloudOps help
+              </p>
+            </div>
+          </a>
         </div>
       </div>
     </aside>
