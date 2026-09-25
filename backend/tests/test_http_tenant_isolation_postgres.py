@@ -33,7 +33,9 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.mark.asyncio
-async def test_http_jwt_cannot_select_foreign_organization() -> None:
+async def test_http_jwt_cannot_select_foreign_organization(
+    isolated_app_db_pool: None,
+) -> None:
     """Prevent a valid JWT from selecting another customer's organization."""
 
     assert TENANT_TEST_DATABASE_URL is not None

@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+Disallow: /dashboard
+Disallow: /cloud/
+Disallow: /monitoring/
+Disallow: /costs
+Disallow: /settings
+
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /resend-verification
+Disallow: /invitations/
+
+Sitemap: https://app.cloudopsinsight.tech/sitemap.xml

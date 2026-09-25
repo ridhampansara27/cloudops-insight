@@ -4,6 +4,7 @@ import os
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -34,7 +35,13 @@ from app.api.v1.resources import (
     get_resource_metrics,
     list_resources,
 )
+from app.core.security import (
+    create_access_token,
+    password_state_version,
+)
 from app.core.tenancy import TenantContext
+from app.db.session import get_db_session
+from app.main import app
 from app.models.budget import Budget
 from app.models.cloud_account import CloudAccount
 from app.models.cost import CostRecord
@@ -120,6 +127,8 @@ async def test_customer_data_is_strictly_isolated_between_two_organizations() ->
                 password_hash="test-only",
                 role="viewer",
                 is_active=True,
+                email_verified_at=now,
+                password_changed_at=now,
             )
 
             user_b = User(
@@ -128,6 +137,8 @@ async def test_customer_data_is_strictly_isolated_between_two_organizations() ->
                 password_hash="test-only",
                 role="viewer",
                 is_active=True,
+                email_verified_at=now,
+                password_changed_at=now,
             )
 
             org_a = Organization(
@@ -565,6 +576,397 @@ async def test_customer_data_is_strictly_isolated_between_two_organizations() ->
             assert budgets_a[0].current_spend == Decimal(
                 "10.000000",
             )
+
+            # ==================================================
+            # REAL HTTP TENANT-BOUNDARY REGRESSION
+            #
+            # The assertions above exercise the endpoint functions
+            # directly. This block now proves the same boundaries
+            # through FastAPI routing, JWT authentication, tenant
+            # resolution, request parsing, and response serialization.
+            # ==================================================
+
+            # Build genuine application access tokens bound to each
+            # user's current password state.
+            token_a = create_access_token(
+                str(user_a.id),
+                password_version=password_state_version(
+                    user_a.password_changed_at,
+                ),
+            )
+
+            token_b = create_access_token(
+                str(user_b.id),
+                password_version=password_state_version(
+                    user_b.password_changed_at,
+                ),
+            )
+
+            # Reuse this test's transaction-bound AsyncSession for
+            # HTTP requests. That makes every HTTP assertion observe
+            # the exact same isolated Tenant A / Tenant B dataset.
+            async def override_db_session():
+                yield session
+
+            # Replace only FastAPI's normal DB dependency for the
+            # duration of this HTTP regression block.
+            app.dependency_overrides[get_db_session] = override_db_session
+
+            try:
+                # Send requests directly to FastAPI without opening
+                # a TCP port or contacting any external service.
+                transport = httpx.ASGITransport(
+                    app=app,
+                )
+
+                async with httpx.AsyncClient(
+                    transport=transport,
+                    base_url="http://domain-tenant-boundary-test",
+                ) as client:
+                    # Tenant A may explicitly select only Tenant A.
+                    headers_a = {
+                        "Authorization": f"Bearer {token_a}",
+                        "X-Organization-ID": str(org_a.id),
+                    }
+
+                    # Tenant B may explicitly select only Tenant B.
+                    headers_b = {
+                        "Authorization": f"Bearer {token_b}",
+                        "X-Organization-ID": str(org_b.id),
+                    }
+
+                    # ==============================================
+                    # RESOURCE LIST ISOLATION
+                    # ==============================================
+
+                    resources_http_a = await client.get(
+                        "/api/v1/resources",
+                        headers=headers_a,
+                        params={
+                            "page": 1,
+                            "page_size": 100,
+                        },
+                    )
+
+                    assert resources_http_a.status_code == 200
+
+                    resources_payload_a = resources_http_a.json()
+
+                    assert resources_payload_a["total"] == 1
+                    assert len(resources_payload_a["items"]) == 1
+                    assert resources_payload_a["items"][0]["id"] == str(resource_a.id)
+
+                    # Positive control: Tenant B can see its own
+                    # resource, proving Tenant B's object really exists.
+                    resource_http_b = await client.get(
+                        f"/api/v1/resources/{resource_b.id}",
+                        headers=headers_b,
+                    )
+
+                    assert resource_http_b.status_code == 200
+                    assert resource_http_b.json()["id"] == str(resource_b.id)
+
+                    # Tenant A must not enumerate Tenant B's resource.
+                    foreign_resource = await client.get(
+                        f"/api/v1/resources/{resource_b.id}",
+                        headers=headers_a,
+                    )
+
+                    assert foreign_resource.status_code == 404
+
+                    # ==============================================
+                    # METRIC ISOLATION
+                    # ==============================================
+
+                    own_metrics = await client.get(
+                        f"/api/v1/resources/{resource_a.id}/metrics",
+                        headers=headers_a,
+                    )
+
+                    assert own_metrics.status_code == 200
+
+                    own_metric_payload = own_metrics.json()
+
+                    assert len(own_metric_payload) == 1
+                    assert own_metric_payload[0]["points"][0]["value"] == 12.5
+
+                    # A foreign resource UUID must fail before its
+                    # metric samples can be queried.
+                    foreign_metrics = await client.get(
+                        f"/api/v1/resources/{resource_b.id}/metrics",
+                        headers=headers_a,
+                    )
+
+                    assert foreign_metrics.status_code == 404
+
+                    # ==============================================
+                    # COST AGGREGATE ISOLATION
+                    #
+                    # Tenant A owns USD 10 while Tenant B owns USD 999.
+                    # ==============================================
+
+                    costs_http_a = await client.get(
+                        "/api/v1/costs/summary",
+                        headers=headers_a,
+                    )
+
+                    assert costs_http_a.status_code == 200
+
+                    costs_payload_a = costs_http_a.json()
+
+                    assert costs_payload_a["month_to_date"] == 10.0
+                    assert all(
+                        entry["amount"] != 999.0
+                        for entry in costs_payload_a["by_service"]
+                    )
+
+                    # Positive control proves the 999 value is
+                    # genuinely present for Tenant B.
+                    costs_http_b = await client.get(
+                        "/api/v1/costs/summary",
+                        headers=headers_b,
+                    )
+
+                    assert costs_http_b.status_code == 200
+                    assert costs_http_b.json()["month_to_date"] == 999.0
+
+                    # ==============================================
+                    # DASHBOARD AGGREGATE ISOLATION
+                    # ==============================================
+
+                    dashboard_http_a = await client.get(
+                        "/api/v1/dashboard/summary",
+                        headers=headers_a,
+                    )
+
+                    assert dashboard_http_a.status_code == 200
+
+                    dashboard_payload_a = dashboard_http_a.json()
+
+                    assert dashboard_payload_a["total_resources"] == 1
+                    assert dashboard_payload_a["healthy_resources"] == 1
+                    assert dashboard_payload_a["critical_resources"] == 0
+                    assert dashboard_payload_a["active_incidents"] == 1
+                    assert dashboard_payload_a["month_to_date_cost"] == 10.0
+                    assert dashboard_payload_a["potential_monthly_savings"] == 25.0
+
+                    # Positive control proves Tenant B's critical
+                    # resource, cost, incident, and savings exist.
+                    dashboard_http_b = await client.get(
+                        "/api/v1/dashboard/summary",
+                        headers=headers_b,
+                    )
+
+                    assert dashboard_http_b.status_code == 200
+
+                    dashboard_payload_b = dashboard_http_b.json()
+
+                    assert dashboard_payload_b["total_resources"] == 1
+                    assert dashboard_payload_b["critical_resources"] == 1
+                    assert dashboard_payload_b["month_to_date_cost"] == 999.0
+                    assert dashboard_payload_b["potential_monthly_savings"] == 777.0
+
+                    # ==============================================
+                    # BUDGET LIST ISOLATION
+                    # ==============================================
+
+                    budgets_http_a = await client.get(
+                        "/api/v1/budgets",
+                        headers=headers_a,
+                    )
+
+                    assert budgets_http_a.status_code == 200
+
+                    budgets_payload_a = budgets_http_a.json()
+
+                    assert len(budgets_payload_a) == 1
+                    assert budgets_payload_a[0]["id"] == str(budget_a.id)
+
+                    budgets_http_b = await client.get(
+                        "/api/v1/budgets",
+                        headers=headers_b,
+                    )
+
+                    assert budgets_http_b.status_code == 200
+
+                    budgets_payload_b = budgets_http_b.json()
+
+                    assert len(budgets_payload_b) == 1
+                    assert budgets_payload_b[0]["id"] == str(budget_b.id)
+
+                    # Positive write control: Tenant A may update its
+                    # own budget through the authenticated API.
+                    own_budget_update = await client.patch(
+                        f"/api/v1/budgets/{budget_a.id}",
+                        headers=headers_a,
+                        json={
+                            "name": "Tenant A HTTP Budget",
+                        },
+                    )
+
+                    assert own_budget_update.status_code == 200
+                    assert own_budget_update.json()["name"] == "Tenant A HTTP Budget"
+
+                    # Tenant A cannot update Tenant B's budget UUID.
+                    foreign_budget_update = await client.patch(
+                        f"/api/v1/budgets/{budget_b.id}",
+                        headers=headers_a,
+                        json={
+                            "name": "ILLEGAL TENANT A UPDATE",
+                        },
+                    )
+
+                    assert foreign_budget_update.status_code == 404
+
+                    # Tenant A cannot delete Tenant B's budget.
+                    foreign_budget_delete = await client.delete(
+                        f"/api/v1/budgets/{budget_b.id}",
+                        headers=headers_a,
+                    )
+
+                    assert foreign_budget_delete.status_code == 404
+
+                    # Tenant A also cannot create an account-scoped
+                    # budget referring to Tenant B's cloud account.
+                    foreign_account_budget = await client.post(
+                        "/api/v1/budgets",
+                        headers=headers_a,
+                        json={
+                            "name": "Illegal Tenant B Account Budget",
+                            "scope_type": "account",
+                            "scope_value": str(account_b.id),
+                            "monthly_limit": "100.00",
+                            "warning_threshold": 80,
+                            "critical_threshold": 100,
+                        },
+                    )
+
+                    assert foreign_account_budget.status_code == 422
+
+                    # ==============================================
+                    # INCIDENT LIST + WRITE ISOLATION
+                    # ==============================================
+
+                    incidents_http_a = await client.get(
+                        "/api/v1/incidents",
+                        headers=headers_a,
+                    )
+
+                    assert incidents_http_a.status_code == 200
+
+                    incidents_payload_a = incidents_http_a.json()
+
+                    assert len(incidents_payload_a) == 1
+                    assert incidents_payload_a[0]["id"] == str(incident_a.id)
+
+                    incidents_http_b = await client.get(
+                        "/api/v1/incidents",
+                        headers=headers_b,
+                    )
+
+                    assert incidents_http_b.status_code == 200
+                    assert len(incidents_http_b.json()) == 1
+                    assert incidents_http_b.json()[0]["id"] == str(incident_b.id)
+
+                    # Positive write control for Tenant A.
+                    own_incident_update = await client.patch(
+                        f"/api/v1/incidents/{incident_a.id}/status",
+                        headers=headers_a,
+                        json={
+                            "status": "investigating",
+                        },
+                    )
+
+                    assert own_incident_update.status_code == 200
+                    assert own_incident_update.json()["status"] == "investigating"
+
+                    # Tenant A cannot mutate Tenant B's incident.
+                    foreign_incident_update = await client.patch(
+                        f"/api/v1/incidents/{incident_b.id}/status",
+                        headers=headers_a,
+                        json={
+                            "status": "resolved",
+                        },
+                    )
+
+                    assert foreign_incident_update.status_code == 404
+
+                    # ==============================================
+                    # RECOMMENDATION LIST + WRITE ISOLATION
+                    # ==============================================
+
+                    recommendations_http_a = await client.get(
+                        "/api/v1/recommendations",
+                        headers=headers_a,
+                    )
+
+                    assert recommendations_http_a.status_code == 200
+
+                    recommendations_payload_a = recommendations_http_a.json()
+
+                    assert len(recommendations_payload_a) == 1
+                    assert recommendations_payload_a[0]["id"] == str(
+                        recommendation_a.id
+                    )
+
+                    recommendations_http_b = await client.get(
+                        "/api/v1/recommendations",
+                        headers=headers_b,
+                    )
+
+                    assert recommendations_http_b.status_code == 200
+                    assert len(recommendations_http_b.json()) == 1
+                    assert recommendations_http_b.json()[0]["id"] == str(
+                        recommendation_b.id
+                    )
+
+                    # Positive write control for Tenant A.
+                    own_recommendation_update = await client.patch(
+                        (f"/api/v1/recommendations/{recommendation_a.id}/status"),
+                        headers=headers_a,
+                        json={
+                            "status": "accepted",
+                        },
+                    )
+
+                    assert own_recommendation_update.status_code == 200
+                    assert own_recommendation_update.json()["status"] == "accepted"
+
+                    # Tenant A cannot mutate Tenant B's recommendation.
+                    foreign_recommendation_update = await client.patch(
+                        (f"/api/v1/recommendations/{recommendation_b.id}/status"),
+                        headers=headers_a,
+                        json={
+                            "status": "dismissed",
+                        },
+                    )
+
+                    assert foreign_recommendation_update.status_code == 404
+
+                # Refresh protected Tenant B records from PostgreSQL
+                # after every HTTP attack.
+                await session.refresh(
+                    budget_b,
+                )
+                await session.refresh(
+                    incident_b,
+                )
+                await session.refresh(
+                    recommendation_b,
+                )
+
+                # Cross-tenant HTTP requests must not mutate Tenant B.
+                assert budget_b.name == "Tenant B EC2 Budget"
+                assert incident_b.status == "open"
+                assert recommendation_b.status == "open"
+
+            finally:
+                # Never allow a dependency override to leak into another
+                # pytest test, even when an assertion fails.
+                app.dependency_overrides.pop(
+                    get_db_session,
+                    None,
+                )
 
             # ==================================================
             # BUDGET UUID ATTACKS

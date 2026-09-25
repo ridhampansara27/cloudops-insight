@@ -153,8 +153,7 @@ export function LoginPage() {
 
       const destination =
         locationState?.from
-          ?.pathname ??
-        "/";
+          ?.pathname ?? "/dashboard";
 
       navigate(
         destination,

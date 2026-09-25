@@ -54,6 +54,23 @@ class HealthEvaluationService:
         self,
         resource: CloudResource,
     ) -> HealthEvaluation:
+        # Runtime health is meaningful only while an EC2 instance is running.
+        #
+        # A stopped or otherwise non-running instance can still have recent
+        # CloudWatch samples from before it stopped. Those stale samples must
+        # never make the current resource appear healthy.
+        if (
+            resource.service == "EC2"
+            and resource.resource_type == "AWS::EC2::Instance"
+            and resource.cloud_state != "running"
+        ):
+            return HealthEvaluation(
+                state="unknown",
+                reason=(
+                    "EC2 instance is not running; runtime health is not evaluated."
+                ),
+            )
+
         # Analyze the last thirty minutes.
         cutoff = datetime.now(
             UTC,

@@ -19,6 +19,21 @@ import {
 } from "@/features/workspace/workspace-gate";
 
 
+
+// Load the commercial public homepage only when requested.
+async function loadLandingRoute() {
+  const {
+    LandingPage,
+  } =
+    await import(
+      "@/pages/landing-page"
+    );
+
+  return {
+    Component:
+      LandingPage,
+  };
+}
 // Load the login page only when needed.
 async function loadLoginRoute() {
   const {
@@ -131,6 +146,21 @@ async function loadInvitationAcceptRoute() {
 }
 
 
+
+// Load the public About page only when requested.
+async function loadAboutRoute() {
+  const {
+    AboutPage,
+  } =
+    await import(
+      "@/pages/about-page"
+    );
+
+  return {
+    Component:
+      AboutPage,
+  };
+}
 // Load the public privacy notice only when requested.
 async function loadPrivacyRoute() {
   const {
@@ -375,11 +405,26 @@ async function loadNotFoundRoute() {
 export const appRouter =
   createBrowserRouter([
     {
-      // Keep login publicly accessible.
+      // Public commercial homepage.
+      path:
+        "/",
+
+      lazy:
+        loadLandingRoute,
+    },
+    {
+      // Public company/product story.
+      path:
+        "/about",
+
+      lazy:
+        loadAboutRoute,
+    },
+    {
+      // Public authentication entry point.
       path:
         "/login",
 
-      // Code-split the public authentication page.
       lazy:
         loadLoginRoute,
     },
@@ -392,7 +437,7 @@ export const appRouter =
         loadSignupRoute,
     },
     {
-      // Consume one email verification link.
+      // Consume one email-verification link.
       path:
         "/verify-email",
 
@@ -408,7 +453,7 @@ export const appRouter =
         loadResendVerificationRoute,
     },
     {
-      // Request password recovery without authentication.
+      // Request password recovery.
       path:
         "/forgot-password",
 
@@ -416,7 +461,7 @@ export const appRouter =
         loadForgotPasswordRoute,
     },
     {
-      // Consume a one-time password reset bearer.
+      // Consume a password-reset token.
       path:
         "/reset-password",
 
@@ -424,7 +469,7 @@ export const appRouter =
         loadResetPasswordRoute,
     },
     {
-      // Consume one opaque workspace invitation bearer from the URL fragment.
+      // Accept a workspace invitation.
       path:
         "/invitations/accept",
 
@@ -432,7 +477,7 @@ export const appRouter =
         loadInvitationAcceptRoute,
     },
     {
-      // Public privacy information must remain accessible without login.
+      // Public privacy information.
       path:
         "/privacy",
 
@@ -456,19 +501,16 @@ export const appRouter =
         loadImpressumRoute,
     },
     {
-      // Public support and security contact information.
+      // Public contact information.
       path:
         "/contact",
 
       lazy:
         loadContactRoute,
     },
-    {
-      // Protect every application route.
-      path:
-        "/",
 
-      // Keep the shared authenticated shell mounted.
+    {
+      // All routes below this point require authentication.
       element: (
         <ProtectedRoute>
           <WorkspaceGate>
@@ -480,8 +522,8 @@ export const appRouter =
       children: [
         {
           // Main operational dashboard.
-          index:
-            true,
+          path:
+            "dashboard",
 
           lazy:
             loadDashboardRoute,
@@ -558,14 +600,15 @@ export const appRouter =
           lazy:
             loadSettingsRoute,
         },
-        {
-          // Unknown/removed routes.
-          path:
-            "*",
-
-          lazy:
-            loadNotFoundRoute,
-        },
       ],
+    },
+
+    {
+      // Unknown public or application routes.
+      path:
+        "*",
+
+      lazy:
+        loadNotFoundRoute,
     },
   ]);

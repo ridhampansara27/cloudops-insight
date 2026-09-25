@@ -40,6 +40,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.asyncio
 async def test_foreign_cloud_account_id_is_rejected_before_side_effects(
     monkeypatch: pytest.MonkeyPatch,
+    isolated_app_db_pool: None,
 ) -> None:
     """Prove Tenant A cannot operate on Tenant B's cloud-account UUID."""
 
