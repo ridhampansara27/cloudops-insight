@@ -15,4 +15,4 @@ Disallow: /verify-email
 Disallow: /resend-verification
 Disallow: /invitations/
 
-Sitemap: https://app.cloudopsinsight.tech/sitemap.xml
+Sitemap: https://cloudopsinsight.tech/sitemap.xml
