@@ -38,6 +38,7 @@ configure_logging()
 CORS_ALLOWED_METHODS = [
     "GET",
     "POST",
+    "PUT",
     "PATCH",
     "DELETE",
     "OPTIONS",

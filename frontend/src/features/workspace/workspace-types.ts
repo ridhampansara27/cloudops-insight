@@ -30,6 +30,12 @@ export interface WorkspaceProfile {
 
   full_name: string;
 
+  // Keep workspace profile responses structurally compatible with
+  // AuthenticatedUser after avatar mutations.
+  avatar_updated_at:
+    | string
+    | null;
+
   role: string;
 
   is_active: boolean;

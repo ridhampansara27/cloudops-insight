@@ -10,9 +10,14 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import {
+  toast,
+} from "sonner";
+
 // Import command-bar icons.
 import {
   Bell,
+  Copy,
   Globe2,
   LifeBuoy,
   LogOut,
@@ -20,11 +25,9 @@ import {
   Settings,
 } from "lucide-react";
 
-// Import reusable visual primitives.
 import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+  ProfileAvatar,
+} from "@/features/auth/profile-avatar";
 
 import {
   Button,
@@ -37,6 +40,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -80,6 +84,64 @@ import {
 import {
   useWorkspaceStore,
 } from "@/features/workspace/workspace-store";
+
+
+function compactIdentifier(
+  value:
+    | string
+    | null
+    | undefined,
+): string {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  if (
+    value.length <=
+    18
+  ) {
+    return value;
+  }
+
+  return `${value.slice(
+    0,
+    8,
+  )}...${value.slice(
+    -4,
+  )}`;
+}
+
+
+async function copyIdentifier(
+  value:
+    | string
+    | null
+    | undefined,
+  label: string,
+) {
+  if (!value) {
+    toast.error(
+      `${label} is unavailable.`,
+    );
+
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      value,
+    );
+
+    toast.success(
+      `${label} copied.`,
+    );
+
+  } catch {
+    toast.error(
+      `Unable to copy ${label.toLowerCase()}.`,
+    );
+  }
+}
 
 
 // Export the global application command bar.
@@ -417,13 +479,19 @@ export function AppHeader() {
             className="hidden items-center gap-2.5 rounded-xl border border-border/70 bg-card/45 px-2 py-1.5 text-left shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/55 hover:shadow-lg hover:shadow-primary/5 sm:flex"
             title="View account and workspace details"
           >
-            <Avatar className="size-8 border border-primary/20 shadow-sm">
-              <AvatarFallback className="bg-gradient-to-br from-primary/25 to-violet-500/20 text-xs font-semibold text-foreground">
-                {
-                  initials
-                }
-              </AvatarFallback>
-            </Avatar>
+            <ProfileAvatar
+              avatarUpdatedAt={
+                user?.avatar_updated_at
+              }
+              className="size-8 border border-primary/20 shadow-sm"
+              fallbackClassName="bg-gradient-to-br from-primary/25 to-violet-500/20 text-xs font-semibold text-foreground"
+              initials={
+                initials
+              }
+              userId={
+                user?.id
+              }
+            />
 
             <div className="min-w-0 pr-1">
               <p className="max-w-36 truncate text-xs font-semibold">
@@ -449,19 +517,26 @@ export function AppHeader() {
               8
             }
           >
-            <DropdownMenuLabel className="px-3 pb-2 pt-2">
-              Account
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-3 pb-2 pt-2">
+                Account
+              </DropdownMenuLabel>
 
-            <div className="rounded-xl border border-border/55 bg-background/25 p-3">
+              <div className="rounded-xl border border-border/55 bg-background/25 p-3">
               <div className="flex items-center gap-3">
-                <Avatar className="size-10 border border-primary/20">
-                  <AvatarFallback className="bg-gradient-to-br from-primary/25 to-violet-500/20 text-sm font-semibold">
-                    {
-                      initials
-                    }
-                  </AvatarFallback>
-                </Avatar>
+                <ProfileAvatar
+                  avatarUpdatedAt={
+                    user?.avatar_updated_at
+                  }
+                  className="size-10 border border-primary/20"
+                  fallbackClassName="bg-gradient-to-br from-primary/25 to-violet-500/20 text-sm font-semibold"
+                  initials={
+                    initials
+                  }
+                  userId={
+                    user?.id
+                  }
+                />
 
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">
@@ -484,18 +559,48 @@ export function AppHeader() {
                   Account ID
                 </p>
 
-                <p className="mt-1 break-all font-mono text-[11px] text-foreground/85">
-                  {
-                    user?.id ??
-                    "Unavailable"
-                  }
-                </p>
-              </div>
-            </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <code
+                    className="min-w-0 truncate font-mono text-[11px] text-foreground/85"
+                    title={
+                      user?.id ??
+                      "Unavailable"
+                    }
+                  >
+                    {
+                      compactIdentifier(
+                        user?.id,
+                      )
+                    }
+                  </code>
 
-            <DropdownMenuLabel className="px-3 pb-2 pt-4">
-              Active workspace
-            </DropdownMenuLabel>
+                  {user?.id && (
+                    <Button
+                      aria-label="Copy full account ID"
+                      className="size-7 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                      onClick={() =>
+                        void copyIdentifier(
+                          user.id,
+                          "Account ID",
+                        )
+                      }
+                      size="icon"
+                      title="Copy full account ID"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Copy className="size-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              </div>
+            </DropdownMenuGroup>
+
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-3 pb-2 pt-4">
+                Active workspace
+              </DropdownMenuLabel>
 
             <div className="rounded-xl border border-border/55 bg-background/25 p-3">
               <div className="flex items-center justify-between gap-3">
@@ -518,15 +623,49 @@ export function AppHeader() {
                 Workspace ID
               </p>
 
-              <p className="mt-1 break-all font-mono text-[11px] text-foreground/85">
-                {
-                  activeOrganization
-                    ?.id ??
-                  activeOrganizationId ??
-                  "Unavailable"
-                }
-              </p>
-            </div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <code
+                  className="min-w-0 truncate font-mono text-[11px] text-foreground/85"
+                  title={
+                    activeOrganization
+                      ?.id ??
+                    activeOrganizationId ??
+                    "Unavailable"
+                  }
+                >
+                  {
+                    compactIdentifier(
+                      activeOrganization
+                        ?.id ??
+                      activeOrganizationId,
+                    )
+                  }
+                </code>
+
+                {(activeOrganization?.id ??
+                  activeOrganizationId) && (
+                  <Button
+                    aria-label="Copy full workspace ID"
+                    className="size-7 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                    onClick={() =>
+                      void copyIdentifier(
+                        activeOrganization
+                          ?.id ??
+                        activeOrganizationId,
+                        "Workspace ID",
+                      )
+                    }
+                    size="icon"
+                    title="Copy full workspace ID"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Copy className="size-3.5" />
+                  </Button>
+                )}
+              </div>
+              </div>
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator className="my-2" />
 
@@ -556,18 +695,6 @@ export function AppHeader() {
               CloudOps public website
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-              className="cursor-pointer rounded-xl px-3 py-2.5"
-              onClick={() =>
-                setSupportOpen(
-                  true,
-                )
-              }
-            >
-              <LifeBuoy className="size-4" />
-
-              Support
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 

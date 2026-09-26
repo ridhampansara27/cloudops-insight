@@ -1,5 +1,8 @@
 import {
+  type ChangeEvent,
   type FormEvent,
+  useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -7,6 +10,8 @@ import {
   Building2,
   CircleCheckBig,
   Clock3,
+  ImagePlus,
+  LoaderCircle,
   MailPlus,
   Save,
   Settings,
@@ -14,6 +19,7 @@ import {
   Trash2,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 
 import {
@@ -25,7 +31,13 @@ import {
 } from "@/features/auth/delete-account-dialog";
 
 import {
+  ProfileAvatar,
+} from "@/features/auth/profile-avatar";
+
+import {
   deleteAccount,
+  deleteCurrentUserAvatar,
+  uploadCurrentUserAvatar,
 } from "@/features/auth/api/auth-api";
 
 import {
@@ -156,6 +168,20 @@ function invitationClasses(
 }
 
 
+const MAX_PROFILE_AVATAR_BYTES =
+  5 *
+  1024 *
+  1024;
+
+
+const PROFILE_AVATAR_TYPES =
+  new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ]);
+
+
 function readableError(
   error: unknown,
   fallback: string,
@@ -194,6 +220,71 @@ export function SettingsPage() {
     useState(
       false,
     );
+
+  const [
+    selectedAvatar,
+    setSelectedAvatar,
+  ] =
+    useState<
+      File | null
+    >(
+      null,
+    );
+
+  const [
+    avatarPreviewUrl,
+    setAvatarPreviewUrl,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+  const [
+    isUploadingAvatar,
+    setIsUploadingAvatar,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    isRemovingAvatar,
+    setIsRemovingAvatar,
+  ] =
+    useState(
+      false,
+    );
+
+  const avatarInputRef =
+    useRef<
+      HTMLInputElement | null
+    >(
+      null,
+    );
+
+
+  // Release every temporary browser preview URL when it is replaced or when
+  // Settings unmounts.
+  useEffect(
+    () => {
+      if (
+        !avatarPreviewUrl
+      ) {
+        return;
+      }
+
+      return () => {
+        URL.revokeObjectURL(
+          avatarPreviewUrl,
+        );
+      };
+    },
+    [
+      avatarPreviewUrl,
+    ],
+  );
 
 
   const profileQuery =
@@ -242,6 +333,14 @@ export function SettingsPage() {
   const revokeInvitation =
     useRevokeWorkspaceInvitation();
 
+
+  const authUser =
+    useAuthStore(
+      (
+        state,
+      ) =>
+        state.user,
+    );
 
   const setAuthUser =
     useAuthStore(
@@ -322,6 +421,215 @@ export function SettingsPage() {
         invitation.status ===
         "pending",
     );
+
+
+  const profileInitials =
+    profile.full_name
+      .split(
+        /\s+/,
+      )
+      .filter(
+        Boolean,
+      )
+      .slice(
+        0,
+        2,
+      )
+      .map(
+        (
+          part,
+        ) =>
+          part.charAt(
+            0,
+          ),
+      )
+      .join("")
+      .toUpperCase() ||
+    "U";
+
+  const hasAvatar =
+    Boolean(
+      authUser
+        ?.avatar_updated_at,
+    );
+
+  const avatarBusy =
+    isUploadingAvatar ||
+    isRemovingAvatar;
+
+
+  function clearAvatarSelection() {
+    setSelectedAvatar(
+      null,
+    );
+
+    setAvatarPreviewUrl(
+      null,
+    );
+
+    if (
+      avatarInputRef.current
+    ) {
+      avatarInputRef.current.value =
+        "";
+    }
+  }
+
+
+  function handleAvatarSelection(
+    event:
+      ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.currentTarget
+        .files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (
+      !PROFILE_AVATAR_TYPES.has(
+        file.type,
+      )
+    ) {
+      toast.error(
+        "Choose a JPEG, PNG or WebP image.",
+      );
+
+      event.currentTarget.value =
+        "";
+
+      return;
+    }
+
+    if (
+      file.size <= 0
+    ) {
+      toast.error(
+        "The selected image is empty.",
+      );
+
+      event.currentTarget.value =
+        "";
+
+      return;
+    }
+
+    if (
+      file.size >
+      MAX_PROFILE_AVATAR_BYTES
+    ) {
+      toast.error(
+        "Profile photos must be 5 MB or smaller.",
+      );
+
+      event.currentTarget.value =
+        "";
+
+      return;
+    }
+
+    const previewUrl =
+      URL.createObjectURL(
+        file,
+      );
+
+    setSelectedAvatar(
+      file,
+    );
+
+    setAvatarPreviewUrl(
+      previewUrl,
+    );
+  }
+
+
+  async function handleAvatarUpload() {
+    if (
+      !selectedAvatar ||
+      isUploadingAvatar
+    ) {
+      return;
+    }
+
+    setIsUploadingAvatar(
+      true,
+    );
+
+    try {
+      const updated =
+        await uploadCurrentUserAvatar(
+          selectedAvatar,
+        );
+
+      // Updating the auth store changes avatar_updated_at, which creates a
+      // fresh protected-image query key in the header immediately.
+      setAuthUser(
+        updated,
+      );
+
+      clearAvatarSelection();
+
+      toast.success(
+        "Profile photo updated.",
+      );
+
+    } catch (error) {
+      toast.error(
+        readableError(
+          error,
+          "Unable to update profile photo.",
+        ),
+      );
+
+    } finally {
+      setIsUploadingAvatar(
+        false,
+      );
+    }
+  }
+
+
+  async function handleAvatarRemove() {
+    if (
+      isRemovingAvatar
+    ) {
+      return;
+    }
+
+    setIsRemovingAvatar(
+      true,
+    );
+
+    try {
+      const updated =
+        await deleteCurrentUserAvatar();
+
+      setAuthUser(
+        updated,
+      );
+
+      clearAvatarSelection();
+
+      toast.success(
+        "Profile photo removed.",
+      );
+
+    } catch (error) {
+      toast.error(
+        readableError(
+          error,
+          "Unable to remove profile photo.",
+        ),
+      );
+
+    } finally {
+      setIsRemovingAvatar(
+        false,
+      );
+    }
+  }
 
 
   async function handleProfileSave(
@@ -726,6 +1034,166 @@ export function SettingsPage() {
                 handleProfileSave
               }
             >
+              <div className="rounded-2xl border border-border/60 bg-background/25 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <ProfileAvatar
+                    avatarUpdatedAt={
+                      authUser?.avatar_updated_at
+                    }
+                    className="size-20 border border-primary/25 shadow-lg shadow-primary/5"
+                    fallbackClassName="bg-gradient-to-br from-primary/25 to-violet-500/20 text-xl font-semibold text-foreground"
+                    initials={
+                      profileInitials
+                    }
+                    srcOverride={
+                      avatarPreviewUrl ??
+                      undefined
+                    }
+                    userId={
+                      authUser?.id
+                    }
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">
+                      Profile photo
+                    </p>
+
+                    <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
+                      JPEG, PNG or WebP up to 5 MB. CloudOps securely validates,
+                      resizes and removes image metadata before storing your
+                      profile photo.
+                    </p>
+
+                    <input
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={
+                        avatarBusy
+                      }
+                      onChange={
+                        handleAvatarSelection
+                      }
+                      ref={
+                        avatarInputRef
+                      }
+                      type="file"
+                    />
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        className="rounded-xl"
+                        disabled={
+                          avatarBusy
+                        }
+                        onClick={() =>
+                          avatarInputRef
+                            .current
+                            ?.click()
+                        }
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <ImagePlus className="mr-2 size-4" />
+
+                        {hasAvatar
+                          ? "Change photo"
+                          : "Choose photo"}
+                      </Button>
+
+                      {selectedAvatar && (
+                        <Button
+                          className="rounded-xl"
+                          disabled={
+                            avatarBusy
+                          }
+                          onClick={() =>
+                            void handleAvatarUpload()
+                          }
+                          size="sm"
+                          type="button"
+                        >
+                          {isUploadingAvatar ? (
+                            <LoaderCircle className="mr-2 size-4 animate-spin" />
+                          ) : (
+                            <Save className="mr-2 size-4" />
+                          )}
+
+                          {isUploadingAvatar
+                            ? "Uploading..."
+                            : "Save photo"}
+                        </Button>
+                      )}
+
+                      {selectedAvatar && (
+                        <Button
+                          className="rounded-xl"
+                          disabled={
+                            avatarBusy
+                          }
+                          onClick={
+                            clearAvatarSelection
+                          }
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <X className="mr-2 size-4" />
+
+                          Cancel
+                        </Button>
+                      )}
+
+                      {hasAvatar &&
+                        !selectedAvatar && (
+                        <Button
+                          className="rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          disabled={
+                            avatarBusy
+                          }
+                          onClick={() =>
+                            void handleAvatarRemove()
+                          }
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {isRemovingAvatar ? (
+                            <LoaderCircle className="mr-2 size-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="mr-2 size-4" />
+                          )}
+
+                          {isRemovingAvatar
+                            ? "Removing..."
+                            : "Remove photo"}
+                        </Button>
+                      )}
+                    </div>
+
+                    {selectedAvatar && (
+                      <p className="mt-3 truncate text-[11px] text-muted-foreground">
+                        {
+                          selectedAvatar.name
+                        }
+                        {" - "}
+                        {
+                          (
+                            selectedAvatar.size /
+                            1024 /
+                            1024
+                          ).toFixed(
+                            2,
+                          )
+                        }
+                        {" MB selected"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label
                   className="text-xs font-medium text-muted-foreground"

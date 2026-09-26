@@ -42,6 +42,14 @@ export interface AuthenticatedUser {
 
   full_name: string;
 
+  // Non-null when a persistent profile avatar is configured.
+  //
+  // The timestamp doubles as a safe cache/version boundary without exposing
+  // image bytes in the normal identity response.
+  avatar_updated_at:
+    | string
+    | null;
+
   // Global application role remains separate from tenant membership role.
   role: string;
 

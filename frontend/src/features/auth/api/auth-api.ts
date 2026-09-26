@@ -184,3 +184,122 @@ export async function getCurrentUser(): Promise<AuthenticatedUser> {
     "/api/v1/auth/me",
   );
 }
+
+
+function readBlobAsDataUrl(
+  blob: Blob,
+): Promise<string> {
+  return new Promise(
+    (
+      resolve,
+      reject,
+    ) => {
+      const reader =
+        new FileReader();
+
+      reader.addEventListener(
+        "load",
+        () => {
+          if (
+            typeof reader.result ===
+            "string"
+          ) {
+            resolve(
+              reader.result,
+            );
+
+            return;
+          }
+
+          reject(
+            new Error(
+              "Unable to decode profile avatar.",
+            ),
+          );
+        },
+        {
+          once:
+            true,
+        },
+      );
+
+      reader.addEventListener(
+        "error",
+        () => {
+          reject(
+            reader.error ??
+            new Error(
+              "Unable to read profile avatar.",
+            ),
+          );
+        },
+        {
+          once:
+            true,
+        },
+      );
+
+      reader.readAsDataURL(
+        blob,
+      );
+    },
+  );
+}
+
+
+// Retrieve the protected profile image and convert the small sanitized WebP
+// response into a renderable browser data URL.
+export async function getCurrentUserAvatar(): Promise<string> {
+  const blob =
+    await apiRequest<Blob>(
+      "/api/v1/auth/me/avatar",
+      {
+        responseType:
+          "blob",
+      },
+    );
+
+  return readBlobAsDataUrl(
+    blob,
+  );
+}
+
+
+// Persist one profile image.
+//
+// The browser creates the multipart boundary; the generic API client must
+// never overwrite it with a manual Content-Type header.
+export async function uploadCurrentUserAvatar(
+  file: File,
+): Promise<AuthenticatedUser> {
+  const multipart =
+    new FormData();
+
+  multipart.append(
+    "avatar",
+    file,
+    file.name,
+  );
+
+  return apiRequest<AuthenticatedUser>(
+    "/api/v1/auth/me/avatar",
+    {
+      method:
+        "PUT",
+
+      multipart,
+    },
+  );
+}
+
+
+// Remove the authenticated identity's stored profile image.
+export async function deleteCurrentUserAvatar(): Promise<AuthenticatedUser> {
+  return apiRequest<AuthenticatedUser>(
+    "/api/v1/auth/me/avatar",
+    {
+      method:
+        "DELETE",
+    },
+  );
+}
