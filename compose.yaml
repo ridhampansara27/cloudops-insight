@@ -114,6 +114,13 @@ services:
     # Reuse exactly the same backend image.
     image: cloudops-backend:local
 
+    # The backend image healthcheck probes the Uvicorn HTTP endpoint.
+    # This container runs Celery instead, so disable that inherited
+    # HTTP probe. Docker still stops/restarts the service if Celery's
+    # main process exits.
+    healthcheck:
+      disable: true
+
     # Load application configuration.
     env_file:
       - ./backend/.env
@@ -151,6 +158,12 @@ services:
   cloudops-beat:
     # Reuse backend application image.
     image: cloudops-backend:local
+
+    # Celery Beat does not expose the backend HTTP health endpoint.
+    # Disable the API image's inherited HTTP healthcheck; container
+    # process state remains the lifecycle signal for this scheduler.
+    healthcheck:
+      disable: true
 
     # Load application configuration.
     env_file:
