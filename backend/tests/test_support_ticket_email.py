@@ -1,8 +1,8 @@
 """Support-ticket email composition tests."""
 
 from datetime import (
+    UTC,
     datetime,
-    timezone,
 )
 from email.message import EmailMessage
 
@@ -68,7 +68,7 @@ async def test_support_ticket_email_contains_authenticated_context(
         25,
         21,
         30,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
 
     await service.send_support_ticket(
@@ -118,7 +118,19 @@ async def test_support_ticket_email_contains_authenticated_context(
 
     assert "owner@example.com" in body
 
+    assert (
+        "Account ID: "
+        "11111111-1111-1111-1111-111111111111"
+        in body
+    )
+
     assert "Production AWS" in body
+
+    assert (
+        "Workspace ID: "
+        "22222222-2222-2222-2222-222222222222"
+        in body
+    )
 
     assert "Role: owner" in body
 

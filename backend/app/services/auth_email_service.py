@@ -276,7 +276,7 @@ Authenticated customer
 ----------------------
 Name: {user_name}
 Email: {user_email}
-User ID: {user_id}
+Account ID: {user_id}
 
 Workspace
 ---------
