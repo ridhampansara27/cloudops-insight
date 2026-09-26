@@ -1,13 +1,16 @@
 """Authentication API."""
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import (
     APIRouter,
     Depends,
+    File,
     HTTPException,
     Request,
     Response,
+    UploadFile,
     status,
 )
 from fastapi.security import OAuth2PasswordRequestForm
@@ -47,6 +50,11 @@ from app.services.auth_email_service import AuthEmailService
 from app.services.auth_request_security import enforce_trusted_browser_origin
 from app.services.auth_service import AuthService
 from app.services.password_reset_service import PasswordResetService
+from app.services.profile_avatar_service import (
+    AvatarProcessingError,
+    MAX_AVATAR_UPLOAD_BYTES,
+    process_profile_avatar,
+)
 from app.services.rate_limit_service import (
     limit_forgot_password,
     limit_login,
@@ -55,6 +63,7 @@ from app.services.rate_limit_service import (
     limit_reset_password,
     limit_signup,
     limit_verify_email,
+    limit_avatar_update,
 )
 from app.services.refresh_session_service import (
     InvalidRefreshSessionError,
@@ -508,6 +517,134 @@ async def delete_account(
         personal_workspaces_deleted=result.personal_workspaces_deleted,
         shared_workspaces_left=result.shared_workspaces_left,
         message="CloudOps account deleted successfully.",
+    )
+
+
+@router.get(
+    "/me/avatar",
+)
+async def read_current_user_avatar(
+    current_user: CurrentUser,
+) -> Response:
+    """Return the authenticated identity's sanitized profile image."""
+
+    if (
+        current_user.avatar_bytes is None
+        or current_user.avatar_updated_at is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile image is not configured.",
+        )
+
+    return Response(
+        content=current_user.avatar_bytes,
+        media_type="image/webp",
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.put(
+    "/me/avatar",
+    response_model=UserRead,
+)
+async def update_current_user_avatar(
+    request: Request,
+    avatar: Annotated[
+        UploadFile,
+        File(
+            description="JPEG, PNG or WebP profile image.",
+        ),
+    ],
+    current_user: CurrentUser,
+    session: DatabaseSession,
+) -> UserRead:
+    """Validate, sanitize and persist the authenticated user's avatar."""
+
+    await limit_avatar_update(
+        request,
+        user_id=current_user.id,
+    )
+
+    try:
+        payload = await avatar.read(
+            MAX_AVATAR_UPLOAD_BYTES + 1,
+        )
+
+    finally:
+        await avatar.close()
+
+    if len(payload) > MAX_AVATAR_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="The profile image exceeds the 5 MB upload limit.",
+        )
+
+    try:
+        processed = process_profile_avatar(
+            payload,
+        )
+
+    except AvatarProcessingError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(
+                error,
+            ),
+        ) from error
+
+    current_user.avatar_bytes = (
+        processed.data
+    )
+
+    current_user.avatar_updated_at = (
+        datetime.now(
+            UTC,
+        )
+    )
+
+    await session.commit()
+
+    await session.refresh(
+        current_user,
+    )
+
+    return UserRead.model_validate(
+        current_user,
+    )
+
+
+@router.delete(
+    "/me/avatar",
+    response_model=UserRead,
+)
+async def delete_current_user_avatar(
+    request: Request,
+    current_user: CurrentUser,
+    session: DatabaseSession,
+) -> UserRead:
+    """Remove the authenticated user's persisted profile image."""
+
+    await limit_avatar_update(
+        request,
+        user_id=current_user.id,
+    )
+
+    current_user.avatar_bytes = None
+    current_user.avatar_updated_at = None
+
+    await session.commit()
+
+    await session.refresh(
+        current_user,
+    )
+
+    return UserRead.model_validate(
+        current_user,
     )
 
 

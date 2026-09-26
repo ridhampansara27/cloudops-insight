@@ -185,6 +185,17 @@ SUPPORT_TICKET_ACTOR = RateLimitPolicy(
 )
 
 
+# ============================================================
+# Authenticated profile-image policy
+# ============================================================
+
+AVATAR_UPDATE_ACTOR = RateLimitPolicy(
+    "profile-avatar-update-actor",
+    20,
+    3600,
+)
+
+
 def _normalized_ip(
     value: str | None,
 ) -> str | None:
@@ -552,4 +563,21 @@ async def limit_invitation_accept(
         request,
         INVITATION_ACCEPT_TOKEN,
         token,
+    )
+
+
+async def limit_avatar_update(
+    request: Request,
+    *,
+    user_id: UUID,
+) -> None:
+    """Protect authenticated profile-image write operations."""
+
+    await enforce_rate_limit(
+        request,
+        AVATAR_UPDATE_ACTOR,
+        str(
+            user_id,
+        ),
+        include_client_ip=False,
     )
