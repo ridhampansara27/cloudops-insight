@@ -465,9 +465,7 @@ class Settings(BaseSettings):
 
         smtp_from_email = self.smtp_from_email.strip()
 
-        support_recipient_email = (
-            self.support_recipient_email.strip()
-        )
+        support_recipient_email = self.support_recipient_email.strip()
 
         require(
             bool(
@@ -551,9 +549,7 @@ class Settings(BaseSettings):
                 check_deliverability=False,
             )
 
-            support_domain = (
-                validated_support_recipient.domain.lower()
-            )
+            support_domain = validated_support_recipient.domain.lower()
 
             reserved_support_domains = {
                 "example.com",
@@ -572,10 +568,7 @@ class Settings(BaseSettings):
                         ".test",
                     ),
                 ),
-                (
-                    "SUPPORT_RECIPIENT_EMAIL must use a real "
-                    "production email domain."
-                ),
+                ("SUPPORT_RECIPIENT_EMAIL must use a real production email domain."),
             )
 
         except EmailNotValidError:

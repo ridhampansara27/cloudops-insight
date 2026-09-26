@@ -233,19 +233,14 @@ If you were not expecting this invitation, you can ignore this email.
     ) -> None:
         """Deliver one authenticated customer support request."""
 
-        if (
-            not self.is_configured
-            or not settings.support_recipient_email.strip()
-        ):
+        if not self.is_configured or not settings.support_recipient_email.strip():
             raise VerificationEmailConfigurationError(
                 "Support email delivery is not configured.",
             )
 
         message = EmailMessage()
 
-        message["Subject"] = (
-            f"[CloudOps Support] {ticket_id} - {subject}"
-        )
+        message["Subject"] = f"[CloudOps Support] {ticket_id} - {subject}"
 
         message["From"] = formataddr(
             (
@@ -254,9 +249,7 @@ If you were not expecting this invitation, you can ignore this email.
             ),
         )
 
-        message["To"] = (
-            settings.support_recipient_email.strip()
-        )
+        message["To"] = settings.support_recipient_email.strip()
 
         # Make normal email-client Reply actions reach the customer.
         message["Reply-To"] = user_email

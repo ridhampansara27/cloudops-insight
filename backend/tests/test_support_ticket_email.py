@@ -50,9 +50,7 @@ async def test_support_ticket_email_contains_authenticated_context(
     async def capture(
         message: EmailMessage,
     ) -> None:
-        captured[
-            "message"
-        ] = message
+        captured["message"] = message
 
     service = AuthEmailService()
 
@@ -85,27 +83,14 @@ async def test_support_ticket_email_contains_authenticated_context(
         submitted_at=submitted_at,
     )
 
-    message = captured[
-        "message"
-    ]
+    message = captured["message"]
 
-    assert (
-        message["To"]
-        == "support@cloudopsinsight.tech"
-    )
+    assert message["To"] == "support@cloudopsinsight.tech"
 
-    assert (
-        message["Reply-To"]
-        == "owner@example.com"
-    )
+    assert message["Reply-To"] == "owner@example.com"
 
-    assert (
-        message["Subject"]
-        == (
-            "[CloudOps Support] "
-            "SUP-20260925-ABC12345 - "
-            "Resources page issue"
-        )
+    assert message["Subject"] == (
+        "[CloudOps Support] SUP-20260925-ABC12345 - Resources page issue"
     )
 
     body = message.get_content()
@@ -118,19 +103,11 @@ async def test_support_ticket_email_contains_authenticated_context(
 
     assert "owner@example.com" in body
 
-    assert (
-        "Account ID: "
-        "11111111-1111-1111-1111-111111111111"
-        in body
-    )
+    assert "Account ID: 11111111-1111-1111-1111-111111111111" in body
 
     assert "Production AWS" in body
 
-    assert (
-        "Workspace ID: "
-        "22222222-2222-2222-2222-222222222222"
-        in body
-    )
+    assert "Workspace ID: 22222222-2222-2222-2222-222222222222" in body
 
     assert "Role: owner" in body
 
