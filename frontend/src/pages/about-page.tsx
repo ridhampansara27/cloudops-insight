@@ -130,9 +130,9 @@ export function AboutPage() {
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950"
-                to="/signup"
+                to="/contact"
               >
-                Create account
+                Request access
                 <ArrowRight className="size-4" />
               </Link>
 

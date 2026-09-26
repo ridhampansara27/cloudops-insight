@@ -325,7 +325,7 @@ export function ResourceDataTable({
                 {
                   firstVisible
                 }
-                ?
+                {"\u2013"}
                 {
                   lastVisible
                 }

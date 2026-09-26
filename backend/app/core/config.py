@@ -110,6 +110,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = "no-reply@cloudops-insight.local"
 
+    # Destination for authenticated customer support tickets.
+    support_recipient_email: str = "support@cloudopsinsight.tech"
+
     # Human-readable sender name shown by email clients.
     smtp_from_name: str = "CloudOps Insight"
     smtp_starttls: bool = True
@@ -462,6 +465,8 @@ class Settings(BaseSettings):
 
         smtp_from_email = self.smtp_from_email.strip()
 
+        support_recipient_email = self.support_recipient_email.strip()
+
         require(
             bool(
                 smtp_host,
@@ -536,6 +541,39 @@ class Settings(BaseSettings):
         except EmailNotValidError:
             problems.append(
                 "SMTP_FROM_EMAIL must be a valid email address.",
+            )
+
+        try:
+            validated_support_recipient = validate_email(
+                support_recipient_email,
+                check_deliverability=False,
+            )
+
+            support_domain = validated_support_recipient.domain.lower()
+
+            reserved_support_domains = {
+                "example.com",
+                "example.net",
+                "example.org",
+                "localhost",
+            }
+
+            require(
+                support_domain not in reserved_support_domains
+                and not support_domain.endswith(
+                    (
+                        ".local",
+                        ".invalid",
+                        ".example",
+                        ".test",
+                    ),
+                ),
+                ("SUPPORT_RECIPIENT_EMAIL must use a real production email domain."),
+            )
+
+        except EmailNotValidError:
+            problems.append(
+                "SUPPORT_RECIPIENT_EMAIL must be a valid email address.",
             )
 
         # ----------------------------------------------------

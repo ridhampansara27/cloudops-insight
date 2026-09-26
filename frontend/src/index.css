@@ -330,17 +330,15 @@
    * physical lift without creating disruptive movement.
    */
   .cloudops-interactive {
-    transform:
-      translateY(0)
-      scale(1);
+    /*
+     * Keep text-bearing surfaces at native scale.
+     *
+     * Fractional transform scaling can make Chromium rasterize text on a
+     * transformed layer and produce visibly softer typography.
+     */
+    transform: translateY(0);
 
     transform-origin: center;
-
-    will-change:
-      transform,
-      border-color,
-      box-shadow,
-      background-color;
 
     transition:
       transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -355,9 +353,11 @@
    * CloudOps cyan surface highlight.
    */
   .cloudops-interactive:hover {
-    transform:
-      translateY(-4px)
-      scale(1.01);
+    /*
+     * Preserve dimensional feedback with lift, border and shadow only.
+     * Text remains at native pixel scale.
+     */
+    transform: translateY(-4px);
 
     border-color:
       color-mix(
@@ -676,4 +676,463 @@
   background: rgb(34 211 238 / 5%);
   color: rgb(240 249 255);
   outline: none;
+}
+
+/* ==========================================================
+   H4 commercial landing interactions
+   ========================================================== */
+
+/*
+ * Give primary navigation a dimensional hover state without scaling text.
+ */
+.landing-nav-pop {
+  position: relative;
+
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+
+  padding: 0.45rem 0.6rem;
+
+  transform: translateY(0);
+
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+}
+
+.landing-nav-pop:hover,
+.landing-nav-pop:focus-visible {
+  transform: translateY(-2px);
+
+  border-color:
+    color-mix(
+      in oklab,
+      var(--primary) 20%,
+      transparent
+    );
+
+  background:
+    color-mix(
+      in oklab,
+      var(--primary) 8%,
+      transparent
+    );
+
+  color: var(--foreground);
+
+  box-shadow:
+    0 14px 28px -22px
+      color-mix(
+        in oklab,
+        var(--primary) 55%,
+        transparent
+      );
+
+  outline: none;
+}
+
+/*
+ * Apply one consistent landing-card interaction system.
+ *
+ * Deliberately avoid scale transforms so typography remains sharp.
+ */
+.landing-page article,
+.landing-page details,
+.landing-page .landing-pop-card,
+.landing-page .cloudops-glass,
+.landing-page .landing-product-glow {
+  transform: translateY(0);
+
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background-color 220ms ease;
+}
+
+.landing-page article:hover,
+.landing-page details:hover,
+.landing-page .landing-pop-card:hover,
+.landing-page .cloudops-glass:hover,
+.landing-page .landing-product-glow:hover {
+  transform: translateY(-4px);
+
+  border-color:
+    color-mix(
+      in oklab,
+      var(--primary) 30%,
+      var(--border)
+    );
+
+  box-shadow:
+    0 26px 58px -38px
+      color-mix(
+        in oklab,
+        var(--primary) 55%,
+        transparent
+      ),
+    0 14px 32px -26px
+      rgb(0 0 0 / 70%);
+}
+
+.landing-page article:focus-within,
+.landing-page details:focus-within,
+.landing-page .landing-pop-card:focus-within,
+.landing-page .cloudops-glass:focus-within,
+.landing-page .landing-product-glow:focus-within {
+  border-color:
+    color-mix(
+      in oklab,
+      var(--primary) 34%,
+      var(--border)
+    );
+}
+
+/*
+ * Keep reduced-motion users free from decorative movement.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .landing-nav-pop,
+  .landing-page article,
+  .landing-page details,
+  .landing-page .landing-pop-card,
+  .landing-page .cloudops-glass,
+  .landing-page .landing-product-glow {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* ==========================================================
+   H4.1B visible landing pop interactions
+   ========================================================== */
+
+/*
+ * Make landing surfaces visibly rise above surrounding content.
+ *
+ * We deliberately do NOT use scale() here. Scaling text-bearing elements
+ * was responsible for the soft Chromium text rendering reported earlier.
+ */
+.landing-page article,
+.landing-page details,
+.landing-page .landing-pop-card,
+.landing-page .cloudops-glass,
+.landing-page .landing-product-glow {
+  position: relative;
+
+  transform: translateY(0);
+
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 200ms ease,
+    background-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+
+/*
+ * Stronger card hover:
+ * - larger vertical lift
+ * - bright cyan perimeter
+ * - obvious floating shadow
+ * - foreground stacking so the card visually leaves its row
+ */
+.landing-page article:hover,
+.landing-page details:hover,
+.landing-page .landing-pop-card:hover,
+.landing-page .cloudops-glass:hover,
+.landing-page .landing-product-glow:hover {
+  z-index: 10;
+
+  transform: translateY(-7px);
+
+  border-color:
+    color-mix(
+      in oklab,
+      var(--primary) 50%,
+      var(--border)
+    );
+
+  background-color:
+    color-mix(
+      in oklab,
+      var(--card) 94%,
+      var(--primary) 6%
+    );
+
+  box-shadow:
+    0 0 0 1px
+      color-mix(
+        in oklab,
+        var(--primary) 14%,
+        transparent
+      ),
+    0 18px 42px -20px
+      color-mix(
+        in oklab,
+        var(--primary) 55%,
+        transparent
+      ),
+    0 28px 70px -36px
+      rgb(0 0 0 / 90%);
+}
+
+
+/*
+ * Treat visible rounded landing controls as dimensional controls.
+ *
+ * This automatically covers:
+ * - header Sign in
+ * - header Request access
+ * - hero Request access
+ * - Explore features
+ * - product-tour controls
+ * - support buttons
+ * - final CTA controls
+ *
+ * Footer text links are intentionally excluded because they are not
+ * rounded controls.
+ */
+.landing-page header a[class*="rounded"],
+.landing-page header button[class*="rounded"],
+.landing-page main a[class*="rounded"],
+.landing-page main button[class*="rounded"] {
+  position: relative;
+
+  transform: translateY(0);
+
+  transition:
+    transform 170ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease,
+    color 170ms ease;
+}
+
+
+/*
+ * Give buttons a smaller but very visible physical lift.
+ */
+.landing-page header a[class*="rounded"]:hover,
+.landing-page header button[class*="rounded"]:hover,
+.landing-page main a[class*="rounded"]:hover,
+.landing-page main button[class*="rounded"]:hover {
+  z-index: 20;
+
+  transform: translateY(-4px);
+
+  border-color:
+    color-mix(
+      in oklab,
+      var(--primary) 48%,
+      var(--border)
+    );
+
+  box-shadow:
+    0 0 0 1px
+      color-mix(
+        in oklab,
+        var(--primary) 13%,
+        transparent
+      ),
+    0 14px 28px -14px
+      color-mix(
+        in oklab,
+        var(--primary) 60%,
+        transparent
+      ),
+    0 18px 38px -24px
+      rgb(0 0 0 / 85%);
+}
+
+
+/*
+ * Add a small press response without introducing fractional scaling.
+ */
+.landing-page header a[class*="rounded"]:active,
+.landing-page header button[class*="rounded"]:active,
+.landing-page main a[class*="rounded"]:active,
+.landing-page main button[class*="rounded"]:active {
+  transform: translateY(-1px);
+}
+
+
+/*
+ * Make desktop navigation popup stronger too.
+ */
+.landing-nav-pop:hover,
+.landing-nav-pop:focus-visible {
+  z-index: 20;
+
+  transform: translateY(-4px);
+
+  border-color:
+    color-mix(
+      in oklab,
+      var(--primary) 36%,
+      transparent
+    );
+
+  background:
+    color-mix(
+      in oklab,
+      var(--primary) 11%,
+      transparent
+    );
+
+  color: var(--foreground);
+
+  box-shadow:
+    0 0 0 1px
+      color-mix(
+        in oklab,
+        var(--primary) 10%,
+        transparent
+      ),
+    0 15px 32px -18px
+      color-mix(
+        in oklab,
+        var(--primary) 58%,
+        transparent
+      );
+
+  outline: none;
+}
+
+
+/*
+ * Preserve accessibility preference.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .landing-page article,
+  .landing-page details,
+  .landing-page .landing-pop-card,
+  .landing-page .cloudops-glass,
+  .landing-page .landing-product-glow,
+  .landing-page header a[class*="rounded"],
+  .landing-page header button[class*="rounded"],
+  .landing-page main a[class*="rounded"],
+  .landing-page main button[class*="rounded"],
+  .landing-nav-pop {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+
+/* ==========================================================
+   H4 authenticated native view transitions
+   ========================================================== */
+
+/*
+ * Only the route content receives a named browser view transition.
+ * Sidebar and application header stay visually stable.
+ */
+.cloudops-route-surface {
+  view-transition-name: cloudops-route;
+}
+
+
+/*
+ * React Router starts a native document View Transition for sidebar
+ * navigation. Disable the default whole-document animation and animate
+ * only the named route surface.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+
+::view-transition-group(cloudops-route) {
+  animation-duration: 440ms;
+  animation-timing-function:
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+
+/*
+ * Let both views overlap for most of the transition.
+ *
+ * This creates a softer cross-fade instead of the previous
+ * "old page disappears -> new page moves in" feeling.
+ */
+::view-transition-old(cloudops-route) {
+  animation:
+    cloudops-route-out
+    360ms
+    cubic-bezier(0.4, 0, 0.2, 1)
+    both;
+}
+
+
+::view-transition-new(cloudops-route) {
+  animation:
+    cloudops-route-in
+    440ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+
+@keyframes cloudops-route-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+
+@keyframes cloudops-route-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  45% {
+    opacity: 0.78;
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/*
+ * Keep Settings administration lists compact while allowing real scrolling
+ * when many members or invitations exist.
+ */
+.cloudops-settings-list {
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    color-mix(
+      in oklab,
+      var(--primary) 25%,
+      transparent
+    )
+    transparent;
+}
+
+
+/*
+ * Respect reduced-motion accessibility preferences.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(cloudops-route),
+  ::view-transition-old(cloudops-route),
+  ::view-transition-new(cloudops-route) {
+    animation-duration: 1ms !important;
+  }
 }

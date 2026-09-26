@@ -1,5 +1,8 @@
 import {
+  type ChangeEvent,
   type FormEvent,
+  useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -7,6 +10,8 @@ import {
   Building2,
   CircleCheckBig,
   Clock3,
+  ImagePlus,
+  LoaderCircle,
   MailPlus,
   Save,
   Settings,
@@ -14,6 +19,7 @@ import {
   Trash2,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 
 import {
@@ -25,7 +31,13 @@ import {
 } from "@/features/auth/delete-account-dialog";
 
 import {
+  ProfileAvatar,
+} from "@/features/auth/profile-avatar";
+
+import {
   deleteAccount,
+  deleteCurrentUserAvatar,
+  uploadCurrentUserAvatar,
 } from "@/features/auth/api/auth-api";
 
 import {
@@ -99,16 +111,6 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-
 function roleClasses(
   role: WorkspaceRole,
 ) {
@@ -166,6 +168,20 @@ function invitationClasses(
 }
 
 
+const MAX_PROFILE_AVATAR_BYTES =
+  5 *
+  1024 *
+  1024;
+
+
+const PROFILE_AVATAR_TYPES =
+  new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ]);
+
+
 function readableError(
   error: unknown,
   fallback: string,
@@ -204,6 +220,71 @@ export function SettingsPage() {
     useState(
       false,
     );
+
+  const [
+    selectedAvatar,
+    setSelectedAvatar,
+  ] =
+    useState<
+      File | null
+    >(
+      null,
+    );
+
+  const [
+    avatarPreviewUrl,
+    setAvatarPreviewUrl,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+  const [
+    isUploadingAvatar,
+    setIsUploadingAvatar,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    isRemovingAvatar,
+    setIsRemovingAvatar,
+  ] =
+    useState(
+      false,
+    );
+
+  const avatarInputRef =
+    useRef<
+      HTMLInputElement | null
+    >(
+      null,
+    );
+
+
+  // Release every temporary browser preview URL when it is replaced or when
+  // Settings unmounts.
+  useEffect(
+    () => {
+      if (
+        !avatarPreviewUrl
+      ) {
+        return;
+      }
+
+      return () => {
+        URL.revokeObjectURL(
+          avatarPreviewUrl,
+        );
+      };
+    },
+    [
+      avatarPreviewUrl,
+    ],
+  );
 
 
   const profileQuery =
@@ -252,6 +333,14 @@ export function SettingsPage() {
   const revokeInvitation =
     useRevokeWorkspaceInvitation();
 
+
+  const authUser =
+    useAuthStore(
+      (
+        state,
+      ) =>
+        state.user,
+    );
 
   const setAuthUser =
     useAuthStore(
@@ -332,6 +421,215 @@ export function SettingsPage() {
         invitation.status ===
         "pending",
     );
+
+
+  const profileInitials =
+    profile.full_name
+      .split(
+        /\s+/,
+      )
+      .filter(
+        Boolean,
+      )
+      .slice(
+        0,
+        2,
+      )
+      .map(
+        (
+          part,
+        ) =>
+          part.charAt(
+            0,
+          ),
+      )
+      .join("")
+      .toUpperCase() ||
+    "U";
+
+  const hasAvatar =
+    Boolean(
+      authUser
+        ?.avatar_updated_at,
+    );
+
+  const avatarBusy =
+    isUploadingAvatar ||
+    isRemovingAvatar;
+
+
+  function clearAvatarSelection() {
+    setSelectedAvatar(
+      null,
+    );
+
+    setAvatarPreviewUrl(
+      null,
+    );
+
+    if (
+      avatarInputRef.current
+    ) {
+      avatarInputRef.current.value =
+        "";
+    }
+  }
+
+
+  function handleAvatarSelection(
+    event:
+      ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.currentTarget
+        .files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (
+      !PROFILE_AVATAR_TYPES.has(
+        file.type,
+      )
+    ) {
+      toast.error(
+        "Choose a JPEG, PNG or WebP image.",
+      );
+
+      event.currentTarget.value =
+        "";
+
+      return;
+    }
+
+    if (
+      file.size <= 0
+    ) {
+      toast.error(
+        "The selected image is empty.",
+      );
+
+      event.currentTarget.value =
+        "";
+
+      return;
+    }
+
+    if (
+      file.size >
+      MAX_PROFILE_AVATAR_BYTES
+    ) {
+      toast.error(
+        "Profile photos must be 5 MB or smaller.",
+      );
+
+      event.currentTarget.value =
+        "";
+
+      return;
+    }
+
+    const previewUrl =
+      URL.createObjectURL(
+        file,
+      );
+
+    setSelectedAvatar(
+      file,
+    );
+
+    setAvatarPreviewUrl(
+      previewUrl,
+    );
+  }
+
+
+  async function handleAvatarUpload() {
+    if (
+      !selectedAvatar ||
+      isUploadingAvatar
+    ) {
+      return;
+    }
+
+    setIsUploadingAvatar(
+      true,
+    );
+
+    try {
+      const updated =
+        await uploadCurrentUserAvatar(
+          selectedAvatar,
+        );
+
+      // Updating the auth store changes avatar_updated_at, which creates a
+      // fresh protected-image query key in the header immediately.
+      setAuthUser(
+        updated,
+      );
+
+      clearAvatarSelection();
+
+      toast.success(
+        "Profile photo updated.",
+      );
+
+    } catch (error) {
+      toast.error(
+        readableError(
+          error,
+          "Unable to update profile photo.",
+        ),
+      );
+
+    } finally {
+      setIsUploadingAvatar(
+        false,
+      );
+    }
+  }
+
+
+  async function handleAvatarRemove() {
+    if (
+      isRemovingAvatar
+    ) {
+      return;
+    }
+
+    setIsRemovingAvatar(
+      true,
+    );
+
+    try {
+      const updated =
+        await deleteCurrentUserAvatar();
+
+      setAuthUser(
+        updated,
+      );
+
+      clearAvatarSelection();
+
+      toast.success(
+        "Profile photo removed.",
+      );
+
+    } catch (error) {
+      toast.error(
+        readableError(
+          error,
+          "Unable to remove profile photo.",
+        ),
+      );
+
+    } finally {
+      setIsRemovingAvatar(
+        false,
+      );
+    }
+  }
 
 
   async function handleProfileSave(
@@ -736,6 +1034,166 @@ export function SettingsPage() {
                 handleProfileSave
               }
             >
+              <div className="rounded-2xl border border-border/60 bg-background/25 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <ProfileAvatar
+                    avatarUpdatedAt={
+                      authUser?.avatar_updated_at
+                    }
+                    className="size-20 border border-primary/25 shadow-lg shadow-primary/5"
+                    fallbackClassName="bg-gradient-to-br from-primary/25 to-violet-500/20 text-xl font-semibold text-foreground"
+                    initials={
+                      profileInitials
+                    }
+                    srcOverride={
+                      avatarPreviewUrl ??
+                      undefined
+                    }
+                    userId={
+                      authUser?.id
+                    }
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">
+                      Profile photo
+                    </p>
+
+                    <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
+                      JPEG, PNG or WebP up to 5 MB. CloudOps securely validates,
+                      resizes and removes image metadata before storing your
+                      profile photo.
+                    </p>
+
+                    <input
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={
+                        avatarBusy
+                      }
+                      onChange={
+                        handleAvatarSelection
+                      }
+                      ref={
+                        avatarInputRef
+                      }
+                      type="file"
+                    />
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        className="rounded-xl"
+                        disabled={
+                          avatarBusy
+                        }
+                        onClick={() =>
+                          avatarInputRef
+                            .current
+                            ?.click()
+                        }
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <ImagePlus className="mr-2 size-4" />
+
+                        {hasAvatar
+                          ? "Change photo"
+                          : "Choose photo"}
+                      </Button>
+
+                      {selectedAvatar && (
+                        <Button
+                          className="rounded-xl"
+                          disabled={
+                            avatarBusy
+                          }
+                          onClick={() =>
+                            void handleAvatarUpload()
+                          }
+                          size="sm"
+                          type="button"
+                        >
+                          {isUploadingAvatar ? (
+                            <LoaderCircle className="mr-2 size-4 animate-spin" />
+                          ) : (
+                            <Save className="mr-2 size-4" />
+                          )}
+
+                          {isUploadingAvatar
+                            ? "Uploading..."
+                            : "Save photo"}
+                        </Button>
+                      )}
+
+                      {selectedAvatar && (
+                        <Button
+                          className="rounded-xl"
+                          disabled={
+                            avatarBusy
+                          }
+                          onClick={
+                            clearAvatarSelection
+                          }
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <X className="mr-2 size-4" />
+
+                          Cancel
+                        </Button>
+                      )}
+
+                      {hasAvatar &&
+                        !selectedAvatar && (
+                        <Button
+                          className="rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          disabled={
+                            avatarBusy
+                          }
+                          onClick={() =>
+                            void handleAvatarRemove()
+                          }
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {isRemovingAvatar ? (
+                            <LoaderCircle className="mr-2 size-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="mr-2 size-4" />
+                          )}
+
+                          {isRemovingAvatar
+                            ? "Removing..."
+                            : "Remove photo"}
+                        </Button>
+                      )}
+                    </div>
+
+                    {selectedAvatar && (
+                      <p className="mt-3 truncate text-[11px] text-muted-foreground">
+                        {
+                          selectedAvatar.name
+                        }
+                        {" - "}
+                        {
+                          (
+                            selectedAvatar.size /
+                            1024 /
+                            1024
+                          ).toFixed(
+                            2,
+                          )
+                        }
+                        {" MB selected"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label
                   className="text-xs font-medium text-muted-foreground"
@@ -911,86 +1369,99 @@ export function SettingsPage() {
 
 
       {/* =====================================================
-          Members
+          Workspace access
           ===================================================== */}
-      <Card className="overflow-hidden bg-card/72 py-0">
-        <CardHeader className="border-b border-border/50 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/8 text-emerald-300">
-              <Users className="size-[18px]" />
+      <div
+        className={
+          canAdministerWorkspace
+            ? "grid items-start gap-5 xl:grid-cols-2"
+            : "grid gap-5"
+        }
+      >
+        {/* -----------------------------------------------------
+            Team members
+            ----------------------------------------------------- */}
+        <Card className="overflow-hidden bg-card/72 py-0">
+          <CardHeader className="border-b border-border/50 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/8 text-emerald-300">
+                  <Users className="size-[18px]" />
+                </div>
+
+                <div className="min-w-0">
+                  <CardTitle>
+                    Team members
+                  </CardTitle>
+
+                  <CardDescription className="mt-1">
+                    People with active access to this workspace.
+                  </CardDescription>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge
+                  className="rounded-full border-border/70 bg-background/35 px-2.5 py-1 text-muted-foreground"
+                  variant="outline"
+                >
+                  {
+                    members.length
+                  }{" "}
+                  {
+                    members.length ===
+                    1
+                      ? "member"
+                      : "members"
+                  }
+                </Badge>
+
+                {canAdministerWorkspace && (
+                  <Button
+                    className="rounded-xl"
+                    onClick={() =>
+                      setInviteOpen(
+                        true,
+                      )
+                    }
+                    size="sm"
+                    type="button"
+                  >
+                    <MailPlus className="mr-2 size-4" />
+
+                    Invite
+                  </Button>
+                )}
+              </div>
             </div>
+          </CardHeader>
 
-            <div>
-              <CardTitle>
-                Team members
-              </CardTitle>
+          <CardContent className="p-3">
+            <div className="cloudops-settings-list max-h-[430px] space-y-2 overflow-y-auto pr-1">
+              {members.map(
+                (
+                  member,
+                ) => {
+                  const isCurrentUser =
+                    member.user_id ===
+                    profile.id;
 
-              <CardDescription className="mt-1">
-                Active identities with access to this workspace.
-              </CardDescription>
-            </div>
-          </div>
+                  return (
+                    <div
+                      className="rounded-2xl border border-border/55 bg-background/22 p-4 transition-colors hover:border-primary/20 hover:bg-accent/18"
+                      key={
+                        member.membership_id
+                      }
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/7 text-primary">
+                            <UserRound className="size-[18px]" />
+                          </div>
 
-          {canAdministerWorkspace && (
-            <Button
-              className="mt-4 rounded-xl sm:mt-0"
-              onClick={() =>
-                setInviteOpen(
-                  true,
-                )
-              }
-              type="button"
-            >
-              <MailPlus className="mr-2 size-4" />
-
-              Invite member
-            </Button>
-          )}
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/20">
-                <TableRow className="border-border/60 hover:bg-transparent">
-                  <TableHead>
-                    Member
-                  </TableHead>
-
-                  <TableHead>
-                    Role
-                  </TableHead>
-
-                  <TableHead>
-                    Joined
-                  </TableHead>
-
-                  <TableHead className="text-right">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {members.map(
-                  (
-                    member,
-                  ) => {
-                    const isCurrentUser =
-                      member.user_id ===
-                      profile.id;
-
-                    return (
-                      <TableRow
-                        className="border-border/45"
-                        key={
-                          member.membership_id
-                        }
-                      >
-                        <TableCell>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-semibold">
                                 {
                                   member.full_name
                                 }
@@ -1006,218 +1477,242 @@ export function SettingsPage() {
                               )}
                             </div>
 
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
                               {
                                 member.email
                               }
                             </p>
                           </div>
-                        </TableCell>
+                        </div>
 
-                        <TableCell>
-                          {organization.current_role ===
-                            "owner" &&
-                          !isCurrentUser ? (
-                            <NativeSelect
-                              className="min-w-28 rounded-xl"
-                              disabled={
-                                updateMemberRole.isPending
-                              }
-                              onChange={(
-                                event,
-                              ) =>
-                                void handleRoleChange(
-                                  member.membership_id,
-                                  event.target
-                                    .value as WorkspaceRole,
-                                )
-                              }
-                              value={
-                                member.role
-                              }
-                            >
-                              <NativeSelectOption value="owner">
-                                Owner
-                              </NativeSelectOption>
+                        {organization.current_role ===
+                          "owner" &&
+                        !isCurrentUser && (
+                          <Button
+                            aria-label={`Remove ${member.full_name}`}
+                            className="shrink-0 rounded-xl"
+                            disabled={
+                              removeMember.isPending
+                            }
+                            onClick={() =>
+                              void handleRemoveMember(
+                                member.membership_id,
+                                member.full_name,
+                              )
+                            }
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 className="size-4 text-rose-300" />
+                          </Button>
+                        )}
+                      </div>
 
-                              <NativeSelectOption value="admin">
-                                Admin
-                              </NativeSelectOption>
+                      <div className="mt-4 grid gap-3 border-t border-border/40 pt-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            Workspace role
+                          </p>
 
-                              <NativeSelectOption value="member">
-                                Member
-                              </NativeSelectOption>
+                          <div className="mt-1.5">
+                            {organization.current_role ===
+                              "owner" &&
+                            !isCurrentUser ? (
+                              <NativeSelect
+                                className="h-8 min-w-28 rounded-lg text-xs"
+                                disabled={
+                                  updateMemberRole.isPending
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  void handleRoleChange(
+                                    member.membership_id,
+                                    event.target
+                                      .value as WorkspaceRole,
+                                  )
+                                }
+                                value={
+                                  member.role
+                                }
+                              >
+                                <NativeSelectOption value="owner">
+                                  Owner
+                                </NativeSelectOption>
 
-                              <NativeSelectOption value="viewer">
-                                Viewer
-                              </NativeSelectOption>
-                            </NativeSelect>
-                          ) : (
-                            <Badge
-                              className={
-                                roleClasses(
-                                  member.role,
-                                )
-                              }
-                              variant="outline"
-                            >
-                              {
-                                member.role
-                              }
-                            </Badge>
-                          )}
-                        </TableCell>
+                                <NativeSelectOption value="admin">
+                                  Admin
+                                </NativeSelectOption>
 
-                        <TableCell className="text-sm text-muted-foreground">
-                          {
-                            formatTimestamp(
-                              member.joined_at,
-                            )
-                          }
-                        </TableCell>
+                                <NativeSelectOption value="member">
+                                  Member
+                                </NativeSelectOption>
 
-                        <TableCell className="text-right">
-                          {organization.current_role ===
-                            "owner" &&
-                          !isCurrentUser ? (
-                            <Button
-                              aria-label={`Remove ${member.full_name}`}
-                              className="rounded-xl"
-                              disabled={
-                                removeMember.isPending
-                              }
-                              onClick={() =>
-                                void handleRemoveMember(
-                                  member.membership_id,
-                                  member.full_name,
-                                )
-                              }
-                              size="sm"
-                              type="button"
-                              variant="destructive"
-                            >
-                              <Trash2 className="mr-2 size-3.5" />
+                                <NativeSelectOption value="viewer">
+                                  Viewer
+                                </NativeSelectOption>
+                              </NativeSelect>
+                            ) : (
+                              <Badge
+                                className={
+                                  roleClasses(
+                                    member.role,
+                                  )
+                                }
+                                variant="outline"
+                              >
+                                {
+                                  member.role
+                                }
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
 
-                              Remove
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  },
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                        <div className="sm:text-right">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            Joined
+                          </p>
 
-
-      {/* =====================================================
-          Invitations
-          ===================================================== */}
-      {canAdministerWorkspace && (
-        <Card className="overflow-hidden bg-card/72 py-0">
-          <CardHeader className="border-b border-border/50 p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/8 text-amber-300">
-                <MailPlus className="size-[18px]" />
-              </div>
-
-              <div>
-                <CardTitle>
-                  Invitations
-                </CardTitle>
-
-                <CardDescription className="mt-1">
-                  One-time workspace invitations and their current lifecycle.
-                </CardDescription>
-              </div>
+                          <p className="mt-2 text-xs text-foreground/80">
+                            {
+                              formatTimestamp(
+                                member.joined_at,
+                              )
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              )}
             </div>
-          </CardHeader>
+          </CardContent>
+        </Card>
 
-          <CardContent className="p-0">
-            {invitationsQuery.isPending ? (
-              <div className="p-6 text-sm text-muted-foreground">
-                Loading invitations...
-              </div>
-            ) : invitationsQuery.isError ? (
-              <div className="p-6">
-                <p className="text-sm font-medium text-destructive">
-                  Unable to load invitations.
-                </p>
 
-                <Button
-                  className="mt-3 rounded-xl"
-                  onClick={() => {
-                    void invitationsQuery.refetch();
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : invitations.length ===
-              0 ? (
-              <div className="flex min-h-48 flex-col items-center justify-center p-6 text-center">
-                <div className="flex size-11 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
-                  <MailPlus className="size-4" />
+        {/* -----------------------------------------------------
+            Invitations
+            ----------------------------------------------------- */}
+        {canAdministerWorkspace && (
+          <Card className="overflow-hidden bg-card/72 py-0">
+            <CardHeader className="border-b border-border/50 p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/8 text-amber-300">
+                    <MailPlus className="size-[18px]" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <CardTitle>
+                      Invitations
+                    </CardTitle>
+
+                    <CardDescription className="mt-1">
+                      Pending and historical workspace invitations.
+                    </CardDescription>
+                  </div>
                 </div>
 
-                <p className="mt-4 text-sm font-semibold">
-                  No invitations yet
-                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge
+                    className="rounded-full border-amber-400/20 bg-amber-400/7 px-2.5 py-1 text-amber-300"
+                    variant="outline"
+                  >
+                    {
+                      pendingInvitations.length
+                    }{" "}
+                    pending
+                  </Badge>
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Invite a teammate when you are ready to share this workspace.
-                </p>
+                  <Badge
+                    className="rounded-full border-border/70 bg-background/35 px-2.5 py-1 text-muted-foreground"
+                    variant="outline"
+                  >
+                    {
+                      invitations.length
+                    }{" "}
+                    total
+                  </Badge>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/20">
-                    <TableRow className="border-border/60 hover:bg-transparent">
-                      <TableHead>
-                        Invitee
-                      </TableHead>
+            </CardHeader>
 
-                      <TableHead>
-                        Role
-                      </TableHead>
+            <CardContent className="p-3">
+              {invitationsQuery.isPending ? (
+                <div className="rounded-2xl border border-border/50 bg-background/20 p-5 text-sm text-muted-foreground">
+                  Loading invitations...
+                </div>
+              ) : invitationsQuery.isError ? (
+                <div className="rounded-2xl border border-rose-400/15 bg-rose-400/[0.035] p-5">
+                  <p className="text-sm font-medium text-destructive">
+                    Unable to load invitations.
+                  </p>
 
-                      <TableHead>
-                        Status
-                      </TableHead>
+                  <Button
+                    className="mt-3 rounded-xl"
+                    onClick={() => {
+                      void invitationsQuery.refetch();
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : invitations.length ===
+                0 ? (
+                <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-border/65 bg-background/18 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
+                      <MailPlus className="size-4" />
+                    </div>
 
-                      <TableHead>
-                        Expires
-                      </TableHead>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        No invitations yet
+                      </p>
 
-                      <TableHead className="text-right">
-                        Action
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Invite a teammate when you are ready to share this workspace.
+                      </p>
+                    </div>
+                  </div>
 
-                  <TableBody>
-                    {invitations.map(
-                      (
-                        invitation,
-                      ) => (
-                        <TableRow
-                          className="border-border/45"
-                          key={
-                            invitation.id
-                          }
-                        >
-                          <TableCell>
-                            <p className="font-medium">
+                  <Button
+                    className="shrink-0 rounded-xl"
+                    onClick={() =>
+                      setInviteOpen(
+                        true,
+                      )
+                    }
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <MailPlus className="mr-2 size-3.5" />
+
+                    Invite teammate
+                  </Button>
+                </div>
+              ) : (
+                <div className="cloudops-settings-list max-h-[430px] space-y-2 overflow-y-auto pr-1">
+                  {invitations.map(
+                    (
+                      invitation,
+                    ) => (
+                      <div
+                        className="rounded-2xl border border-border/55 bg-background/22 p-4 transition-colors hover:border-primary/20 hover:bg-accent/18"
+                        key={
+                          invitation.id
+                        }
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
                               {
                                 invitation.invited_email
                               }
@@ -1231,85 +1726,76 @@ export function SettingsPage() {
                                 )
                               }
                             </p>
-                          </TableCell>
+                          </div>
 
-                          <TableCell>
-                            <Badge
-                              className={
-                                roleClasses(
-                                  invitation.role,
+                          <Badge
+                            className={
+                              invitationClasses(
+                                invitation.status,
+                              )
+                            }
+                            variant="outline"
+                          >
+                            {
+                              invitation.status
+                            }
+                          </Badge>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/40 pt-3">
+                          <Badge
+                            className={
+                              roleClasses(
+                                invitation.role,
+                              )
+                            }
+                            variant="outline"
+                          >
+                            {
+                              invitation.role
+                            }
+                          </Badge>
+
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Clock3 className="size-3.5" />
+
+                            Expires{" "}
+                            {
+                              formatTimestamp(
+                                invitation.expires_at,
+                              )
+                            }
+                          </span>
+
+                          {invitation.status ===
+                            "pending" && (
+                            <Button
+                              className="ml-auto rounded-xl"
+                              disabled={
+                                revokeInvitation.isPending
+                              }
+                              onClick={() =>
+                                void handleRevokeInvitation(
+                                  invitation.id,
                                 )
                               }
-                              variant="outline"
+                              size="sm"
+                              type="button"
+                              variant="ghost"
                             >
-                              {
-                                invitation.role
-                              }
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell>
-                            <Badge
-                              className={
-                                invitationClasses(
-                                  invitation.status,
-                                )
-                              }
-                              variant="outline"
-                            >
-                              {
-                                invitation.status
-                              }
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell className="text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Clock3 className="size-3.5" />
-
-                              {
-                                formatTimestamp(
-                                  invitation.expires_at,
-                                )
-                              }
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            {invitation.status ===
-                              "pending" ? (
-                              <Button
-                                className="rounded-xl"
-                                disabled={
-                                  revokeInvitation.isPending
-                                }
-                                onClick={() =>
-                                  void handleRevokeInvitation(
-                                    invitation.id,
-                                  )
-                                }
-                                size="sm"
-                                type="button"
-                                variant="destructive"
-                              >
-                                Revoke
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                —
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ),
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                              Revoke
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
 
       {/* =====================================================

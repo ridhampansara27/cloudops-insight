@@ -40,6 +40,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import {
+  Button,
+} from "@/components/ui/button";
+
 // Import reusable loading/error states.
 import {
   PageErrorState,
@@ -133,6 +137,28 @@ export function DashboardPage() {
       />
     );
   }
+
+  // Treat any active dashboard query refresh as one command-center refresh.
+  const isRefreshing =
+    dashboardQuery.isFetching ||
+    costQuery.isFetching ||
+    incidentsQuery.isFetching ||
+    resourcesQuery.isFetching;
+
+
+  async function refreshDashboard() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await Promise.all([
+      dashboardQuery.refetch(),
+      costQuery.refetch(),
+      incidentsQuery.refetch(),
+      resourcesQuery.refetch(),
+    ]);
+  }
+
 
   // Store successful API responses.
   const summary =
@@ -261,7 +287,7 @@ export function DashboardPage() {
 
   // Render the CloudOps command center.
   return (
-    <section className="space-y-7">
+    <section className="space-y-6">
       {/* =====================================================
           Command-center hero
           ===================================================== */}
@@ -284,7 +310,7 @@ export function DashboardPage() {
           className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent"
         />
 
-        <CardContent className="relative grid gap-8 p-6 lg:grid-cols-[1.35fr_0.65fr] lg:p-8">
+        <CardContent className="relative grid gap-6 p-5 lg:grid-cols-[1.4fr_0.6fr] lg:p-6 xl:gap-8">
           <div className="flex flex-col justify-center">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
               <Sparkles className="size-3.5" />
@@ -292,19 +318,19 @@ export function DashboardPage() {
               AWS operations command center
             </div>
 
-            <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-[-0.045em] sm:text-4xl xl:text-[44px] xl:leading-[1.05]">
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.045em] sm:text-4xl xl:text-[40px] xl:leading-[1.06]">
               Infrastructure health,
               cost and operational
               signals in one view.
             </h1>
 
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-[15px]">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-[14px]">
               Monitor synchronized AWS inventory, resource health,
               incidents, billing activity and quantified optimization
               opportunities from the same operational workspace.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <Link
                 className="group inline-flex h-10 items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 text-sm font-medium text-primary transition-all hover:-translate-y-0.5 hover:bg-primary/15"
                 to="/cloud/resources"
@@ -322,11 +348,39 @@ export function DashboardPage() {
 
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
+
+              <Button
+                aria-label="Refresh dashboard"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isRefreshing
+                }
+                onClick={() => {
+                  void refreshDashboard();
+                }}
+                title="Refresh dashboard data"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isRefreshing
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
+              </Button>
             </div>
           </div>
 
           {/* Real operational posture panel. */}
-          <div className="rounded-2xl border border-border/70 bg-background/35 p-4 shadow-inner backdrop-blur-xl sm:p-5">
+          <div className="rounded-2xl border border-border/70 bg-background/35 p-4 shadow-inner backdrop-blur-xl">
             <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-muted-foreground">
               Operational posture
             </p>
@@ -353,7 +407,7 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-4 divide-y divide-border/50 rounded-xl border border-border/60 bg-card/35 px-3">
+            <div className="mt-3 divide-y divide-border/50 rounded-xl border border-border/60 bg-card/35 px-3">
               <div className="flex items-center justify-between py-2.5">
                 <span className="text-xs text-muted-foreground">
                   Tracked resources
@@ -404,7 +458,7 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
               {summary.last_resource_sync_at ? (
                 <span className="relative flex size-2">
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-30" />
@@ -450,7 +504,7 @@ export function DashboardPage() {
       {/* =====================================================
           Health + FinOps visualizations
           ===================================================== */}
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid items-start gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <ResourceHealthSummary
           total={
             summary.total_resources

@@ -180,9 +180,9 @@ export function ResourceHealthSummary({
         </div>
       </CardHeader>
 
-      <CardContent className="grid gap-7 pt-2 md:grid-cols-[190px_1fr] md:items-center">
+      <CardContent className="grid gap-5 pt-2 md:grid-cols-[168px_1fr] md:items-center">
         {/* Render an actual-data health distribution ring. */}
-        <div className="relative mx-auto size-[176px]">
+        <div className="relative mx-auto size-[154px]">
           <div
             className={
               total === 0
@@ -195,12 +195,12 @@ export function ResourceHealthSummary({
             }}
           />
 
-          <div className="absolute inset-[17px] flex flex-col items-center justify-center rounded-full border border-border/60 bg-card shadow-inner">
+          <div className="absolute inset-[15px] flex flex-col items-center justify-center rounded-full border border-border/60 bg-card shadow-inner">
             <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
               Resources
             </span>
 
-            <span className="mt-1 text-4xl font-semibold tracking-[-0.05em]">
+            <span className="mt-1 text-3xl font-semibold tracking-[-0.05em]">
               {
                 total
               }
@@ -213,7 +213,7 @@ export function ResourceHealthSummary({
         </div>
 
         {/* Show exact values beside the visual distribution. */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           {healthItems.map(
             (
               item,
@@ -222,7 +222,7 @@ export function ResourceHealthSummary({
                 key={
                   item.label
                 }
-                className="group rounded-xl border border-border/60 bg-background/25 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/30"
+                className="group rounded-xl border border-border/60 bg-background/25 px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/30"
               >
                 <div className="flex items-center gap-2">
                   <span
@@ -237,7 +237,7 @@ export function ResourceHealthSummary({
                 </div>
 
                 <p
-                  className={`mt-3 text-2xl font-semibold tracking-tight ${item.text}`}
+                  className={`mt-2 text-xl font-semibold tracking-tight ${item.text}`}
                 >
                   {
                     item.value

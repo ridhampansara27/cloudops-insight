@@ -45,7 +45,9 @@ export function AppLayout() {
 
           {/* Use a generous maximum width for large command-center screens. */}
           <main className="mx-auto w-full max-w-[1900px] p-4 sm:p-6 lg:p-8">
-            <Outlet />
+            <div className="cloudops-route-surface">
+              <Outlet />
+            </div>
 
             <LegalFooter className="mt-10 border-t border-border/50 pt-5" />
           </main>

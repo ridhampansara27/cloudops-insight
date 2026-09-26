@@ -45,7 +45,7 @@ export function CommandCenterPreview() {
         className="absolute -inset-10 rounded-full bg-cyan-500/[0.09] blur-3xl"
       />
 
-      <div className="landing-product-glow relative overflow-hidden rounded-[30px] border border-cyan-400/10 bg-[#07101d]/90 shadow-2xl shadow-black/35 backdrop-blur-xl">
+      <div className="landing-pop-card landing-product-glow relative overflow-hidden rounded-[30px] border border-cyan-400/10 bg-[#07101d]/90 shadow-2xl shadow-black/35 backdrop-blur-xl">
         <div className="flex flex-col items-start gap-4 border-b border-white/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
           <div className="flex items-center gap-4">
             <div className="flex size-11 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.07] text-cyan-300">

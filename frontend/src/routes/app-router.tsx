@@ -50,7 +50,7 @@ async function loadLoginRoute() {
 }
 
 
-// Load commercial signup only when visited.
+// Keep the closed-signup compatibility page available for old links and bookmarks.
 async function loadSignupRoute() {
   const {
     SignupPage,
@@ -429,7 +429,7 @@ export const appRouter =
         loadLoginRoute,
     },
     {
-      // Commercial tenant-owner registration.
+      // Closed public-signup compatibility route.
       path:
         "/signup",
 

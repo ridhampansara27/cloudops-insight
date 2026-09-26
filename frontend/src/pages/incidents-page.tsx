@@ -15,6 +15,7 @@ import {
   Eye,
   Filter,
   Radar,
+  RefreshCw,
   Search,
   SearchX,
   ShieldAlert,
@@ -585,6 +586,24 @@ export function IncidentsPage() {
     );
   }
 
+  // Refresh both incident records and their supporting resource context.
+  const isRefreshing =
+    incidentsQuery.isFetching ||
+    resourcesQuery.isFetching;
+
+
+  async function refreshIncidents() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await Promise.all([
+      incidentsQuery.refetch(),
+      resourcesQuery.refetch(),
+    ]);
+  }
+
+
   // Derive real command-center posture.
   const incidentPosture =
     criticalIncidents.length >
@@ -793,6 +812,36 @@ export function IncidentsPage() {
               affected resources and response state from one operational
               workspace.
             </p>
+
+            <div className="mt-5">
+              <Button
+                aria-label="Refresh incidents"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isRefreshing
+                }
+                onClick={() => {
+                  void refreshIncidents();
+                }}
+                title="Refresh incident data"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isRefreshing
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
+              </Button>
+            </div>
           </div>
 
           {/* Genuine incident response posture. */}

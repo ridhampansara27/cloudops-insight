@@ -36,6 +36,15 @@ interface ApiRequestOptions
 
   form?: URLSearchParams;
 
+  // Browser-created multipart data. Content-Type must remain unset here so
+  // fetch can add the correct multipart boundary automatically.
+  multipart?: FormData;
+
+  // JSON remains the default response contract for the existing API.
+  responseType?:
+    | "json"
+    | "blob";
+
   requiresAuth?: boolean;
 }
 
@@ -57,12 +66,23 @@ let refreshPromise:
 
 async function readResponseBody(
   response: Response,
+  responseType:
+    | "json"
+    | "blob" =
+      "json",
 ): Promise<unknown> {
   if (
     response.status ===
     204
   ) {
     return null;
+  }
+
+  if (
+    responseType ===
+    "blob"
+  ) {
+    return response.blob();
   }
 
   return response
@@ -194,6 +214,8 @@ async function sendRequest(
   const {
     json,
     form,
+    multipart,
+    responseType,
     headers,
     ...requestOptions
   } = options;
@@ -205,7 +227,10 @@ async function sendRequest(
 
   requestHeaders.set(
     "Accept",
-    "application/json",
+    responseType ===
+      "blob"
+      ? "image/*"
+      : "application/json",
   );
 
   if (accessToken) {
@@ -230,6 +255,7 @@ async function sendRequest(
   let body:
     | string
     | URLSearchParams
+    | FormData
     | undefined;
 
   if (
@@ -254,6 +280,14 @@ async function sendRequest(
     );
 
     body = form;
+  }
+
+  if (
+    multipart !== undefined
+  ) {
+    // Deliberately do not set Content-Type. The browser must generate the
+    // multipart boundary that corresponds to this FormData body.
+    body = multipart;
   }
 
   return fetch(
@@ -345,9 +379,15 @@ export async function apiRequest<T>(
       );
   }
 
+  // Errors from binary endpoints are still ordinary FastAPI JSON
+  // responses, so preserve the existing useful ApiError messages.
   const responseBody =
     await readResponseBody(
       response,
+      response.ok
+        ? networkOptions
+            .responseType
+        : "json",
     );
 
   if (!response.ok) {

@@ -2,12 +2,13 @@
 // Import visual identity icons.
 import {
   CloudCog,
-  GitBranch,
+  ExternalLink,
   Sparkles,
 } from "lucide-react";
 
 // Import React Router navigation helpers.
 import {
+  Link,
   NavLink,
 } from "react-router-dom";
 
@@ -33,8 +34,14 @@ export function AppSidebar() {
         className="pointer-events-none absolute left-0 top-0 h-40 w-full bg-gradient-to-br from-primary/10 via-transparent to-transparent"
       />
 
-      {/* Render the product identity. */}
-      <div className="relative flex h-[72px] items-center gap-3 border-b border-sidebar-border px-5">
+      {/* Product identity is also the dashboard-home control. */}
+      <Link
+        aria-label="Go to dashboard"
+        className="cloudops-nav-pop relative flex h-[72px] items-center gap-3 border-b border-sidebar-border px-5"
+        title="Dashboard"
+        to="/dashboard"
+        viewTransition
+      >
         <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl border border-primary/25 bg-gradient-to-br from-primary/25 via-primary/10 to-violet-500/15 text-primary shadow-lg shadow-primary/5">
           <CloudCog className="relative z-10 size-5" />
 
@@ -57,7 +64,7 @@ export function AppSidebar() {
             Command Center
           </p>
         </div>
-      </div>
+      </Link>
 
       {/* Render production navigation groups. */}
       <nav className="relative flex-1 space-y-6 overflow-y-auto px-3 py-5">
@@ -108,6 +115,7 @@ export function AppSidebar() {
                         to={
                           item.href
                         }
+                        viewTransition
                       >
                         {/* Give active/hovered routes dimensional icon treatment. */}
                         <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent bg-transparent transition-colors group-hover:border-sidebar-border group-hover:bg-sidebar-accent">
@@ -135,25 +143,20 @@ export function AppSidebar() {
         )}
       </nav>
 
-      {/* Show architecture context without inventing runtime status. */}
-      <div className="relative border-t border-sidebar-border p-4">
-        <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/30 p-3.5 shadow-inner">
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-lg border border-primary/15 bg-primary/8 text-primary">
-              <GitBranch className="size-4" />
-            </div>
+      {/* Keep one compact shortcut back to the public CloudOps website. */}
+      <div className="relative border-t border-sidebar-border p-2">
+        <Link
+          aria-label="Open CloudOps Insight public website"
+          className="cloudops-nav-pop group flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/25 px-3 text-xs font-semibold text-muted-foreground shadow-inner transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-sidebar-accent/55 hover:text-sidebar-foreground hover:shadow-lg hover:shadow-primary/5"
+          title="CloudOps Insight public website"
+          to="/"
+        >
+          <ExternalLink className="size-3.5 shrink-0 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
 
-            <div>
-              <p className="text-xs font-semibold text-sidebar-foreground">
-                GitOps delivery
-              </p>
-
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                AWS ? EKS ? Argo CD
-              </p>
-            </div>
-          </div>
-        </div>
+          <span>
+            Public website
+          </span>
+        </Link>
       </div>
     </aside>
   );

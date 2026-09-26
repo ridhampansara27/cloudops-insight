@@ -1,7 +1,7 @@
 from datetime import datetime
 
 # Import SQLAlchemy column types.
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, LargeBinary, String, func
 
 # Import SQLAlchemy ORM typing helpers.
 from sqlalchemy.orm import Mapped, mapped_column
@@ -40,6 +40,24 @@ class User(
         String(160),
         # Require a display name.
         nullable=False,
+    )
+
+    # Store only the sanitized, server-generated avatar representation.
+    #
+    # Original user uploads are never persisted. The avatar service decodes,
+    # validates, resizes, strips metadata and re-encodes every accepted image
+    # as WebP before these bytes reach PostgreSQL.
+    avatar_bytes: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+
+    # Record avatar version time for cache invalidation and client state.
+    avatar_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(
+            timezone=True,
+        ),
+        nullable=True,
     )
 
     # Store only the password hash, never the original password.

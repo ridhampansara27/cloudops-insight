@@ -10,18 +10,24 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import {
+  toast,
+} from "sonner";
+
 // Import command-bar icons.
 import {
   Bell,
+  Copy,
+  Globe2,
+  LifeBuoy,
   LogOut,
   Search,
+  Settings,
 } from "lucide-react";
 
-// Import reusable visual primitives.
 import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+  ProfileAvatar,
+} from "@/features/auth/profile-avatar";
 
 import {
   Button,
@@ -30,6 +36,16 @@ import {
 import {
   Input,
 } from "@/components/ui/input";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 import {
@@ -46,6 +62,10 @@ import {
 import {
   ThemeToggle,
 } from "@/components/layout/theme-toggle";
+
+import {
+  SupportDialog,
+} from "@/components/layout/support-dialog";
 
 // Import authenticated-user state.
 import {
@@ -64,6 +84,64 @@ import {
 import {
   useWorkspaceStore,
 } from "@/features/workspace/workspace-store";
+
+
+function compactIdentifier(
+  value:
+    | string
+    | null
+    | undefined,
+): string {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  if (
+    value.length <=
+    18
+  ) {
+    return value;
+  }
+
+  return `${value.slice(
+    0,
+    8,
+  )}...${value.slice(
+    -4,
+  )}`;
+}
+
+
+async function copyIdentifier(
+  value:
+    | string
+    | null
+    | undefined,
+  label: string,
+) {
+  if (!value) {
+    toast.error(
+      `${label} is unavailable.`,
+    );
+
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      value,
+    );
+
+    toast.success(
+      `${label} copied.`,
+    );
+
+  } catch {
+    toast.error(
+      `Unable to copy ${label.toLowerCase()}.`,
+    );
+  }
+}
 
 
 // Export the global application command bar.
@@ -121,6 +199,34 @@ export function AppHeader() {
     setIsLoggingOut,
   ] =
     useState(false);
+
+  const [
+    supportOpen,
+    setSupportOpen,
+  ] =
+    useState(false);
+
+  // Resolve the active workspace using genuine organization data.
+  const activeOrganization =
+    organizationsQuery.data
+      ?.find(
+        (
+          organization,
+        ) =>
+          organization.id ===
+          activeOrganizationId,
+      ) ??
+    null;
+
+  // Format the genuine workspace role for display.
+  const workspaceRole =
+    activeOrganization
+      ? activeOrganization.role
+          .charAt(0)
+          .toUpperCase() +
+        activeOrganization.role
+          .slice(1)
+      : "Workspace member";
 
   // Build a safe user-facing display name.
   const displayName =
@@ -248,7 +354,8 @@ export function AppHeader() {
 
   // Render the premium global command bar.
   return (
-    <header className="sticky top-0 z-30 flex h-[72px] items-center border-b border-border/70 bg-background/68 px-4 shadow-[0_12px_36px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:px-6 lg:px-8">
+    <>
+      <header className="sticky top-0 z-30 flex h-[72px] items-center border-b border-border/70 bg-background/68 px-4 shadow-[0_12px_36px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:px-6 lg:px-8">
       {/* Keep the existing mobile navigation entry point. */}
       <MobileNavigation />
 
@@ -264,7 +371,7 @@ export function AppHeader() {
 
           <Input
             aria-label="Search resources"
-            className="h-10 rounded-xl border-border/70 bg-card/50 pl-10 pr-14 text-sm shadow-inner backdrop-blur-xl transition-all placeholder:text-muted-foreground/70 focus-visible:border-primary/45 focus-visible:bg-card/80 focus-visible:ring-primary/20"
+            className="h-10 rounded-xl border-border/70 bg-card/50 pl-10 pr-14 text-sm shadow-inner backdrop-blur-xl transition-all placeholder:text-muted-foreground/70 hover:border-primary/35 hover:bg-card/75 hover:shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_12%,transparent),0_10px_30px_-22px_color-mix(in_oklab,var(--primary)_65%,transparent)] focus-visible:border-primary/50 focus-visible:bg-card/85 focus-visible:ring-primary/20"
             placeholder="Search resources..."
             type="search"
             value={
@@ -330,6 +437,24 @@ export function AppHeader() {
           )}
 
         <Button
+          aria-label="Open support"
+          className="hidden rounded-xl border border-border/70 bg-card/45 px-3 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 xl:inline-flex"
+          onClick={() =>
+            setSupportOpen(
+              true,
+            )
+          }
+          title="CloudOps Support"
+          variant="ghost"
+        >
+          <LifeBuoy className="size-4" />
+
+          <span>
+            Support
+          </span>
+        </Button>
+
+        <Button
           aria-label="View incidents"
           className="rounded-xl border border-border/70 bg-card/45 shadow-sm backdrop-blur-xl hover:border-primary/25 hover:bg-accent/70"
           onClick={() =>
@@ -347,28 +472,231 @@ export function AppHeader() {
         {/* Keep light/dark/system switching available. */}
         <ThemeToggle />
 
-        {/* Render genuine authenticated-user identity. */}
-        <div className="hidden items-center gap-2.5 rounded-xl border border-border/70 bg-card/45 px-2 py-1.5 shadow-sm backdrop-blur-xl sm:flex">
-          <Avatar className="size-8 border border-primary/20 shadow-sm">
-            <AvatarFallback className="bg-gradient-to-br from-primary/25 to-violet-500/20 text-xs font-semibold text-foreground">
-              {
+        {/* Render genuine authenticated account and workspace details. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Open account details"
+            className="hidden items-center gap-2.5 rounded-xl border border-border/70 bg-card/45 px-2 py-1.5 text-left shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/55 hover:shadow-lg hover:shadow-primary/5 sm:flex"
+            title="View account and workspace details"
+          >
+            <ProfileAvatar
+              avatarUpdatedAt={
+                user?.avatar_updated_at
+              }
+              className="size-8 border border-primary/20 shadow-sm"
+              fallbackClassName="bg-gradient-to-br from-primary/25 to-violet-500/20 text-xs font-semibold text-foreground"
+              initials={
                 initials
               }
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="min-w-0 pr-1">
-            <p className="max-w-36 truncate text-xs font-semibold">
-              {
-                displayName
+              userId={
+                user?.id
               }
-            </p>
+            />
 
-            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Operator
-            </p>
-          </div>
-        </div>
+            <div className="min-w-0 pr-1">
+              <p className="max-w-36 truncate text-xs font-semibold">
+                {
+                  displayName
+                }
+              </p>
+
+              <p className="max-w-36 truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                {
+                  activeOrganization
+                    ?.name ??
+                  "CloudOps account"
+                }
+              </p>
+            </div>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="end"
+            className="w-[320px] rounded-2xl border border-border/70 bg-popover/98 p-2 shadow-2xl"
+            sideOffset={
+              8
+            }
+          >
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-3 pb-2 pt-2">
+                Account
+              </DropdownMenuLabel>
+
+              <div className="rounded-xl border border-border/55 bg-background/25 p-3">
+              <div className="flex items-center gap-3">
+                <ProfileAvatar
+                  avatarUpdatedAt={
+                    user?.avatar_updated_at
+                  }
+                  className="size-10 border border-primary/20"
+                  fallbackClassName="bg-gradient-to-br from-primary/25 to-violet-500/20 text-sm font-semibold"
+                  initials={
+                    initials
+                  }
+                  userId={
+                    user?.id
+                  }
+                />
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {
+                      displayName
+                    }
+                  </p>
+
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {
+                      user?.email ??
+                      "Email unavailable"
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 border-t border-border/45 pt-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                  Account ID
+                </p>
+
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <code
+                    className="min-w-0 truncate font-mono text-[11px] text-foreground/85"
+                    title={
+                      user?.id ??
+                      "Unavailable"
+                    }
+                  >
+                    {
+                      compactIdentifier(
+                        user?.id,
+                      )
+                    }
+                  </code>
+
+                  {user?.id && (
+                    <Button
+                      aria-label="Copy full account ID"
+                      className="size-7 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                      onClick={() =>
+                        void copyIdentifier(
+                          user.id,
+                          "Account ID",
+                        )
+                      }
+                      size="icon"
+                      title="Copy full account ID"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Copy className="size-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              </div>
+            </DropdownMenuGroup>
+
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-3 pb-2 pt-4">
+                Active workspace
+              </DropdownMenuLabel>
+
+            <div className="rounded-xl border border-border/55 bg-background/25 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate text-sm font-semibold">
+                  {
+                    activeOrganization
+                      ?.name ??
+                    "Unavailable"
+                  }
+                </span>
+
+                <span className="shrink-0 rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {
+                    workspaceRole
+                  }
+                </span>
+              </div>
+
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                Workspace ID
+              </p>
+
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <code
+                  className="min-w-0 truncate font-mono text-[11px] text-foreground/85"
+                  title={
+                    activeOrganization
+                      ?.id ??
+                    activeOrganizationId ??
+                    "Unavailable"
+                  }
+                >
+                  {
+                    compactIdentifier(
+                      activeOrganization
+                        ?.id ??
+                      activeOrganizationId,
+                    )
+                  }
+                </code>
+
+                {(activeOrganization?.id ??
+                  activeOrganizationId) && (
+                  <Button
+                    aria-label="Copy full workspace ID"
+                    className="size-7 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                    onClick={() =>
+                      void copyIdentifier(
+                        activeOrganization
+                          ?.id ??
+                        activeOrganizationId,
+                        "Workspace ID",
+                      )
+                    }
+                    size="icon"
+                    title="Copy full workspace ID"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Copy className="size-3.5" />
+                  </Button>
+                )}
+              </div>
+              </div>
+            </DropdownMenuGroup>
+
+            <DropdownMenuSeparator className="my-2" />
+
+            <DropdownMenuItem
+              className="cursor-pointer rounded-xl px-3 py-2.5"
+              onClick={() =>
+                navigate(
+                  "/settings",
+                )
+              }
+            >
+              <Settings className="size-4" />
+
+              Workspace settings
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="cursor-pointer rounded-xl px-3 py-2.5"
+              onClick={() =>
+                navigate(
+                  "/",
+                )
+              }
+            >
+              <Globe2 className="size-4" />
+
+              CloudOps public website
+            </DropdownMenuItem>
+
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Preserve real logout functionality. */}
         <Button
@@ -387,6 +715,16 @@ export function AppHeader() {
           <LogOut className="size-4" />
         </Button>
       </div>
-    </header>
+      </header>
+
+      <SupportDialog
+        onOpenChange={
+          setSupportOpen
+        }
+        open={
+          supportOpen
+        }
+      />
+    </>
   );
 }

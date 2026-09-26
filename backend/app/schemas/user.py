@@ -21,6 +21,12 @@ class UserRead(BaseModel):
 
     full_name: str
 
+    # Non-NULL means this identity has a persisted profile avatar.
+    #
+    # The image bytes themselves are intentionally exposed only through the
+    # authenticated avatar endpoint.
+    avatar_updated_at: datetime | None
+
     # Global application role remains separate from tenant membership role.
     role: str
 

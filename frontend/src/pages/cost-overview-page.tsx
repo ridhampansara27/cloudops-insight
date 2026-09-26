@@ -47,6 +47,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import {
+  Button,
+} from "@/components/ui/button";
+
 // Import real backend hooks.
 import {
   useBudgets,
@@ -157,6 +161,26 @@ export function CostOverviewPage() {
       />
     );
   }
+
+  // Treat all FinOps data sources as one refresh operation.
+  const isRefreshing =
+    costQuery.isFetching ||
+    budgetsQuery.isFetching ||
+    recommendationsQuery.isFetching;
+
+
+  async function refreshFinOps() {
+    if (isRefreshing) {
+      return;
+    }
+
+    await Promise.all([
+      costQuery.refetch(),
+      budgetsQuery.refetch(),
+      recommendationsQuery.refetch(),
+    ]);
+  }
+
 
   // Store successful cost response.
   const costs =
@@ -474,6 +498,34 @@ export function CostOverviewPage() {
 
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
+
+              <Button
+                aria-label="Refresh FinOps overview"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isRefreshing
+                }
+                onClick={() => {
+                  void refreshFinOps();
+                }}
+                title="Refresh FinOps data"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isRefreshing
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
+              </Button>
             </div>
           </div>
 

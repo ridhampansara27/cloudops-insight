@@ -352,6 +352,36 @@ export function CloudAccountsPage() {
   const accountsQuery =
     useCloudAccounts();
 
+  // Keep explicit refresh state separate from background polling.
+  // This prevents the visible Refresh button from spinning every
+  // time the automatic account-status poll runs.
+  const [
+    isManualRefreshing,
+    setIsManualRefreshing,
+  ] =
+    useState(false);
+
+
+  async function refreshAccounts() {
+    if (isManualRefreshing) {
+      return;
+    }
+
+    setIsManualRefreshing(
+      true,
+    );
+
+    try {
+      await accountsQuery.refetch();
+
+    } finally {
+      setIsManualRefreshing(
+        false,
+      );
+    }
+  }
+
+
   // Initialize existing backend mutations.
   const createAccount =
     useCreateCloudAccount();
@@ -967,6 +997,34 @@ export function CloudAccountsPage() {
                 <Plus className="mr-2 size-4" />
 
                 Add AWS account
+              </Button>
+
+              <Button
+                aria-label="Refresh AWS accounts"
+                className="h-10 rounded-xl border-border/70 bg-background/30 px-3 text-muted-foreground hover:border-primary/25 hover:bg-accent/45 hover:text-foreground"
+                disabled={
+                  isManualRefreshing
+                }
+                onClick={() => {
+                  void refreshAccounts();
+                }}
+                title="Refresh AWS account state"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw
+                  className={
+                    isManualRefreshing
+                      ? "size-4 animate-spin"
+                      : "size-4"
+                  }
+                />
+
+                {
+                  isManualRefreshing
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
               </Button>
             </div>
           </div>
