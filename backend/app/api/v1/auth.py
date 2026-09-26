@@ -51,11 +51,12 @@ from app.services.auth_request_security import enforce_trusted_browser_origin
 from app.services.auth_service import AuthService
 from app.services.password_reset_service import PasswordResetService
 from app.services.profile_avatar_service import (
-    AvatarProcessingError,
     MAX_AVATAR_UPLOAD_BYTES,
+    AvatarProcessingError,
     process_profile_avatar,
 )
 from app.services.rate_limit_service import (
+    limit_avatar_update,
     limit_forgot_password,
     limit_login,
     limit_refresh,
@@ -63,7 +64,6 @@ from app.services.rate_limit_service import (
     limit_reset_password,
     limit_signup,
     limit_verify_email,
-    limit_avatar_update,
 )
 from app.services.refresh_session_service import (
     InvalidRefreshSessionError,
@@ -528,10 +528,7 @@ async def read_current_user_avatar(
 ) -> Response:
     """Return the authenticated identity's sanitized profile image."""
 
-    if (
-        current_user.avatar_bytes is None
-        or current_user.avatar_updated_at is None
-    ):
+    if current_user.avatar_bytes is None or current_user.avatar_updated_at is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile image is not configured.",
@@ -597,14 +594,10 @@ async def update_current_user_avatar(
             ),
         ) from error
 
-    current_user.avatar_bytes = (
-        processed.data
-    )
+    current_user.avatar_bytes = processed.data
 
-    current_user.avatar_updated_at = (
-        datetime.now(
-            UTC,
-        )
+    current_user.avatar_updated_at = datetime.now(
+        UTC,
     )
 
     await session.commit()

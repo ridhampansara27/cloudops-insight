@@ -10,7 +10,6 @@ from pydantic import (
     field_validator,
 )
 
-
 SupportCategory = Literal[
     "access",
     "aws_onboarding",

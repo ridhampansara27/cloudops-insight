@@ -6,9 +6,9 @@ import pytest
 from PIL import Image
 
 from app.services.profile_avatar_service import (
-    AvatarProcessingError,
     MAX_AVATAR_EDGE,
     MAX_AVATAR_UPLOAD_BYTES,
+    AvatarProcessingError,
     process_profile_avatar,
 )
 
@@ -75,13 +75,9 @@ def test_supported_avatar_is_reencoded_as_bounded_webp(
     ) as image:
         assert image.format == "WEBP"
 
-        assert (
-            image.width <= MAX_AVATAR_EDGE
-        )
+        assert image.width <= MAX_AVATAR_EDGE
 
-        assert (
-            image.height <= MAX_AVATAR_EDGE
-        )
+        assert image.height <= MAX_AVATAR_EDGE
 
 
 def test_non_image_payload_is_rejected() -> None:
@@ -113,9 +109,5 @@ def test_oversized_avatar_is_rejected_before_decode() -> None:
         AvatarProcessingError,
     ):
         process_profile_avatar(
-            b"x" *
-            (
-                MAX_AVATAR_UPLOAD_BYTES +
-                1
-            ),
+            b"x" * (MAX_AVATAR_UPLOAD_BYTES + 1),
         )

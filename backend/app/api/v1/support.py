@@ -3,8 +3,8 @@
 import logging
 import re
 from datetime import (
+    UTC,
     datetime,
-    timezone,
 )
 from uuid import uuid4
 
@@ -34,7 +34,6 @@ from app.services.rate_limit_service import (
     limit_support_ticket,
 )
 
-
 logger = logging.getLogger(
     __name__,
 )
@@ -50,7 +49,7 @@ router = APIRouter()
 _OBVIOUS_SECRET_PATTERN = re.compile(
     r"""
     (
-        (?:AKIA|ASIA)[A-Z0-9]{16}
+        \b(?:AKIA|ASIA)[A-Z0-9]{16}\b
         |
         -----BEGIN[ ](?:RSA[ ]|EC[ ]|OPENSSH[ ])?PRIVATE[ ]KEY-----
         |
@@ -83,11 +82,7 @@ async def create_support_ticket(
         organization_id=tenant.organization_id,
     )
 
-    combined_text = (
-        payload.subject
-        + "\n"
-        + payload.message
-    )
+    combined_text = payload.subject + "\n" + payload.message
 
     if _OBVIOUS_SECRET_PATTERN.search(
         combined_text,
@@ -105,17 +100,14 @@ async def create_support_ticket(
         tenant.organization_id,
     )
 
-    if (
-        organization is None
-        or not organization.is_active
-    ):
+    if organization is None or not organization.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found.",
         )
 
     submitted_at = datetime.now(
-        timezone.utc,
+        UTC,
     )
 
     ticket_id = (
@@ -159,10 +151,7 @@ async def create_support_ticket(
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Support ticket could not be delivered. "
-                "Please try again shortly."
-            ),
+            detail=("Support ticket could not be delivered. Please try again shortly."),
         ) from error
 
     return SupportTicketResponse(

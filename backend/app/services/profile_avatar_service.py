@@ -1,15 +1,14 @@
 """Secure profile-avatar image normalization."""
 
+import warnings
 from dataclasses import dataclass
 from io import BytesIO
-import warnings
 
 from PIL import (
     Image,
     ImageOps,
     UnidentifiedImageError,
 )
-
 
 # Accept normal camera/image uploads without allowing large request bodies.
 MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -85,20 +84,21 @@ def process_profile_avatar(
                     payload,
                 ),
             ) as source:
-                source_format = (
-                    source.format or ""
-                ).upper()
+                source_format = (source.format or "").upper()
 
                 if source_format not in ALLOWED_SOURCE_FORMATS:
                     raise AvatarProcessingError(
                         "Use a JPEG, PNG or WebP profile image.",
                     )
 
-                if getattr(
-                    source,
-                    "n_frames",
-                    1,
-                ) != 1:
+                if (
+                    getattr(
+                        source,
+                        "n_frames",
+                        1,
+                    )
+                    != 1
+                ):
                     raise AvatarProcessingError(
                         "Animated profile images are not supported.",
                     )
@@ -112,21 +112,13 @@ def process_profile_avatar(
                     source,
                 )
 
-                has_alpha = (
-                    oriented.mode in {
-                        "RGBA",
-                        "LA",
-                    }
-                    or (
-                        oriented.mode == "P"
-                        and "transparency" in oriented.info
-                    )
-                )
+                has_alpha = oriented.mode in {
+                    "RGBA",
+                    "LA",
+                } or (oriented.mode == "P" and "transparency" in oriented.info)
 
                 normalized = oriented.convert(
-                    "RGBA"
-                    if has_alpha
-                    else "RGB",
+                    "RGBA" if has_alpha else "RGB",
                 )
 
                 normalized.thumbnail(
@@ -166,10 +158,7 @@ def process_profile_avatar(
 
     result = output.getvalue()
 
-    if (
-        not result
-        or len(result) > MAX_AVATAR_STORED_BYTES
-    ):
+    if not result or len(result) > MAX_AVATAR_STORED_BYTES:
         raise AvatarProcessingError(
             "The profile image could not be normalized safely.",
         )
