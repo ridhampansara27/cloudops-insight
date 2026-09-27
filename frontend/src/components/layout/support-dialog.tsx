@@ -4,11 +4,13 @@ import {
 } from "react";
 
 import {
+  Check,
   CheckCircle2,
   LifeBuoy,
   LoaderCircle,
   Mail,
   MessageSquareText,
+  Plus,
   Send,
   ShieldCheck,
   TicketCheck,
@@ -380,20 +382,21 @@ export function SupportDialog({
               </div>
             </div>
 
-            <DialogFooter className="border-t border-border/50 bg-background/75 px-5 py-3.5 backdrop-blur-xl sm:px-6">
+            <DialogFooter className="m-0 grid grid-cols-1 gap-2 border-t border-border/50 bg-background/80 px-5 py-4 backdrop-blur-xl sm:grid-cols-2 sm:px-6">
               <Button
-                className="rounded-xl"
+                className="h-11 w-full rounded-xl border-border/70 bg-card/40 px-5 font-medium transition-all hover:border-cyan-400/30 hover:bg-card/75"
                 onClick={
                   createAnotherTicket
                 }
                 type="button"
                 variant="outline"
               >
+                <Plus className="size-4" />
                 Create another
               </Button>
 
               <Button
-                className="rounded-xl"
+                className="h-11 w-full rounded-xl bg-cyan-400 px-5 font-semibold text-slate-950 shadow-lg shadow-cyan-500/10 transition-all hover:bg-cyan-300 focus-visible:ring-cyan-300/50"
                 onClick={() =>
                   handleOpenChange(
                     false,
@@ -401,6 +404,7 @@ export function SupportDialog({
                 }
                 type="button"
               >
+                <Check className="size-4" />
                 Done
               </Button>
             </DialogFooter>

@@ -74,7 +74,31 @@ async def test_workspace_invitation_email_uses_fragment_bearer(
         message["Subject"],
     )
 
-    body = message.get_content()
+    plain_part = message.get_body(
+        preferencelist=("plain",),
+    )
+
+    assert plain_part is not None
+
+    body = plain_part.get_content()
+
+    assert isinstance(
+        body,
+        str,
+    )
+
+    html_part = message.get_body(
+        preferencelist=("html",),
+    )
+
+    assert html_part is not None
+
+    html_body = html_part.get_content()
+
+    assert isinstance(
+        html_body,
+        str,
+    )
 
     assert "https://app.example.com/invitations/accept#token=" in body
 
@@ -83,3 +107,15 @@ async def test_workspace_invitation_email_uses_fragment_bearer(
     assert "Workspace Owner" in body
 
     assert "Workspace role: member" in body
+
+    assert "https://app.example.com/invitations/accept#token=" in html_body
+
+    assert "/invitations/accept?token=" not in html_body
+
+    assert "Workspace Owner" in html_body
+
+    assert "Cloud Platform" in html_body
+
+    assert "member" in html_body
+
+    assert message.is_multipart()

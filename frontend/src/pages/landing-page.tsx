@@ -397,24 +397,24 @@ async function handleSignOut() {
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-1.5 text-xs font-medium text-cyan-200">
                   <Sparkles className="size-3.5" />
-                  AWS operations + monitoring + FinOps
+                  AWS cloud monitoring + FinOps + cost optimization
                 </div>
 
                 <h1 className="mt-7 max-w-4xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl xl:text-[3.55rem]">
-                  A modern
+                  AWS cloud operations and
                   {" "}
                   <span className="text-cyan-300">
-                    cloud command center
+                    FinOps in one command center
                   </span>
                   {" "}
-                  for understanding AWS infrastructure, spend and health.
+                  for infrastructure, cost and health.
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-[1.05rem]">
-                  CloudOps Insight helps teams connect AWS inventory,
-                  CloudWatch-linked monitoring, cost visibility, resource
-                  health, incidents and recommendations in one operational
-                  workspace.
+                  Monitor AWS infrastructure, connect CloudWatch telemetry to
+                  resource health, understand cloud costs, investigate
+                  incidents and identify FinOps cost optimization
+                  opportunities from one operational workspace.
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-3">

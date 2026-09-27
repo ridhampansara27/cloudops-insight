@@ -434,6 +434,34 @@ async def test_real_smtp_delivers_all_commercial_auth_emails(
 
     assert "?token=" not in invitation_body
 
+    # --------------------------------------------------------
+    # Branded HTML alternatives
+    # --------------------------------------------------------
+
+    for branded_message in (
+        verification,
+        reset,
+        invitation,
+    ):
+        html_part = branded_message.get_body(
+            preferencelist=("html",),
+        )
+
+        assert html_part is not None
+
+        html_body = html_part.get_content()
+
+        assert isinstance(
+            html_body,
+            str,
+        )
+
+        assert "CloudOps Insight" in html_body
+
+        assert "https://cloudinsight.example/cloudops-mark.svg" in html_body
+
+        assert branded_message.is_multipart()
+
 
 class FakeSMTP:
     """Capture the production SMTP call sequence."""
