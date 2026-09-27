@@ -42,6 +42,12 @@ async def test_support_ticket_email_contains_authenticated_context(
         "support@cloudopsinsight.tech",
     )
 
+    monkeypatch.setattr(
+        settings,
+        "frontend_base_url",
+        "https://cloudopsinsight.tech",
+    )
+
     captured: dict[
         str,
         EmailMessage,
@@ -93,8 +99,31 @@ async def test_support_ticket_email_contains_authenticated_context(
         "[CloudOps Support] SUP-20260925-ABC12345 - Resources page issue"
     )
 
-    body = message.get_content()
+    plain_part = message.get_body(
+        preferencelist=("plain",),
+    )
 
+    assert plain_part is not None
+
+    body = plain_part.get_content()
+
+    assert isinstance(
+        body,
+        str,
+    )
+
+    html_part = message.get_body(
+        preferencelist=("html",),
+    )
+
+    assert html_part is not None
+
+    html_body = html_part.get_content()
+
+    assert isinstance(
+        html_body,
+        str,
+    )
     assert "SUP-20260925-ABC12345" in body
 
     assert "Category: bug" in body
@@ -112,3 +141,17 @@ async def test_support_ticket_email_contains_authenticated_context(
     assert "Role: owner" in body
 
     assert "Resource pagination text is incorrect." in body
+
+    assert "CloudOps Insight" in html_body
+
+    assert "https://cloudopsinsight.tech/cloudops-mark.svg" in html_body
+
+    assert "SUP-20260925-ABC12345" in html_body
+
+    assert "11111111-1111-1111-1111-111111111111" in html_body
+
+    assert "22222222-2222-2222-2222-222222222222" in html_body
+
+    assert "Resource pagination text is incorrect." in html_body
+
+    assert message.is_multipart()
