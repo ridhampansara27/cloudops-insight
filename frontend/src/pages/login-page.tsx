@@ -294,9 +294,9 @@ export function LoginPage() {
           New to CloudOps Insight?{" "}
           <Link
             className="font-medium text-cyan-300 transition-colors hover:text-cyan-200"
-            to="/contact"
+            to="/signup"
           >
-            Request access
+            Create workspace
           </Link>
         </p>
 
