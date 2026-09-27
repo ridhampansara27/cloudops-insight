@@ -7,6 +7,7 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    field_validator,
 )
 
 
@@ -41,6 +42,40 @@ class SignupRequest(BaseModel):
         min_length=12,
         max_length=128,
     )
+
+    @field_validator(
+        "full_name",
+        "organization_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_signup_identity_fields(
+        cls,
+        value: object,
+    ) -> object:
+        """Normalize tenant identity labels before length validation."""
+
+        if not isinstance(
+            value,
+            str,
+        ):
+            return value
+
+        normalized = value.strip()
+
+        if any(
+            character in normalized
+            for character in (
+                "\r",
+                "\n",
+                "\x00",
+            )
+        ):
+            raise ValueError(
+                "Name fields must contain a single line.",
+            )
+
+        return normalized
 
 
 class VerifyEmailRequest(BaseModel):

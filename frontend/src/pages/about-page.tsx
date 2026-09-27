@@ -120,19 +120,19 @@ export function AboutPage() {
             </h2>
 
             <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
-              CloudOps Insight is currently operated by Ridham Pansara as an
-              individual student project in Germany. The platform is being
-              developed toward commercial availability while security,
-              recovery, tenant isolation and customer lifecycle controls are
+              CloudOps Insight is operated by Ridham Pansara as an
+              individual student-built cloud platform in Germany. The service
+              is entering public availability while security, recovery,
+              tenant isolation and customer lifecycle controls continue to be
               tested and hardened.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950"
-                to="/contact"
+                to="/signup"
               >
-                Request access
+                Create workspace
                 <ArrowRight className="size-4" />
               </Link>
 

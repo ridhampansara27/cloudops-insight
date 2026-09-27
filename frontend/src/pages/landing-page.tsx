@@ -300,9 +300,9 @@ async function handleSignOut() {
 
                   <Link
                     className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:bg-cyan-300"
-                    to="/contact"
+                    to="/signup"
                   >
-                    Request access
+                    Create workspace
                   </Link>
                 </>
               )}
@@ -379,10 +379,10 @@ async function handleSignOut() {
 
                       <Link
                         className="rounded-xl bg-cyan-400 px-4 py-2 font-semibold text-slate-950"
-                        to="/contact"
-                      >
-                        Request access
-                      </Link>
+                        to="/signup"
+                  >
+                    Create workspace
+                  </Link>
                     </>
                   )}
                 </div>
@@ -420,9 +420,9 @@ async function handleSignOut() {
                 <div className="mt-8 flex flex-wrap gap-3">
                   <Link
                     className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 shadow-xl shadow-cyan-500/10 transition hover:bg-cyan-300"
-                    to={isAuthenticated ? "/dashboard" : "/contact"}
+                    to={isAuthenticated ? "/dashboard" : "/signup"}
                   >
-                    {isAuthenticated ? "Open dashboard" : "Request access"}
+                    {isAuthenticated ? "Open dashboard" : "Create workspace"}
                     <ArrowRight className="size-4" />
                   </Link>
 
@@ -703,7 +703,7 @@ async function handleSignOut() {
               </h2>
 
               <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-muted-foreground">
-                Request access to CloudOps Insight, then connect AWS securely
+                Create your CloudOps Insight workspace, then connect AWS securely
                 and bring inventory, monitoring and FinOps information into one
                 operational command center.
               </p>
@@ -711,9 +711,9 @@ async function handleSignOut() {
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link
                   className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950"
-                  to={isAuthenticated ? "/dashboard" : "/contact"}
+                  to={isAuthenticated ? "/dashboard" : "/signup"}
                 >
-                  {isAuthenticated ? "Open dashboard" : "Request access"}
+                  {isAuthenticated ? "Open dashboard" : "Create workspace"}
                   <ArrowRight className="size-4" />
                 </Link>
 
