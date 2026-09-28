@@ -164,19 +164,6 @@ export function InvitationAcceptPage() {
     }
 
 
-    if (
-      password.length <
-      12 ||
-      password.length >
-      128
-    ) {
-      setErrorMessage(
-        "Password must contain 12-128 characters.",
-      );
-
-      return;
-    }
-
 
     if (
       password !==
@@ -391,12 +378,8 @@ export function InvitationAcceptPage() {
           <Input
             autoComplete="current-password"
             id="invitation-password"
-            maxLength={
-              128
-            }
-            minLength={
-              12
-            }
+
+
             onChange={(
               event,
             ) =>
@@ -431,12 +414,8 @@ export function InvitationAcceptPage() {
           <Input
             autoComplete="current-password"
             id="invitation-confirm-password"
-            maxLength={
-              128
-            }
-            minLength={
-              12
-            }
+
+
             onChange={(
               event,
             ) =>
