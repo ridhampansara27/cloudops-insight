@@ -36,7 +36,7 @@ async def test_public_signup_is_disabled_by_default() -> None:
                     email="closed@example.com",
                     full_name="Closed Signup",
                     organization_name="Closed Tenant",
-                    password="closed-signup-password",
+                    password="CloudOpsClosed1!",
                 ),
             )
 
@@ -47,7 +47,7 @@ async def test_public_signup_is_disabled_by_default() -> None:
 def test_signup_request_normalizes_identity_fields_without_mutating_password() -> None:
     """Tenant labels are canonicalized while passwords remain exact."""
 
-    raw_password = "  commercial-password-with-spaces  "
+    raw_password = "  CloudOpsKeep1!  "
 
     payload = SignupRequest(
         email="owner@example.com",
@@ -87,7 +87,7 @@ def test_signup_request_rejects_whitespace_only_identity_fields(
         "email": "validation@example.com",
         "full_name": "Valid Owner",
         "organization_name": "Valid Workspace",
-        "password": "commercial-validation-password",
+        "password": "CloudOpsFixture1!",
     }
 
     values[field_name] = invalid_value
@@ -130,7 +130,7 @@ def test_signup_request_rejects_multiline_or_nul_identity_fields(
         "email": "controls@example.com",
         "full_name": "Valid Owner",
         "organization_name": "Valid Workspace",
-        "password": "commercial-control-password",
+        "password": "CloudOpsFixture2!",
     }
 
     values[field_name] = invalid_value

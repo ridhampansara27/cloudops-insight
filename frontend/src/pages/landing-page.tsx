@@ -302,7 +302,7 @@ async function handleSignOut() {
                     className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:bg-cyan-300"
                     to="/signup"
                   >
-                    Create workspace
+                    Create account
                   </Link>
                 </>
               )}
@@ -381,7 +381,7 @@ async function handleSignOut() {
                         className="rounded-xl bg-cyan-400 px-4 py-2 font-semibold text-slate-950"
                         to="/signup"
                   >
-                    Create workspace
+                    Create account
                   </Link>
                     </>
                   )}
@@ -422,7 +422,7 @@ async function handleSignOut() {
                     className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 shadow-xl shadow-cyan-500/10 transition hover:bg-cyan-300"
                     to={isAuthenticated ? "/dashboard" : "/signup"}
                   >
-                    {isAuthenticated ? "Open dashboard" : "Create workspace"}
+                    {isAuthenticated ? "Open dashboard" : "Create account"}
                     <ArrowRight className="size-4" />
                   </Link>
 
@@ -542,11 +542,11 @@ async function handleSignOut() {
                   01
                 </p>
                 <h3 className="mt-6 text-lg font-semibold">
-                  Create a workspace
+                  Create an account
                 </h3>
                 <p className="mt-4 text-sm leading-7 text-muted-foreground">
-                  Start with an isolated CloudOps Insight workspace for your
-                  organization.
+                  Start with an isolated CloudOps Insight workspace for yourself,
+                  a personal project, a team, or a company.
                 </p>
               </article>
 
@@ -713,7 +713,7 @@ async function handleSignOut() {
                   className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950"
                   to={isAuthenticated ? "/dashboard" : "/signup"}
                 >
-                  {isAuthenticated ? "Open dashboard" : "Create workspace"}
+                  {isAuthenticated ? "Open dashboard" : "Create account"}
                   <ArrowRight className="size-4" />
                 </Link>
 

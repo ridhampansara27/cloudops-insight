@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.password_policy import validate_new_password
 from app.core.security import (
     generate_opaque_token,
     hash_opaque_token,
@@ -475,6 +476,16 @@ class WorkspaceInvitationService:
                 user.email_verified_at = now
 
         else:
+            try:
+                validate_new_password(
+                    password,
+                )
+
+            except ValueError as error:
+                raise WorkspaceInvitationAcceptanceError(
+                    "Invitation could not be accepted.",
+                ) from error
+
             try:
                 user = await UserRepository(
                     self.session,

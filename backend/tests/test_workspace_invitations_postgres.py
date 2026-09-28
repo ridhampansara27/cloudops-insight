@@ -290,10 +290,19 @@ async def test_new_user_can_accept_once_and_is_email_verified() -> None:
 
             assert sender.token is not None
 
+            with pytest.raises(
+                WorkspaceInvitationAcceptanceError,
+            ):
+                await service.accept_invitation(
+                    raw_token=(sender.token),
+                    full_name=("Brand New User"),
+                    password=("brand-new-secure-password"),
+                )
+
             accepted = await service.accept_invitation(
                 raw_token=(sender.token),
                 full_name=("Brand New User"),
-                password=("brand-new-secure-password"),
+                password=("BrandNewInvite1!"),
             )
 
             assert accepted.account_created is True
@@ -333,7 +342,7 @@ async def test_new_user_can_accept_once_and_is_email_verified() -> None:
                 await service.accept_invitation(
                     raw_token=(sender.token),
                     full_name=("Replay"),
-                    password=("brand-new-secure-password"),
+                    password=("BrandNewInvite1!"),
                 )
 
         finally:

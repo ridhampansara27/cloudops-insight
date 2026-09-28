@@ -132,7 +132,7 @@ export function AboutPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950"
                 to="/signup"
               >
-                Create workspace
+                Create account
                 <ArrowRight className="size-4" />
               </Link>
 

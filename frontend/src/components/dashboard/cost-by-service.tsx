@@ -35,6 +35,9 @@ interface CostByServiceProps {
 
   // Backend reporting currency.
   currency: string;
+
+  // Optionally cap rows for compact dashboard surfaces.
+  limit?: number;
 }
 
 
@@ -43,6 +46,7 @@ export function CostByService({
   services,
   total,
   currency,
+  limit,
 }: CostByServiceProps) {
   // Use positive AWS service charges as a fallback denominator
   // when credits make the net month total non-positive.
@@ -64,6 +68,30 @@ export function CostByService({
     total > 0
       ? total
       : positiveServiceTotal;
+
+  // Preserve the full input by default. Dashboard callers may
+  // request a compact top-N view without mutating API data.
+  const visibleServices =
+    limit === undefined
+      ? services
+      : [...services]
+          .sort(
+            (
+              left,
+              right,
+            ) =>
+              right.amount -
+              left.amount,
+          )
+          .slice(
+            0,
+            Math.max(
+              0,
+              Math.floor(
+                limit,
+              ),
+            ),
+          );
 
   // Render the FinOps command card.
   return (
@@ -98,7 +126,7 @@ export function CostByService({
       </CardHeader>
 
       <CardContent className="pt-2">
-        {services.length ===
+        {visibleServices.length ===
         0 ? (
           <div className="flex min-h-[170px] flex-col items-center justify-center px-5 text-center">
             <div className="flex size-10 items-center justify-center rounded-xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
@@ -116,7 +144,7 @@ export function CostByService({
           </div>
         ) : (
           <div className="space-y-2.5">
-            {services.map(
+            {visibleServices.map(
               (
                 service,
                 index,

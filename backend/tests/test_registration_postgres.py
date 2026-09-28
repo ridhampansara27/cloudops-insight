@@ -90,7 +90,7 @@ async def test_signup_is_atomic_tenant_owner_and_requires_verification() -> None
                 email="new-owner@example.com",
                 full_name="New Owner",
                 organization_name="New Owner Cloud",
-                password="correct-horse-cloud-ops",
+                password="CloudOpsSignup1!",
             )
 
             created = await service.register(
@@ -169,7 +169,7 @@ async def test_signup_is_atomic_tenant_owner_and_requires_verification() -> None
                 session,
             ).authenticate(
                 email="new-owner@example.com",
-                password="correct-horse-cloud-ops",
+                password="CloudOpsSignup1!",
             )
 
             assert before_verification is None
@@ -197,7 +197,7 @@ async def test_signup_is_atomic_tenant_owner_and_requires_verification() -> None
                 session,
             ).authenticate(
                 email="new-owner@example.com",
-                password="correct-horse-cloud-ops",
+                password="CloudOpsSignup1!",
             )
 
             assert after_verification is not None
@@ -244,14 +244,14 @@ async def test_duplicate_signup_is_non_enumerating_and_creates_no_second_tenant(
                 email="duplicate@example.com",
                 full_name="First Identity",
                 organization_name="First Tenant",
-                password="commercial-password-one",
+                password="CloudOpsDuplicate1!",
             )
 
             second = SignupRequest(
                 email="duplicate@example.com",
                 full_name="Attacker Controlled Name",
                 organization_name="Second Tenant",
-                password="commercial-password-two",
+                password="CloudOpsDuplicate2!",
             )
 
             assert await service.register(
@@ -347,7 +347,7 @@ async def test_resend_rotates_verification_bearer() -> None:
                 email="resend@example.com",
                 full_name="Resend User",
                 organization_name="Resend Tenant",
-                password="resend-secure-password",
+                password="CloudOpsResend1!",
             )
 
             assert await service.register(
