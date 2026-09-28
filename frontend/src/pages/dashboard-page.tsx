@@ -502,226 +502,231 @@ export function DashboardPage() {
       </div>
 
       {/* =====================================================
-          Health + FinOps visualizations
+          Independent operational columns
+
+          Left: resource health + resources requiring attention
+          Right: top service costs + active incidents
           ===================================================== */}
       <div className="grid items-start gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <ResourceHealthSummary
-          total={
-            summary.total_resources
-          }
-          healthy={
-            summary.healthy_resources
-          }
-          warning={
-            summary.warning_resources
-          }
-          critical={
-            summary.critical_resources
-          }
-        />
+        <div className="space-y-6">
+          <ResourceHealthSummary
+            total={
+              summary.total_resources
+            }
+            healthy={
+              summary.healthy_resources
+            }
+            warning={
+              summary.warning_resources
+            }
+            critical={
+              summary.critical_resources
+            }
+          />
 
-        <CostByService
-          services={
-            costs.by_service
-          }
-          total={
-            costs.month_to_date
-          }
-          currency={
-            costs.currency
-          }
-        />
-      </div>
+          <Card className="bg-card/72">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle>
+                    Resources requiring attention
+                  </CardTitle>
 
-      {/* =====================================================
-          Operational focus queues
-          ===================================================== */}
-      <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
-        <Card className="bg-card/72">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle>
-                  Resources requiring attention
-                </CardTitle>
-
-                <CardDescription className="mt-1">
-                  Warning and critical resources from synchronized inventory.
-                </CardDescription>
-              </div>
-
-              <Link
-                className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
-                to="/cloud/resources"
-              >
-                View inventory
-              </Link>
-            </div>
-          </CardHeader>
-
-          <CardContent className="pt-2">
-            {attentionResources.length ===
-            0 ? (
-              <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl border border-emerald-400/15 bg-emerald-400/8 text-emerald-300">
-                  <CircleCheckBig className="size-5" />
+                  <CardDescription className="mt-1">
+                    Warning and critical resources from synchronized inventory.
+                  </CardDescription>
                 </div>
 
-                <p className="mt-4 font-semibold">
-                  No warning or critical resources
-                </p>
-
-                <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                  No synchronized inventory currently requires warning or
-                  critical attention. Resources without sufficient metrics
-                  may remain Unknown.
-                </p>
+                <Link
+                  className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                  to="/cloud/resources"
+                >
+                  View inventory
+                </Link>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {attentionResources.map(
-                  (
-                    resource,
-                  ) => (
-                    <Link
-                      className="group flex flex-col gap-3 rounded-xl border border-border/55 bg-background/20 p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/25 sm:flex-row sm:items-center sm:justify-between"
-                      key={
-                        resource.id
-                      }
-                      to={`/cloud/resources/${resource.id}`}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold group-hover:text-primary">
-                          {
-                            resource.name
-                          }
-                        </p>
+            </CardHeader>
 
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {
-                            resource.service
-                          }
-                          {" ? "}
-                          {
-                            resource.region
-                          }
-                          {resource.environment
-                            ? ` ? ${resource.environment}`
-                            : ""}
-                        </p>
-                      </div>
+            <CardContent className="pt-2">
+              {attentionResources.length ===
+              0 ? (
+                <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
+                  <div className="flex size-12 items-center justify-center rounded-2xl border border-emerald-400/15 bg-emerald-400/8 text-emerald-300">
+                    <CircleCheckBig className="size-5" />
+                  </div>
 
-                      <div className="flex shrink-0 items-center gap-3">
-                        <ResourceHealthBadge
-                          health={
-                            resource.health_state
-                          }
-                        />
+                  <p className="mt-4 font-semibold">
+                    No warning or critical resources
+                  </p>
 
-                        <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                      </div>
-                    </Link>
-                  ),
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/72">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle>
-                  Active incidents
-                </CardTitle>
-
-                <CardDescription className="mt-1">
-                  Current unresolved operational events.
-                </CardDescription>
-              </div>
-
-              <Link
-                className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
-                to="/monitoring/incidents"
-              >
-                Open incidents
-              </Link>
-            </div>
-          </CardHeader>
-
-          <CardContent className="pt-2">
-            {activeIncidents.length ===
-            0 ? (
-              <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
-                  <ShieldAlert className="size-5" />
+                  <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                    No synchronized inventory currently requires warning or
+                    critical attention. Resources without sufficient metrics
+                    may remain Unknown.
+                  </p>
                 </div>
-
-                <p className="mt-4 font-semibold">
-                  No active incidents
-                </p>
-
-                <p className="mt-1 max-w-xs text-sm leading-relaxed text-muted-foreground">
-                  There are currently no unresolved operational incidents.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {activeIncidents.map(
-                  (
-                    incident,
-                  ) => (
-                    <Link
-                      className="group block rounded-xl border border-border/55 bg-background/20 p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/25"
-                      key={
-                        incident.id
-                      }
-                      to="/monitoring/incidents"
-                    >
-                      <div className="flex items-start justify-between gap-4">
+              ) : (
+                <div className="space-y-2">
+                  {attentionResources.map(
+                    (
+                      resource,
+                    ) => (
+                      <Link
+                        className="group flex flex-col gap-3 rounded-xl border border-border/55 bg-background/20 p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/25 sm:flex-row sm:items-center sm:justify-between"
+                        key={
+                          resource.id
+                        }
+                        to={`/cloud/resources/${resource.id}`}
+                      >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold group-hover:text-primary">
                             {
-                              incident.title
+                              resource.name
                             }
                           </p>
 
                           <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {resourceNames.get(
-                              incident.resource_id,
-                            ) ??
-                              incident.resource_id}
+                            {
+                              resource.service
+                            }
+                            {" ? "}
+                            {
+                              resource.region
+                            }
+                            {resource.environment
+                              ? ` ? ${resource.environment}`
+                              : ""}
                           </p>
                         </div>
 
-                        <span className="shrink-0 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          {
-                            incident.severity
-                          }
-                        </span>
-                      </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <ResourceHealthBadge
+                            health={
+                              resource.health_state
+                            }
+                          />
 
-                      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-                        <span className="capitalize">
-                          {
-                            incident.status
-                          }
-                        </span>
+                          <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                        </div>
+                      </Link>
+                    ),
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-                        <span>
-                          {formatTimestamp(
-                            incident.started_at,
-                          )}
-                        </span>
-                      </div>
-                    </Link>
-                  ),
-                )}
+        <div className="space-y-6">
+          <CostByService
+            limit={
+              8
+            }
+            services={
+              costs.by_service
+            }
+            total={
+              costs.month_to_date
+            }
+            currency={
+              costs.currency
+            }
+          />
+
+          <Card className="bg-card/72">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle>
+                    Active incidents
+                  </CardTitle>
+
+                  <CardDescription className="mt-1">
+                    Current unresolved operational events.
+                  </CardDescription>
+                </div>
+
+                <Link
+                  className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                  to="/monitoring/incidents"
+                >
+                  Open incidents
+                </Link>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+
+            <CardContent className="pt-2">
+              {activeIncidents.length ===
+              0 ? (
+                <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
+                  <div className="flex size-12 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/8 text-sky-300">
+                    <ShieldAlert className="size-5" />
+                  </div>
+
+                  <p className="mt-4 font-semibold">
+                    No active incidents
+                  </p>
+
+                  <p className="mt-1 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                    There are currently no unresolved operational incidents.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {activeIncidents.map(
+                    (
+                      incident,
+                    ) => (
+                      <Link
+                        className="group block rounded-xl border border-border/55 bg-background/20 p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/25"
+                        key={
+                          incident.id
+                        }
+                        to="/monitoring/incidents"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold group-hover:text-primary">
+                              {
+                                incident.title
+                              }
+                            </p>
+
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {resourceNames.get(
+                                incident.resource_id,
+                              ) ??
+                                incident.resource_id}
+                            </p>
+                          </div>
+
+                          <span className="shrink-0 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {
+                              incident.severity
+                            }
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                          <span className="capitalize">
+                            {
+                              incident.status
+                            }
+                          </span>
+
+                          <span>
+                            {formatTimestamp(
+                              incident.started_at,
+                            )}
+                          </span>
+                        </div>
+                      </Link>
+                    ),
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </section>
   );

@@ -10,6 +10,8 @@ from pydantic import (
     field_validator,
 )
 
+from app.core.password_policy import validate_new_password
+
 
 class TokenResponse(BaseModel):
     """Current access-token response retained until session migration."""
@@ -42,6 +44,20 @@ class SignupRequest(BaseModel):
         min_length=12,
         max_length=128,
     )
+
+    @field_validator(
+        "password",
+    )
+    @classmethod
+    def validate_signup_password(
+        cls,
+        value: str,
+    ) -> str:
+        """Apply the central policy to newly assigned signup passwords."""
+
+        return validate_new_password(
+            value,
+        )
 
     @field_validator(
         "full_name",
@@ -127,6 +143,20 @@ class ResetPasswordRequest(BaseModel):
         min_length=12,
         max_length=128,
     )
+
+    @field_validator(
+        "new_password",
+    )
+    @classmethod
+    def validate_reset_password(
+        cls,
+        value: str,
+    ) -> str:
+        """Apply the central policy to newly assigned reset passwords."""
+
+        return validate_new_password(
+            value,
+        )
 
 
 class AuthMessageResponse(BaseModel):

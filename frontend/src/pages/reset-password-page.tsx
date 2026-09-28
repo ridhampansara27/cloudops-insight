@@ -22,6 +22,12 @@ import {
 import {
   AuthShell,
 } from "@/features/auth/auth-shell";
+import {
+  PasswordRequirements,
+} from "@/features/auth/password-requirements";
+import {
+  isStrongNewPassword,
+} from "@/features/auth/password-policy";
 
 import {
   Button,
@@ -140,11 +146,12 @@ const [
     }
 
     if (
-      password.length <
-      12
+      !isStrongNewPassword(
+        password,
+      )
     ) {
       setErrorMessage(
-        "Use at least 12 characters for your new password.",
+        "New password must satisfy all security requirements below.",
       );
 
       return;
@@ -276,6 +283,9 @@ const [
           <Input
             autoComplete="new-password"
             id="new-password"
+            maxLength={
+              128
+            }
             minLength={
               12
             }
@@ -295,6 +305,12 @@ const [
           />
         </div>
 
+        <PasswordRequirements
+          password={
+            password
+          }
+        />
+
         <div className="space-y-2">
           <label
             className="text-sm font-medium"
@@ -306,6 +322,9 @@ const [
           <Input
             autoComplete="new-password"
             id="confirm-password"
+            maxLength={
+              128
+            }
             minLength={
               12
             }
@@ -326,8 +345,8 @@ const [
         </div>
 
         <p className="text-xs leading-5 text-muted-foreground">
-          Use at least 12 characters. Completing the reset invalidates
-          older authentication credentials for this account.
+          Completing the reset invalidates older authentication
+          credentials for this account.
         </p>
 
         {errorMessage && (
@@ -345,7 +364,12 @@ const [
         <Button
           className="w-full rounded-xl"
           disabled={
-            isSubmitting
+            isSubmitting ||
+            !isStrongNewPassword(
+              password,
+            ) ||
+            password !==
+              confirmPassword
           }
           type="submit"
         >

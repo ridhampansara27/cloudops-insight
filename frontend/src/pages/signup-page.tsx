@@ -12,7 +12,6 @@ import {
   Eye,
   EyeOff,
   MailCheck,
-  ShieldCheck,
   UserRoundPlus,
 } from "lucide-react";
 
@@ -23,6 +22,12 @@ import {
 import {
   AuthShell,
 } from "@/features/auth/auth-shell";
+import {
+  PasswordRequirements,
+} from "@/features/auth/password-requirements";
+import {
+  isStrongNewPassword,
+} from "@/features/auth/password-policy";
 
 import {
   Button,
@@ -153,7 +158,7 @@ export function SignupPage() {
       2
     ) {
       setErrorMessage(
-        "Enter a valid workspace or organization name.",
+        "Enter a valid workspace name.",
       );
 
       return;
@@ -171,22 +176,12 @@ export function SignupPage() {
     }
 
     if (
-      password.length <
-      12
+      !isStrongNewPassword(
+        password,
+      )
     ) {
       setErrorMessage(
-        "Use at least 12 characters for your password.",
-      );
-
-      return;
-    }
-
-    if (
-      password.length >
-      128
-    ) {
-      setErrorMessage(
-        "Password must be 128 characters or fewer.",
+        "Password must satisfy all security requirements below.",
       );
 
       return;
@@ -295,8 +290,8 @@ export function SignupPage() {
 
   return (
     <AuthShell
-      description="Create your organization workspace. You will become its first owner after verifying your email."
-      eyebrow="Create workspace"
+      description="Create your account and a workspace for yourself, a personal project, a team, or a company. You will become its first owner after verifying your email."
+      eyebrow="Create account"
       title="Start with CloudOps Insight"
     >
       <form
@@ -346,7 +341,7 @@ export function SignupPage() {
               className="text-sm font-medium"
               htmlFor="organization"
             >
-              Organization
+              Workspace name
             </label>
 
             <Input
@@ -379,7 +374,7 @@ export function SignupPage() {
             className="text-sm font-medium"
             htmlFor="email"
           >
-            Work email
+            Email address
           </label>
 
           <Input
@@ -394,7 +389,7 @@ export function SignupPage() {
                   .value,
               )
             }
-            placeholder="you@company.com"
+            placeholder="you@example.com"
             required
             spellCheck={
               false
@@ -542,14 +537,11 @@ export function SignupPage() {
           </div>
         </div>
 
-        <div className="flex items-start gap-2 rounded-xl border border-border/50 bg-card/30 px-3.5 py-3">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-cyan-300" />
-
-          <p className="text-xs leading-5 text-muted-foreground">
-            Use 12-128 characters. Your password is transmitted over HTTPS
-            and CloudOps stores only a secure password hash.
-          </p>
-        </div>
+        <PasswordRequirements
+          password={
+            password
+          }
+        />
 
         <label
           className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-card/20 p-3.5 transition-colors hover:border-border"
@@ -608,15 +600,20 @@ export function SignupPage() {
           className="w-full rounded-xl"
           disabled={
             isSubmitting ||
-            !acceptedLegal
+            !acceptedLegal ||
+            !isStrongNewPassword(
+              password,
+            ) ||
+            password !==
+              confirmPassword
           }
           type="submit"
         >
           <UserRoundPlus className="mr-2 size-4" />
 
           {isSubmitting
-            ? "Creating workspace..."
-            : "Create workspace"}
+            ? "Creating account..."
+            : "Create account"}
         </Button>
       </form>
 

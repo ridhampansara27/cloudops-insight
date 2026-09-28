@@ -27,6 +27,9 @@ import type {
 import {
   AuthShell,
 } from "@/features/auth/auth-shell";
+import {
+  PasswordRequirements,
+} from "@/features/auth/password-requirements";
 
 import {
   ApiError,
@@ -163,10 +166,12 @@ export function InvitationAcceptPage() {
 
     if (
       password.length <
-      12
+      12 ||
+      password.length >
+      128
     ) {
       setErrorMessage(
-        "Use at least 12 characters for your password.",
+        "Password must contain 12-128 characters.",
       );
 
       return;
@@ -386,6 +391,9 @@ export function InvitationAcceptPage() {
           <Input
             autoComplete="current-password"
             id="invitation-password"
+            maxLength={
+              128
+            }
             minLength={
               12
             }
@@ -404,9 +412,12 @@ export function InvitationAcceptPage() {
             }
           />
 
-          <p className="text-xs leading-5 text-muted-foreground">
-            Use your current CloudOps password if you already have an account.
-          </p>
+          <PasswordRequirements
+            advisory
+            password={
+              password
+            }
+          />
         </div>
 
         <div className="space-y-2">
@@ -420,6 +431,9 @@ export function InvitationAcceptPage() {
           <Input
             autoComplete="current-password"
             id="invitation-confirm-password"
+            maxLength={
+              128
+            }
             minLength={
               12
             }

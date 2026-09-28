@@ -296,7 +296,7 @@ export function LoginPage() {
             className="font-medium text-cyan-300 transition-colors hover:text-cyan-200"
             to="/signup"
           >
-            Create workspace
+            Create account
           </Link>
         </p>
 

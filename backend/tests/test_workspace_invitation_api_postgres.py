@@ -254,7 +254,7 @@ async def test_invitation_api_issue_list_accept_and_replay(
                 payload=WorkspaceInvitationAcceptRequest(
                     token=raw_token,
                     full_name="New API Member",
-                    password="new-api-member-password",
+                    password="NewApiMember1!",
                 ),
                 session=session,
             )
@@ -275,7 +275,7 @@ async def test_invitation_api_issue_list_accept_and_replay(
                     payload=WorkspaceInvitationAcceptRequest(
                         token=raw_token,
                         full_name="Replay User",
-                        password="new-api-member-password",
+                        password="NewApiMember1!",
                     ),
                     session=session,
                 )
