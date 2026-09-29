@@ -143,3 +143,7 @@ The application workflow tests code, builds and scans `linux/amd64` and `linux/a
 GitOps owns the live Helm chart, deployment and rollback. Infrastructure owns OKE, Terraform state, volume backup policy, and Object Storage. See their runbooks for the exact recovery prerequisites; database restores must first be validated in an isolated target.
 
 Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [CHANGELOG.md](CHANGELOG.md). Do not commit `.env`, AWS credentials, database dumps, or generated Celery Beat schedules.
+
+---
+
+© 2026 Ridham Pansara. All rights reserved.
