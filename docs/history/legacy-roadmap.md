@@ -1,4 +1,6 @@
-﻿# CloudOps Insight Roadmap
+> Historical planning document. Status and hosting references below are not the current production state. See [architecture](../architecture.md) and the root [README](../../README.md).
+
+# CloudOps Insight Roadmap
 
 ## Milestone 1 — Product foundation
 
