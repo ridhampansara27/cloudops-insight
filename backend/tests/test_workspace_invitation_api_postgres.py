@@ -295,6 +295,191 @@ async def test_invitation_api_issue_list_accept_and_replay(
 
 
 @pytest.mark.asyncio
+async def test_invitation_api_accepts_existing_legacy_password(
+    monkeypatch,
+) -> None:
+    """Preserve existing passwords without weakening new-user policy."""
+
+    assert TENANT_TEST_DATABASE_URL is not None
+
+    engine = create_async_engine(
+        TENANT_TEST_DATABASE_URL,
+    )
+
+    async with engine.connect() as connection:
+        outer_transaction = await connection.begin()
+
+        session = AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
+
+        try:
+            organization = Organization(
+                name="Legacy Invitation API Workspace",
+                is_active=True,
+            )
+
+            session.add(
+                organization,
+            )
+
+            await session.flush()
+
+            owner = await _create_user(
+                session,
+                email="legacy-api-owner@example.com",
+                full_name="Legacy API Owner",
+            )
+
+            legacy_password = "Legacy#12"
+
+            legacy_user = await UserRepository(
+                session,
+            ).create(
+                email="legacy-api-member@example.com",
+                full_name="Legacy API Member",
+                password_hash=hash_password(
+                    legacy_password,
+                ),
+                email_verified_at=datetime.now(
+                    UTC,
+                ),
+                commit=False,
+            )
+
+            await session.flush()
+
+            owner_membership = OrganizationMembership(
+                organization_id=organization.id,
+                user_id=owner.id,
+                role="owner",
+                is_active=True,
+            )
+
+            session.add(
+                owner_membership,
+            )
+
+            await session.commit()
+
+            sender = CapturingApiInvitationEmail()
+
+            monkeypatch.setattr(
+                workspace_api,
+                "AuthEmailService",
+                lambda: sender,
+            )
+
+            tenant = SimpleNamespace(
+                organization_id=organization.id,
+                role="owner",
+            )
+
+            existing_invitation = await workspace_api.create_workspace_invitation(
+                request=_request(),
+                payload=WorkspaceInvitationCreate(
+                    email=legacy_user.email,
+                    role="viewer",
+                ),
+                current_user=owner,
+                tenant=tenant,
+                session=session,
+            )
+
+            assert existing_invitation.status == "pending"
+
+            assert (
+                len(
+                    sender.tokens,
+                )
+                == 1
+            )
+
+            existing_token = sender.tokens[0]
+
+            # Regression boundary:
+            # this construction previously failed before the API handler
+            # because the shared request schema imposed min_length=12.
+            existing_payload = WorkspaceInvitationAcceptRequest(
+                token=existing_token,
+                full_name="Legacy API Member",
+                password=legacy_password,
+            )
+
+            accepted = await workspace_api.accept_workspace_invitation(
+                request=_request(),
+                payload=existing_payload,
+                session=session,
+            )
+
+            assert accepted.organization_id == organization.id
+
+            assert accepted.user_id == legacy_user.id
+
+            assert accepted.email == legacy_user.email
+
+            assert accepted.role == "viewer"
+
+            assert accepted.account_created is False
+
+            # The same short credential must remain invalid when the
+            # invitation creates a brand-new identity. The transport
+            # model allows it to reach the service, where the central
+            # new-password policy rejects it.
+            new_invitation = await workspace_api.create_workspace_invitation(
+                request=_request(),
+                payload=WorkspaceInvitationCreate(
+                    email="weak-new-api-member@example.com",
+                    role="viewer",
+                ),
+                current_user=owner,
+                tenant=tenant,
+                session=session,
+            )
+
+            assert new_invitation.status == "pending"
+
+            assert (
+                len(
+                    sender.tokens,
+                )
+                == 2
+            )
+
+            weak_new_token = sender.tokens[1]
+
+            weak_new_payload = WorkspaceInvitationAcceptRequest(
+                token=weak_new_token,
+                full_name="Weak New API Member",
+                password=legacy_password,
+            )
+
+            with pytest.raises(
+                HTTPException,
+            ) as weak_new_acceptance:
+                await workspace_api.accept_workspace_invitation(
+                    request=_request(),
+                    payload=weak_new_payload,
+                    session=session,
+                )
+
+            assert weak_new_acceptance.value.status_code == 400
+
+            assert weak_new_acceptance.value.detail == (
+                "Invitation is invalid, expired, or could not be accepted."
+            )
+
+        finally:
+            await session.close()
+
+            await outer_transaction.rollback()
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_invitation_api_revoke_is_tenant_scoped(
     monkeypatch,
 ) -> None:

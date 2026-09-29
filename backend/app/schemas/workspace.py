@@ -175,8 +175,17 @@ class WorkspaceInvitationAcceptRequest(BaseModel):
         max_length=160,
     )
 
+    # Invitation acceptance serves two credential paths:
+    #
+    # - existing identities re-authenticate with their current stored
+    #   password, which may predate the current strong-password policy;
+    # - newly created identities are validated by
+    #   WorkspaceInvitationService, which applies validate_new_password().
+    #
+    # Keep only transport-level bounds here so an existing credential
+    # reaches the service without weakening new-account password policy.
     password: str = Field(
-        min_length=12,
+        min_length=1,
         max_length=128,
     )
 
