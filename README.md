@@ -1,10 +1,31 @@
 # CloudOps Insight
 
-Multi-tenant cloud inventory, monitoring, incident, and FinOps application. Customers connect AWS accounts through read-only cross-account IAM roles; the application is hosted on Oracle Cloud Infrastructure (OCI).
+[![CloudOps CI/CD](https://github.com/ridhampansara27/cloudops-insight/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/ridhampansara27/cloudops-insight/actions/workflows/ci-cd.yml)
+![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![OCI OKE](https://img.shields.io/badge/Hosting-OCI%20OKE-7C3AED)
+![GitOps](https://img.shields.io/badge/Delivery-Argo%20CD%20%2B%20Helm-2563EB)
 
-**Live:** [cloudopsinsight.tech](https://cloudopsinsight.tech) · **Delivery:** GitHub Actions → GHCR → reviewed GitOps → Argo CD → OKE
+**A multi-tenant cloud operations and FinOps platform.** Connect customer AWS accounts through read-only cross-account roles, bring inventory, health, costs and recommendations into workspace-scoped dashboards, and run the application on OCI OKE with reviewed GitOps delivery.
 
-> The certified commercial-launch baseline is application commit `29d8aede6537165e8cf051641c6b6f3f79709839` and GitOps commit `473ad08567eb32d8ca09c59fdeb7c9199c07e3ff` (29 September 2026). Check current GitOps values and Argo CD before an operation; these identifiers are historical.
+**Live application:** [cloudopsinsight.tech](https://cloudopsinsight.tech) · **Source of deployed configuration:** [cloudops-gitops](https://github.com/ridhampansara27/cloudops-gitops) · **Cloud infrastructure:** [cloudops-infrastructure](https://github.com/ridhampansara27/cloudops-infrastructure)
+
+> [!IMPORTANT]
+> **Current host: OCI OKE in Frankfurt.** AWS EKS files are historical hosting material; AWS remains the cloud that customer accounts connect for monitoring. The certified 29 September 2026 baseline used application image `sha-29d8aede6537165e8cf051641c6b6f3f79709839` and GitOps revision `473ad08567eb32d8ca09c59fdeb7c9199c07e3ff`. These are snapshot identifiers, not a substitute for checking current Argo CD state.
+
+**Explore:** [Architecture](#architecture) · [Capabilities](#capabilities) · [Technology](#technology-and-versions) · [Run locally](#local-development-on-windows) · [Delivery and recovery](#delivery-rollback-and-recovery)
+
+## Architecture
+
+![Color-coded CloudOps Insight system overview: Cloudflare to OCI OKE workloads, protected data, and read-only customer AWS role assumption](docs/diagrams/system-overview.svg)
+
+The browser reaches the React frontend through Cloudflare and an outbound Tunnel connector. FastAPI and Celery share PostgreSQL for tenant data and Redis for cache and task coordination. The backend assumes temporary credentials through AWS STS using each customer's role and External ID; customer access keys are not stored in the browser. [Detailed application architecture](docs/architecture.md) covers tenant boundaries, AWS trust, and data recovery.
+
+| Repository | Owns | Production boundary |
+|---|---|---|
+| **This repository** | React frontend, FastAPI backend, tests, migrations, image build | CI publishes SHA-tagged images; application changes do not directly sync OKE |
+| [cloudops-gitops](https://github.com/ridhampansara27/cloudops-gitops) | Helm chart, OCI values, Argo CD applications, backup CronJob | Reviewed OCI values and controlled child-application sync |
+| [cloudops-infrastructure](https://github.com/ridhampansara27/cloudops-infrastructure) | Terraform for OCI network, OKE, volumes, backup storage and recovery resources | Separate authenticated plan and apply |
 
 ## Capabilities
 
@@ -15,34 +36,7 @@ Multi-tenant cloud inventory, monitoring, incident, and FinOps application. Cust
 - Dashboards, budgets, incidents, recommendations, and integration disconnect/removal workflows.
 - Celery Beat and Redis-backed workers; PostgreSQL for persistent application data.
 
-## System at a glance
-
-```mermaid
-flowchart LR
-    U["Browser"] --> CF["Cloudflare"]
-    CF --> T["Cloudflare Tunnel"]
-    subgraph OKE["OCI Frankfurt · OKE"]
-      T --> F["React / NGINX"]
-      F --> A["FastAPI"]
-      A --> DB[("PostgreSQL · Block Volume")]
-      A --> R[("Redis")]
-      R --> W["Celery worker"]
-      B["Celery Beat"] --> R
-    end
-    A --> STS["AWS STS · AssumeRole"]
-    W --> STS
-    STS --> C["Customer AWS read-only role"]
-    classDef edge fill:#dbeafe,stroke:#2563eb,color:#172554;
-    classDef compute fill:#ede9fe,stroke:#7c3aed,color:#2e1065;
-    classDef data fill:#dcfce7,stroke:#16a34a,color:#14532d;
-    classDef aws fill:#ffedd5,stroke:#ea580c,color:#7c2d12;
-    class U,CF,T edge;
-    class F,A,W,B compute;
-    class DB,R data;
-    class STS,C aws;
-```
-
-The live values are in [`cloudops-gitops/environments/oci-dev`](https://github.com/ridhampansara27/cloudops-gitops/tree/main/environments/oci-dev), despite the historical directory name. AWS EKS **hosting** is retired; AWS **customer monitoring** remains supported. See [detailed architecture](docs/architecture.md), [GitOps](https://github.com/ridhampansara27/cloudops-gitops), and [Terraform infrastructure](https://github.com/ridhampansara27/cloudops-infrastructure).
+The live values are in [`cloudops-gitops/environments/oci-dev`](https://github.com/ridhampansara27/cloudops-gitops/tree/main/environments/oci-dev), despite the historical directory name. AWS EKS **hosting** is retired; AWS **customer monitoring** remains supported.
 
 ## Repository map
 
@@ -56,7 +50,7 @@ The live values are in [`cloudops-gitops/environments/oci-dev`](https://github.c
 | `deploy/helm/`, `deploy/kind/` | Local Kind deployment; live OKE chart is in GitOps |
 | `.github/workflows/ci-cd.yml` | Checks, multi-platform builds, scans, image publication, development PR |
 
-## Versions recorded in this commit
+## Technology and versions
 
 These are locked dependencies or configured image tags, **not a live-cluster inventory**.
 
@@ -73,6 +67,16 @@ These are locked dependencies or configured image tags, **not a live-cluster inv
 | Local Helm chart | 0.1.0 | `deploy/helm/cloudops-insight/Chart.yaml` |
 
 The broad `-alpine` image tags are not immutable digests. Review the [frontend security exception](frontend/docs/security-exceptions.md) before changing React Router or its runtime mode.
+
+### Why these boundaries matter
+
+| Concern | Implementation | Operational implication |
+|---|---|---|
+| Customer cloud access | Read-only cross-account IAM role, generated External ID, short-lived STS session | No customer access keys in frontend code or application records; the customer controls role revocation |
+| Tenant separation | Workspace membership/role checks and organization-scoped records | Tenant tests use disposable PostgreSQL; this is application isolation, not database row-level security |
+| Public access | HTTPS at Cloudflare, outbound Tunnel to OKE, secure host-only refresh cookie | The application does not expose a public OCI Load Balancer |
+| Persistence | PostgreSQL on OCI Block Volume; logical and volume backup layers | An image rollback cannot reverse a migration or restore data |
+| Availability | One ARM worker, one in-cluster PostgreSQL instance, ephemeral Redis | The current commercial host is not highly available; see the recovery runbooks |
 
 ## Local development on Windows
 
