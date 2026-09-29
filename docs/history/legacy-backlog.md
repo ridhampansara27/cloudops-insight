@@ -1,3 +1,5 @@
+> Historical planning document. Status and hosting references below are not the current production state. See [architecture](../architecture.md) and the root [README](../../README.md).
+
 # Feature Backlog
 
 This backlog defines the planned features for the Cloud Resource Monitoring Portal.

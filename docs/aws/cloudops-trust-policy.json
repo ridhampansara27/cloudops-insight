@@ -1,18 +1,18 @@
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowCloudOpsLocalDev",
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "arn:aws:iam::902664897666:user/cloudops-local-dev"
-      },
-      "Action": "sts:AssumeRole",
-      "Condition": {
-        "StringEquals": {
-          "sts:ExternalId": "CnJzdTtriPKEZ5DY-_Qr_RnFK4Ns_pl_KV2LB-DgyVY"
-        }
-      }
-    }
-  ]
+    "Version":  "2012-10-17",
+    "Statement":  [
+                      {
+                          "Sid":  "AllowCloudOpsInsightAssumeRoleExample",
+                          "Effect":  "Allow",
+                          "Principal":  {
+                                            "AWS":  "arn:aws:iam::123456789012:role/REPLACE_WITH_CLOUDOPS_PLATFORM_PRINCIPAL"
+                                        },
+                          "Action":  "sts:AssumeRole",
+                          "Condition":  {
+                                            "StringEquals":  {
+                                                                 "sts:ExternalId":  "REPLACE_WITH_EXTERNAL_ID_GENERATED_FOR_THIS_INTEGRATION"
+                                                             }
+                                        }
+                      }
+                  ]
 }

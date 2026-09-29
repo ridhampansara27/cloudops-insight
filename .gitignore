@@ -36,6 +36,9 @@ frontend/.vite/
 *.log
 logs/
 
+# Celery Beat local scheduler state and its SQLite sidecars
+celerybeat-schedule*
+
 # Test and report outputs
 coverage/
 test-results/
