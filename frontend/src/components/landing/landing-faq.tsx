@@ -22,7 +22,7 @@ const faqItems = [
   {
     question: "Can different customers access each other's data?",
     answer:
-      "CloudOps Insight workspaces are designed to be tenant-isolated. Final commercial readiness also includes a dedicated tenant-security validation phase.",
+      "No. Each workspace's data is kept separate, and every workspace request is checked against the signed-in user's membership and role. Automated tests verify that one workspace cannot reach another workspace's data or AWS accounts.",
   },
   {
     question: "Who is CloudOps Insight for?",

@@ -146,13 +146,14 @@ export function SecurityArchitecture() {
 
         <div className="landing-pop-card rounded-3xl border border-cyan-400/20 bg-cyan-400/[0.05] p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-            Transparency
+            Tested before launch
           </p>
 
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
-            CloudOps Insight is being hardened for commercial readiness with
-            dedicated tenant-security validation, backup/restore proof and
-            customer lifecycle testing.
+            Cross-tenant access, AWS disconnect and removal, and account
+            deletion are covered by automated tests against PostgreSQL. The
+            database is backed up daily, and a restore has been verified in an
+            isolated environment.
           </p>
         </div>
       </div>

@@ -288,34 +288,34 @@ export function ProductPreview() {
                   AWS resources
                 </p>
                 <p className="mt-3 text-2xl font-semibold">
-                  Synchronized
+                  38
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Inventory from supported services
+                  Synced from EC2 and S3
                 </p>
               </div>
 
               <div className="rounded-2xl border border-border/50 bg-background/30 p-4">
                 <p className="text-xs text-muted-foreground">
-                  Cloud spend
+                  Month-to-date spend
                 </p>
                 <p className="mt-3 text-2xl font-semibold">
-                  Tracked
+                  €284
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Cost Explorer integration
+                  From AWS Cost Explorer
                 </p>
               </div>
 
               <div className="rounded-2xl border border-border/50 bg-background/30 p-4">
                 <p className="text-xs text-muted-foreground">
-                  Health posture
+                  Healthy resources
                 </p>
                 <p className="mt-3 text-2xl font-semibold">
-                  Evaluated
+                  94%
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Monitoring + cloud state context
+                  CloudWatch metrics + resource state
                 </p>
               </div>
             </div>

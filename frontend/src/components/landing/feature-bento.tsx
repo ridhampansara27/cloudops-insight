@@ -1,8 +1,6 @@
 import {
   Activity,
   AlertTriangle,
-  BarChart3,
-  CloudCog,
   Lightbulb,
   Server,
   ShieldCheck,
@@ -257,36 +255,26 @@ function renderVisual(visual: string) {
 
     default:
       return (
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-center">
-            <BarChart3 className="mx-auto size-4 text-cyan-300" />
-            <p className="mt-3 text-xs text-muted-foreground">
-              Cost
-            </p>
-            <p className="mt-1 font-semibold">
-              Context
-            </p>
+        <div className="mt-6 rounded-2xl border border-border/50 bg-background/30 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">
+                Rightsize EC2 instance reporting-dev-01
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                24-hour average CPU 4.2%, below the 10% threshold
+              </p>
+            </div>
+
+            <span className="shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-2.5 py-1 text-xs text-cyan-300">
+              open
+            </span>
           </div>
 
-          <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-center">
-            <Activity className="mx-auto size-4 text-emerald-300" />
-            <p className="mt-3 text-xs text-muted-foreground">
-              Health
-            </p>
-            <p className="mt-1 font-semibold">
-              Signals
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-center">
-            <CloudCog className="mx-auto size-4 text-violet-300" />
-            <p className="mt-3 text-xs text-muted-foreground">
-              Actions
-            </p>
-            <p className="mt-1 font-semibold">
-              Suggested
-            </p>
-          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Estimated saving: 25% of the instance's monthly run-rate from AWS
+            Cost Explorer
+          </p>
         </div>
       );
   }
