@@ -16,6 +16,9 @@ import { AppProviders } from "@/providers/app-providers";
 // Import the application route configuration.
 import { appRouter } from "@/routes/app-router";
 
+// Import the per-route browser-tab titles.
+import { titleForPath } from "@/routes/route-titles";
+
 // Find the HTML element where React should mount.
 const rootElement = document.getElementById("root");
 
@@ -25,6 +28,13 @@ if (!rootElement) {
     "The application root element could not be found.",
   );
 }
+
+// Keep the browser-tab title in sync with the current route.
+document.title = titleForPath(appRouter.state.location.pathname);
+
+appRouter.subscribe((state) => {
+  document.title = titleForPath(state.location.pathname);
+});
 
 // Create the React root and render the application.
 createRoot(rootElement).render(

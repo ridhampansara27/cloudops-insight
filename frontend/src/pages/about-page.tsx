@@ -63,7 +63,7 @@ export function AboutPage() {
           </h1>
 
           <p className="mt-7 max-w-3xl text-base leading-8 text-muted-foreground">
-            CloudOps Insight is being built to reduce the fragmentation between
+            CloudOps Insight was built to reduce the fragmentation between
             cloud inventory, monitoring and cost analysis. Instead of forcing
             engineers to jump between separate operational views, the platform
             brings important AWS information into a unified workspace.
@@ -116,15 +116,15 @@ export function AboutPage() {
             </p>
 
             <h2 className="mt-4 text-2xl font-semibold">
-              An evolving student-built cloud platform.
+              A student-built cloud platform, now publicly available.
             </h2>
 
             <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
-              CloudOps Insight is operated by Ridham Pansara as an
-              individual student-built cloud platform in Germany. The service
-              is entering public availability while security, recovery,
-              tenant isolation and customer lifecycle controls continue to be
-              tested and hardened.
+              CloudOps Insight is built and operated by Ridham Pansara as an
+              independent student project in Germany. Anyone can create a
+              workspace, connect an AWS account through a cross-account IAM
+              role, and disconnect or permanently remove the integration at
+              any time.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">

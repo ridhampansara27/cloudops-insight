@@ -730,7 +730,7 @@ async function handleSignOut() {
               <div className="mt-10 flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/25 px-3 py-2">
                   <CheckCircle2 className="size-3.5 text-emerald-300" />
-                  Public signup currently closed
+                  Email-verified accounts
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/25 px-3 py-2">
@@ -740,7 +740,7 @@ async function handleSignOut() {
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/25 px-3 py-2">
                   <ShieldCheck className="size-3.5 text-cyan-300" />
-                  Commercial readiness in progress
+                  Disconnect AWS at any time
                 </div>
               </div>
             </div>
